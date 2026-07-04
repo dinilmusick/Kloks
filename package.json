@@ -1,0 +1,40 @@
+{
+  "name": "kloks",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "kloks": "./bin/kloks.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "start": "node dist/index.js",
+    "sync": "npm update krnlts && npm install",
+    "build": "tsup src/index.ts --format esm,cjs --clean --splitting --external express --external cors --external krnlts --external better-sqlite3 --external fuse.js --external fs --external path --external os --external child_process --external crypto --external url --external events && tsup src/libraries/*/*.ts --format esm,cjs --out-dir dist/libraries --external krnlts --external zod",
+    "dev": "tsup src/index.ts --format esm,cjs --watch",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --detectOpenHandles"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.0",
+    "fuse.js": "^7.0.0",
+    "krnlts": "git+https://github.com/dinilmusick/KrnlTS.git",
+    "zod": "^3.24.1",
+    "zod-to-json-schema": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.6.0",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.11",
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.3"
+  }
+}

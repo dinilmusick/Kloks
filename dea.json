@@ -1,0 +1,479 @@
+{
+  "currentStage": "Implementation Stage",
+  "lastDoneMove": "Transitioned to stage: Implementation Stage",
+  "boneAssets": [],
+  "implementedAssets": [
+    "BlockRegistry",
+    "SaveBlock",
+    "GetBlock",
+    "ListBlocks",
+    "UpdateBlockFiles",
+    "UpdateBlockMetadata",
+    "DeleteBlock",
+    "GetBlockChangelog",
+    "GetBlockInstallPlan",
+    "ExtractBlockFromProject",
+    "SearchEngine",
+    "SearchBlocks",
+    "ListCategories",
+    "UpsertCategory",
+    "GetBlocksByCategory",
+    "GetBlocksByTag",
+    "SuggestRelatedBlocks",
+    "SuggestBlocksForNames",
+    "BlockScanner",
+    "ScanProject",
+    "CheckBlockPresence",
+    "GetProjectBlockReport",
+    "UpdateManager",
+    "BumpBlockVersion",
+    "GetBlockDiff",
+    "FindBlockUsages",
+    "GetUpdateableProjects",
+    "GenerateUpdatePatch"
+  ],
+  "installedLibraries": [],
+  "untestedEndpoints": [],
+  "projectTested": false,
+  "gitTaskCount": 0,
+  "structureTree": {
+    "id": "Kloks",
+    "type": "system",
+    "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src",
+    "checked": {
+      "scaffold": true,
+      "implementation": true,
+      "tested": {
+        "unit": false,
+        "integration": false
+      }
+    },
+    "buggedEntries": [],
+    "children": [
+      {
+        "id": "BlockRegistry",
+        "type": "entity",
+        "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/BlockRegistry",
+        "checked": {
+          "scaffold": true,
+          "implementation": true,
+          "tested": {
+            "unit": false,
+            "integration": false
+          }
+        },
+        "buggedEntries": [],
+        "children": [
+          {
+            "id": "SaveBlock",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/BlockRegistry/functionalities/SaveBlock",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "GetBlock",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/BlockRegistry/functionalities/GetBlock",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "ListBlocks",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/BlockRegistry/functionalities/ListBlocks",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "UpdateBlockFiles",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/BlockRegistry/functionalities/UpdateBlockFiles",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "UpdateBlockMetadata",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/BlockRegistry/functionalities/UpdateBlockMetadata",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "DeleteBlock",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/BlockRegistry/functionalities/DeleteBlock",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "GetBlockChangelog",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/BlockRegistry/functionalities/GetBlockChangelog",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "GetBlockInstallPlan",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/BlockRegistry/functionalities/GetBlockInstallPlan",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "ExtractBlockFromProject",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/BlockRegistry/functionalities/ExtractBlockFromProject",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          }
+        ]
+      },
+      {
+        "id": "SearchEngine",
+        "type": "entity",
+        "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/SearchEngine",
+        "checked": {
+          "scaffold": true,
+          "implementation": true,
+          "tested": {
+            "unit": false,
+            "integration": false
+          }
+        },
+        "buggedEntries": [],
+        "children": [
+          {
+            "id": "SearchBlocks",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/SearchEngine/functionalities/SearchBlocks",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "ListCategories",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/SearchEngine/functionalities/ListCategories",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "UpsertCategory",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/SearchEngine/functionalities/UpsertCategory",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "GetBlocksByCategory",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/SearchEngine/functionalities/GetBlocksByCategory",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "GetBlocksByTag",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/SearchEngine/functionalities/GetBlocksByTag",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "SuggestRelatedBlocks",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/SearchEngine/functionalities/SuggestRelatedBlocks",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "SuggestBlocksForNames",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/SearchEngine/functionalities/SuggestBlocksForNames",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          }
+        ]
+      },
+      {
+        "id": "BlockScanner",
+        "type": "entity",
+        "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/BlockScanner",
+        "checked": {
+          "scaffold": true,
+          "implementation": true,
+          "tested": {
+            "unit": false,
+            "integration": false
+          }
+        },
+        "buggedEntries": [],
+        "children": [
+          {
+            "id": "ScanProject",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/BlockScanner/functionalities/ScanProject",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "CheckBlockPresence",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/BlockScanner/functionalities/CheckBlockPresence",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "GetProjectBlockReport",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/BlockScanner/functionalities/GetProjectBlockReport",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          }
+        ]
+      },
+      {
+        "id": "UpdateManager",
+        "type": "entity",
+        "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/UpdateManager",
+        "checked": {
+          "scaffold": true,
+          "implementation": true,
+          "tested": {
+            "unit": false,
+            "integration": false
+          }
+        },
+        "buggedEntries": [],
+        "children": [
+          {
+            "id": "BumpBlockVersion",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/UpdateManager/functionalities/BumpBlockVersion",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "GetBlockDiff",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/UpdateManager/functionalities/GetBlockDiff",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "FindBlockUsages",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/UpdateManager/functionalities/FindBlockUsages",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "GetUpdateableProjects",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/UpdateManager/functionalities/GetUpdateableProjects",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          },
+          {
+            "id": "GenerateUpdatePatch",
+            "type": "functionality",
+            "path": "/Users/dinil/Desktop/Projects/Javascript/Kloks/src/entities/UpdateManager/functionalities/GenerateUpdatePatch",
+            "checked": {
+              "scaffold": true,
+              "implementation": true,
+              "tested": {
+                "unit": false,
+                "integration": false
+              }
+            },
+            "buggedEntries": [],
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+}
