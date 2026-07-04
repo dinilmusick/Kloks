@@ -50,11 +50,33 @@ export const main = async (input: any, { state, emitters, functionality, caller 
         let searchDir = "";
         let finalName = name;
 
+        let isSingleFile = false;
+        let singleFilePath = "";
+        let singleFileDestName = "";
+
         if (blockType === "concept") {
             if (!finalName.endsWith("Concepts")) {
                 finalName = `${finalName}Concepts`;
             }
             searchDir = path.join(projectPath, "src", "libraries", finalName);
+            if (!fs.existsSync(searchDir)) {
+                // Try file fallbacks
+                const legacyName = name.replace("Concepts", "");
+                const candidates = [
+                    { path: path.join(projectPath, "src", "libraries", `${finalName}.ts`), dest: `${finalName}.ts` },
+                    { path: path.join(projectPath, "src", "libraries", `${legacyName}.ts`), dest: `${finalName}.ts` },
+                    { path: path.join(projectPath, "src", "libraries", `${finalName}.js`), dest: `${finalName}.js` },
+                    { path: path.join(projectPath, "src", "libraries", `${legacyName}.js`), dest: `${finalName}.js` }
+                ];
+                for (const cand of candidates) {
+                    if (fs.existsSync(cand.path)) {
+                        isSingleFile = true;
+                        singleFilePath = cand.path;
+                        singleFileDestName = cand.dest;
+                        break;
+                    }
+                }
+            }
         } else if (blockType === "entity") {
             searchDir = path.join(projectPath, "src", "entities", finalName);
         } else if (blockType === "functionality") {
@@ -81,15 +103,20 @@ export const main = async (input: any, { state, emitters, functionality, caller 
             searchDir = foundDir;
         }
 
-        if (!searchDir || !fs.existsSync(searchDir)) {
+        if (!isSingleFile && (!searchDir || !fs.existsSync(searchDir))) {
             return {
                 status: "error",
-                message: `Block directory not found for ${blockType} '${name}' in ${projectPath}`
+                message: `Block directory or file not found for ${blockType} '${name}' in ${projectPath}`
             };
         }
 
-        // Read all files
-        const files = readDirRecursive(searchDir);
+        // Read files
+        let files: Record<string, string> = {};
+        if (isSingleFile) {
+            files[singleFileDestName] = fs.readFileSync(singleFilePath, "utf8");
+        } else {
+            files = readDirRecursive(searchDir);
+        }
         
         // Calculate hash of all combined file contents
         const hash = crypto.createHash("sha256");

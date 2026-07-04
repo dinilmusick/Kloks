@@ -17,6 +17,10 @@ export class Kloks extends krnlSystemEntityBase {
         console.log("[Kloks] System Entity initialized.");
     }
 
+    boot() {
+        // Dummy method for KrnlMagneticLoader sub-app detection
+    }
+
     private async isUdpPortAvailable(port: number, host = (this as any).host || "0.0.0.0"): Promise<boolean> {
         const dgram = await import("dgram").then((m: any) => m.default || m);
         return await new Promise<boolean>((resolve) => {
