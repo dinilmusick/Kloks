@@ -1,0 +1,69 @@
+{
+  "$schema": "https://skipo.dev/schemas/kloks-manifest.v1.json",
+  "package": "@kloks/audio-midi",
+  "version": "1.0.0",
+  "services": [
+    {
+      "id": "audio",
+      "name": "Audio Hardware Service",
+      "version": "1.0.0",
+      "description": "Audio worklet stream capture, device query, and buffer processor.",
+      "backend": {
+        "package": "@kloks/audio-midi",
+        "export": "AudioHardwareServiceFacade",
+        "facade": "AudioHardwareServiceFacade"
+      },
+      "ui": {
+        "package": "@floks/ui",
+        "components": [
+          "BaseCard"
+        ]
+      },
+      "modes": [
+        "backend",
+        "fullstack"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ],
+        "frontend": [
+          "App.main-content"
+        ]
+      },
+      "dependencies": []
+    },
+    {
+      "id": "midi",
+      "name": "MIDI Hardware Service",
+      "version": "1.0.0",
+      "description": "Web MIDI hardware access, clock sync, and message parser.",
+      "backend": {
+        "package": "@kloks/audio-midi",
+        "export": "MidiServiceFacade",
+        "facade": "MidiServiceFacade"
+      },
+      "modes": [
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      },
+      "dependencies": []
+    }
+  ],
+  "orchestrations": [
+    {
+      "id": "audio-midi",
+      "name": "Audio & MIDI Orchestrator",
+      "version": "1.0.0",
+      "package": "@kloks/audio-midi",
+      "export": "AudioMidiOrchestratorFacade",
+      "targetTypes": [
+        "BackendFacade.orchestrations"
+      ]
+    }
+  ]
+}

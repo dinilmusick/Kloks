@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "description": "Kloks Non-UI State, Execution & Node-Graph Domain/Rules/Spatial Services built on KrnlTS",
   "type": "module",
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "skipoManifest": "./kloks.manifest.json",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -42,8 +47,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@dinilmusick/krnl": "file:../../../KrnlTS",
-    "@kloks/functions": "file:../functions",
+    "@dinilmusick/krnl": "^1.0.0",
+    "@kloks/functions": "^1.0.0",
     "bullmq": "^6.3.8",
     "zustand": "^5.0.15"
   },

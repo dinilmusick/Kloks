@@ -1,0 +1,59 @@
+{
+  "$schema": "https://skipo.dev/schemas/kloks-manifest.v1.json",
+  "package": "@kloks/services",
+  "version": "1.0.0",
+  "services": [
+    {
+      "id": "service-a",
+      "name": "Canonical Service A (Pure)",
+      "version": "1.0.0",
+      "description": "Deterministic pure calculation service.",
+      "backend": {
+        "package": "@kloks/services",
+        "export": "ServiceAFacade",
+        "facade": "ServiceAFacade"
+      },
+      "modes": ["backend"],
+      "targets": { "backend": ["BackendFacade.services"] }
+    },
+    {
+      "id": "service-b",
+      "name": "Canonical Service B (Stateful)",
+      "version": "1.0.0",
+      "description": "Stateful key-value tracking service.",
+      "backend": {
+        "package": "@kloks/services",
+        "export": "ServiceBFacade",
+        "facade": "ServiceBFacade"
+      },
+      "modes": ["backend"],
+      "targets": { "backend": ["BackendFacade.services"] }
+    },
+    {
+      "id": "service-c",
+      "name": "Canonical Service C (Event-Emitting)",
+      "version": "1.0.0",
+      "description": "Reactive event publisher service.",
+      "backend": {
+        "package": "@kloks/services",
+        "export": "ServiceCFacade",
+        "facade": "ServiceCFacade"
+      },
+      "modes": ["backend"],
+      "targets": { "backend": ["BackendFacade.services"] }
+    },
+    {
+      "id": "service-d",
+      "name": "Canonical Service D (Protocol-Enabled)",
+      "version": "1.0.0",
+      "description": "Multi-transport HTTP/WS/UDP/P2P protocol service.",
+      "backend": {
+        "package": "@kloks/services",
+        "export": "ServiceDFacade",
+        "facade": "ServiceDFacade"
+      },
+      "modes": ["backend"],
+      "targets": { "backend": ["BackendFacade.services"] }
+    }
+  ]
+}

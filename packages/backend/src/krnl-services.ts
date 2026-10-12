@@ -208,3 +208,67 @@ export const ExecutionServiceFacade = {
   createInstance: () => createService(ExecutionServiceDefinition),
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await executionServiceInstance.start(); return executionServiceInstance.call<TIn, TOut>(op, input); },
 };
+
+// 6. DatabaseService (KrnlTS Service)
+export const DatabaseServiceDefinition: ServiceDefinition = createServiceDefinition({
+  id: 'kloks.backend.database',
+  name: 'DatabaseService',
+  version: '1.0.0',
+  operations: {
+    query: {
+      id: 'DatabaseService.query',
+      name: 'query',
+      handler: async (input: { sql: string; params?: unknown[] }) => {
+        return { rows: [], sql: input.sql, executedAt: Date.now() };
+      },
+    },
+    isHealthy: {
+      id: 'DatabaseService.isHealthy',
+      name: 'isHealthy',
+      handler: async () => ({ healthy: true }),
+    },
+  },
+});
+
+const databaseServiceInstance: IService = createService(DatabaseServiceDefinition);
+
+export const DatabaseServiceFacade = {
+  id: DatabaseServiceDefinition.id,
+  name: DatabaseServiceDefinition.name,
+  version: DatabaseServiceDefinition.version,
+  runtime: 'server' as const,
+  deployment: 'local' as const,
+  definition: DatabaseServiceDefinition,
+  createInstance: () => createService(DatabaseServiceDefinition),
+  execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await databaseServiceInstance.start(); return databaseServiceInstance.call<TIn, TOut>(op, input); },
+};
+
+// 7. GeminiService (KrnlTS Service)
+export const GeminiServiceDefinition: ServiceDefinition = createServiceDefinition({
+  id: 'kloks.backend.gemini',
+  name: 'GeminiService',
+  version: '1.0.0',
+  operations: {
+    generateText: {
+      id: 'GeminiService.generateText',
+      name: 'generateText',
+      handler: async (input: { prompt: string; model?: string }) => {
+        return { text: `[GeminiResponse] Generated response for: ${input.prompt}`, model: input.model ?? 'gemini-2.5-flash', timestamp: Date.now() };
+      },
+    },
+  },
+});
+
+const geminiServiceInstance: IService = createService(GeminiServiceDefinition);
+
+export const GeminiServiceFacade = {
+  id: GeminiServiceDefinition.id,
+  name: GeminiServiceDefinition.name,
+  version: GeminiServiceDefinition.version,
+  runtime: 'server' as const,
+  deployment: 'remote' as const,
+  definition: GeminiServiceDefinition,
+  createInstance: () => createService(GeminiServiceDefinition),
+  execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await geminiServiceInstance.start(); return geminiServiceInstance.call<TIn, TOut>(op, input); },
+};
+

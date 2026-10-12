@@ -1,8 +1,13 @@
 {
   "name": "@kloks/backend",
   "version": "1.0.0",
-  "description": "Kloks Backend Services \u2014 Auth, Storage, Workspace, Control Plane, API, Connectivity & Execution built on KrnlTS",
+  "description": "Kloks Backend Services — Auth, Storage, Workspace, Control Plane, API, Connectivity & Execution built on KrnlTS",
   "type": "module",
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "skipoManifest": "./kloks.manifest.json",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -62,8 +67,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@dinilmusick/krnl": "file:../../../KrnlTS",
-    "@kloks/functions": "file:../functions"
+    "@dinilmusick/krnl": "^1.0.0",
+    "@kloks/functions": "^1.0.0"
   },
   "peerDependencies": {
     "better-sqlite3": "^11.0.0",

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://skipo.dev/schemas/kloks-manifest.v1.json",
+  "package": "@kloks/state-graph",
+  "version": "1.0.0",
+  "services": [
+    {
+      "id": "state-lifecycle",
+      "name": "State & Lifecycle Service",
+      "version": "1.0.0",
+      "description": "Zustand state engine and explicit lifecycle state-graph service.",
+      "backend": {
+        "package": "@kloks/state-graph",
+        "export": "StateLifecycleServiceFacade",
+        "facade": "StateLifecycleServiceFacade"
+      },
+      "modes": ["backend"],
+      "targets": { "backend": ["BackendFacade.services"] }
+    },
+    {
+      "id": "node-graph",
+      "name": "Node Graph Rules & Spatial Engine",
+      "version": "1.0.0",
+      "description": "Non-UI node graph rule verification, spatial positioning, and ghost routing engine.",
+      "backend": {
+        "package": "@kloks/state-graph",
+        "export": "NodeGraphEngineServiceFacade",
+        "facade": "NodeGraphEngineServiceFacade"
+      },
+      "ui": {
+        "package": "@floks/canvas-ui",
+        "components": ["InfiniteCanvas"]
+      },
+      "modes": ["backend", "fullstack"],
+      "targets": {
+        "backend": ["BackendFacade.services"],
+        "frontend": ["App.main-content"]
+      }
+    }
+  ]
+}

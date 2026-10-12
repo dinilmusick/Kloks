@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "description": "Kloks Canonical Orchestrators A & B built on KrnlTS and @kloks/services",
   "type": "module",
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "skipoManifest": "./kloks.manifest.json",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -18,7 +23,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@dinilmusick/krnl": "file:../../../KrnlTS",
-    "@kloks/services": "file:../services"
+    "@dinilmusick/krnl": "^1.0.0",
+    "@kloks/services": "^1.0.0"
   }
 }

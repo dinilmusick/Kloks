@@ -1,0 +1,195 @@
+{
+  "$schema": "https://skipo.dev/schemas/kloks-manifest.v1.json",
+  "package": "@kloks/backend",
+  "version": "1.0.0",
+  "services": [
+    {
+      "id": "auth",
+      "name": "Authentication & Session Management",
+      "version": "1.0.0",
+      "description": "Enterprise multi-session token lifecycle, password hashing, and rate limiting service.",
+      "backend": {
+        "package": "@kloks/backend",
+        "subpath": "krnl-services",
+        "export": "AuthServiceFacade",
+        "facade": "AuthServiceFacade"
+      },
+      "ui": {
+        "package": "@floks/ui",
+        "components": [
+          "LoginModal",
+          "CredentialField"
+        ]
+      },
+      "modes": [
+        "backend",
+        "fullstack"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ],
+        "frontend": [
+          "App.main-content"
+        ]
+      },
+      "dependencies": []
+    },
+    {
+      "id": "storage",
+      "name": "Cloud & Workspace Storage",
+      "version": "1.0.0",
+      "description": "Unified S3, Supabase, B2, and local filesystem presigned transfer service.",
+      "backend": {
+        "package": "@kloks/backend",
+        "subpath": "krnl-services",
+        "export": "StorageServiceFacade",
+        "facade": "StorageServiceFacade"
+      },
+      "ui": {
+        "package": "@floks/ui",
+        "components": [
+          "BaseCard"
+        ]
+      },
+      "modes": [
+        "backend",
+        "fullstack"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ],
+        "frontend": [
+          "App.main-content"
+        ]
+      },
+      "dependencies": []
+    },
+    {
+      "id": "workspace",
+      "name": "Workspace Management",
+      "version": "1.0.0",
+      "description": "Multi-tenant workspace isolation and canonical sync replication service.",
+      "backend": {
+        "package": "@kloks/backend",
+        "subpath": "krnl-services",
+        "export": "WorkspaceServiceFacade",
+        "facade": "WorkspaceServiceFacade"
+      },
+      "ui": {
+        "package": "@floks/ui",
+        "components": [
+          "WorkspaceTilesMenu"
+        ]
+      },
+      "modes": [
+        "backend",
+        "fullstack"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ],
+        "frontend": [
+          "App.main-content"
+        ]
+      },
+      "dependencies": []
+    },
+    {
+      "id": "control-plane",
+      "name": "Control Plane Service",
+      "version": "1.0.0",
+      "description": "Control plane health checking, telemetry, and system lifecycle monitoring.",
+      "backend": {
+        "package": "@kloks/backend",
+        "subpath": "krnl-services",
+        "export": "ControlPlaneServiceFacade",
+        "facade": "ControlPlaneServiceFacade"
+      },
+      "ui": {
+        "package": "@floks/ui",
+        "components": [
+          "StatusIndicator"
+        ]
+      },
+      "modes": [
+        "backend",
+        "fullstack"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ],
+        "frontend": [
+          "App.footer"
+        ]
+      },
+      "dependencies": []
+    },
+    {
+      "id": "execution",
+      "name": "Execution & Worker Boundary",
+      "version": "1.0.0",
+      "description": "Executable backend facade with isolated background worker boundary.",
+      "backend": {
+        "package": "@kloks/backend",
+        "subpath": "krnl-services",
+        "export": "ExecutionServiceFacade",
+        "facade": "ExecutionServiceFacade"
+      },
+      "modes": [
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      },
+      "dependencies": []
+    },
+    {
+      "id": "database",
+      "name": "Database Service",
+      "version": "1.0.0",
+      "description": "SQL and transaction execution driver service.",
+      "backend": {
+        "package": "@kloks/backend",
+        "subpath": "krnl-services",
+        "export": "DatabaseServiceFacade",
+        "facade": "DatabaseServiceFacade"
+      },
+      "modes": [
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      },
+      "dependencies": []
+    },
+    {
+      "id": "gemini",
+      "name": "Google Gemini AI Service",
+      "version": "1.0.0",
+      "description": "Gemini text and multimodal generation service.",
+      "backend": {
+        "package": "@kloks/backend",
+        "subpath": "krnl-services",
+        "export": "GeminiServiceFacade",
+        "facade": "GeminiServiceFacade"
+      },
+      "modes": [
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      },
+      "dependencies": []
+    }
+  ]
+}
