@@ -1,2 +1,2 @@
 # Kloks
-Kloks stands for KrnlTS BLOcKS. So this will be an app that will be used to store and get ready to use KrnlTS entities, functionalities and concept ( library) assets. These make assembling KrnlTS apps like modular blocks.
+Kloks stands for KrnlTS BLOcKS. So this will be a libraries repository that will be used to store and get ready to use KrnlTS services and their component (entities, functionalities and concept libraries) assets. These make assembling KrnlTS services like modular blocks based construction.
