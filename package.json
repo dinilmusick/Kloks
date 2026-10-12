@@ -1,0 +1,32 @@
+{
+  "name": "kloks",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Kloks — Public Backend & Service Package Library built on KrnlTS (@kloks/*)",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "test": "vitest run",
+    "typecheck": "pnpm -r run typecheck",
+    "clean": "pnpm -r run clean"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/lib-storage": "^3.600.0",
+    "@dinilmusick/krnl": "file:../KrnlTS",
+    "@neondatabase/serverless": "^0.10.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "@types/bcryptjs": "^2.4.0",
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.0.0",
+    "react": "^19.0.1",
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.1.0",
+    "zod": "^3.24.1"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

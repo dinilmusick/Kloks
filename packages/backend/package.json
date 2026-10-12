@@ -1,0 +1,104 @@
+{
+  "name": "@kloks/backend",
+  "version": "1.0.0",
+  "description": "Kloks Backend Services \u2014 Auth, Storage, Workspace, Control Plane, API, Connectivity & Execution built on KrnlTS",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./auth": {
+      "import": "./dist/auth/index.js",
+      "types": "./dist/auth/index.d.ts"
+    },
+    "./storage": {
+      "import": "./dist/storage/index.js",
+      "types": "./dist/storage/index.d.ts"
+    },
+    "./workspace": {
+      "import": "./dist/workspace/index.js",
+      "types": "./dist/workspace/index.d.ts"
+    },
+    "./control-plane": {
+      "import": "./dist/control-plane/index.js",
+      "types": "./dist/control-plane/index.d.ts"
+    },
+    "./api": {
+      "import": "./dist/api/index.js",
+      "types": "./dist/api/index.d.ts"
+    },
+    "./connectivity": {
+      "import": "./dist/connectivity/index.js",
+      "types": "./dist/connectivity/index.d.ts"
+    },
+    "./client": {
+      "import": "./dist/client/index.js",
+      "types": "./dist/client/index.d.ts"
+    },
+    "./srkl": {
+      "import": "./dist/srkl/index.js",
+      "types": "./dist/srkl/index.d.ts"
+    },
+    "./execution": {
+      "import": "./dist/execution/index.js",
+      "types": "./dist/execution/index.d.ts"
+    },
+    "./services": {
+      "import": "./dist/services/index.js",
+      "types": "./dist/services/index.d.ts"
+    },
+    "./krnl-services": {
+      "import": "./dist/krnl-services.js",
+      "types": "./dist/krnl-services.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/krnl-services.ts src/services/index.ts src/auth/index.ts src/storage/index.ts src/workspace/index.ts src/control-plane/index.ts src/api/index.ts src/connectivity/index.ts src/client/index.ts src/srkl/index.ts src/execution/index.ts --format esm --dts --clean --external @dinilmusick/krnl --external @kloks/functions --external react",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@dinilmusick/krnl": "file:../../../KrnlTS",
+    "@kloks/functions": "file:../functions"
+  },
+  "peerDependencies": {
+    "better-sqlite3": "^11.0.0",
+    "@aws-sdk/client-s3": "^3.600.0",
+    "@aws-sdk/lib-storage": "^3.600.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "@neondatabase/serverless": "^0.10.0",
+    "bcryptjs": "^2.4.3",
+    "zod": "^3.22.0",
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "better-sqlite3": {
+      "optional": true
+    },
+    "@aws-sdk/client-s3": {
+      "optional": true
+    },
+    "@aws-sdk/lib-storage": {
+      "optional": true
+    },
+    "@supabase/supabase-js": {
+      "optional": true
+    },
+    "@neondatabase/serverless": {
+      "optional": true
+    },
+    "bcryptjs": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "name": "@kloks/state-graph",
+  "version": "1.0.0",
+  "description": "Kloks Non-UI State, Execution & Node-Graph Domain/Rules/Spatial Services built on KrnlTS",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./state": {
+      "import": "./dist/state/index.js",
+      "types": "./dist/state/index.d.ts"
+    },
+    "./execution": {
+      "import": "./dist/execution/index.js",
+      "types": "./dist/execution/index.d.ts"
+    },
+    "./domain": {
+      "import": "./dist/domain/index.js",
+      "types": "./dist/domain/index.d.ts"
+    },
+    "./rules": {
+      "import": "./dist/rules/index.js",
+      "types": "./dist/rules/index.d.ts"
+    },
+    "./spatial": {
+      "import": "./dist/spatial/index.js",
+      "types": "./dist/spatial/index.d.ts"
+    },
+    "./store": {
+      "import": "./dist/store/index.js",
+      "types": "./dist/store/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts src/state/index.ts src/execution/index.ts src/domain/index.ts src/rules/index.ts src/spatial/index.ts src/store/index.ts --format esm --dts --clean --external @dinilmusick/krnl --external zustand --external bullmq --external react",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@dinilmusick/krnl": "file:../../../KrnlTS",
+    "@kloks/functions": "file:../functions",
+    "bullmq": "^6.3.8",
+    "zustand": "^5.0.15"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  }
+}

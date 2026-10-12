@@ -1,0 +1,24 @@
+{
+  "name": "@kloks/functions",
+  "version": "1.0.0",
+  "description": "Kloks Reusable Functions & Utilities Service built on KrnlTS",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean --external @dinilmusick/krnl --external zod",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@dinilmusick/krnl": "file:../../../KrnlTS",
+    "zod": "^3.24.1"
+  }
+}
