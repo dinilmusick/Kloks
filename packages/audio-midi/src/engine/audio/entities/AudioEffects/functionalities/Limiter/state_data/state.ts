@@ -1,4 +1,4 @@
-import { LimiterEffectConfig } from '../../../../../legacyTypes';
+import { LimiterEffectConfig } from '@kloks/state-graph';
 
 export const initialLimiterState: LimiterEffectConfig = {
   ceiling: -0.1, // -12 to 0 dB

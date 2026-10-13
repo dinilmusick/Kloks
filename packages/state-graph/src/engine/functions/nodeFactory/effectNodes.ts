@@ -25,7 +25,7 @@ export function createEffectNode(
     effectiveSignalType = 'midi';
   }
 
-  const signalColorMap: Record<SignalType, string> = {
+  const signalColorMap: Partial<Record<SignalType, string>> = {
     trigger: type === 'repeater' ? '#c084fc' : '#a855f7',
     trigger_stream: type === 'repeater' ? '#f59e0b' : '#d97706',
     trigger_packet: '#f97316',

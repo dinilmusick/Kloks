@@ -3,7 +3,8 @@ export * from './helpers';
 
 import fs from 'fs';
 import path from 'path';
-
+import type { ProjectMetadata } from './types';
+import { ensureProjectsRoot } from './helpers';
 
 export const PROJECTS_ROOT = path.join(process.cwd(), 'projects');
 

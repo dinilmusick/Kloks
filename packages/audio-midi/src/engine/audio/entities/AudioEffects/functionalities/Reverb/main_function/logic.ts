@@ -1,4 +1,4 @@
-import { ReverbEffectConfig } from '../../../../../legacyTypes';
+import { ReverbEffectConfig } from '@kloks/state-graph';
 import { initialReverbState } from '../state_data/state';
 
 export function updateReverbParams(

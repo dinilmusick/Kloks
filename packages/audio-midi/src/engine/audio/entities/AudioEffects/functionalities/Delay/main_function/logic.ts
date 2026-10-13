@@ -1,4 +1,4 @@
-import { DelayEffectConfig } from '../../../../../legacyTypes';
+import { DelayEffectConfig } from '@kloks/state-graph';
 import { initialDelayState } from '../state_data/state';
 
 export function updateDelayParams(

@@ -4,6 +4,8 @@ export * from './helpers';
 import fs from 'fs';
 import path from 'path';
 import { createWavBuffer } from '../../wavHelper';
+import type { AssetDataType, AssetChannelType, AssetPoolScope, AssetFolderInfo, AssetPoolItem } from './types';
+import { getAssetPoolPublicUrl, getAssetPoolLocationPath } from './helpers';
 
 export const WORKSPACE_ASSETS_ROOT = path.join(process.cwd(), 'assets');
 export const PROJECTS_ROOT = path.join(process.cwd(), 'projects');

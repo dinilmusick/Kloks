@@ -1,4 +1,4 @@
-import { MultibandCompressorEffectConfig } from '../../../../../legacyTypes';
+import { MultibandCompressorEffectConfig } from '@kloks/state-graph';
 
 export const initialMultibandState: MultibandCompressorEffectConfig = {
   crossoverLow: 150, // 20 - 500 Hz

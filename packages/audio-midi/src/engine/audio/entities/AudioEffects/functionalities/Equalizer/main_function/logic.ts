@@ -1,4 +1,4 @@
-import { EqEffectConfig, EqBandConfig } from '../../../../../legacyTypes';
+import { EqEffectConfig, EqBandConfig } from '@kloks/state-graph';
 import { initialEqState } from '../state_data/state';
 
 export function updateEqBand(

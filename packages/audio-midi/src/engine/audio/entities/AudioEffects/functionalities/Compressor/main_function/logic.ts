@@ -1,4 +1,4 @@
-import { CompressorEffectConfig } from '../../../../../legacyTypes';
+import { CompressorEffectConfig } from '@kloks/state-graph';
 import { initialCompressorState } from '../state_data/state';
 
 export function updateCompressorParams(

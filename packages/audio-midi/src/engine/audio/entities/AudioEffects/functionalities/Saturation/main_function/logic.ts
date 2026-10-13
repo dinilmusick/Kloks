@@ -1,4 +1,4 @@
-import { SaturationEffectConfig } from '../../../../../legacyTypes';
+import { SaturationEffectConfig } from '@kloks/state-graph';
 import { initialSaturationState } from '../state_data/state';
 
 export function updateSaturationParams(

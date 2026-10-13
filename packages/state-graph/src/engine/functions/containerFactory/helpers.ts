@@ -66,10 +66,10 @@ export function createContainerNode(
       tempo: bpm,
       notes: (type === 'midi' || type === 'instrument')
         ? [
-            { id: 'n1', note: 60, name: 'C4', velocity: 0.85, startTime: 0, duration: 0.5 },
-            { id: 'n2', note: 67, name: 'G4', velocity: 0.8, startTime: 1, duration: 0.5 },
-            { id: 'n3', note: 64, name: 'E4', velocity: 0.8, startTime: 2, duration: 0.5 },
-            { id: 'n4', note: 71, name: 'B4', velocity: 0.8, startTime: 3, duration: 0.5 },
+            { note: 60, name: 'C4', velocity: 0.85, time: 0, duration: 0.5 },
+            { note: 67, name: 'G4', velocity: 0.8, time: 1, duration: 0.5 },
+            { note: 64, name: 'E4', velocity: 0.8, time: 2, duration: 0.5 },
+            { note: 71, name: 'B4', velocity: 0.8, time: 3, duration: 0.5 },
           ]
         : [],
     },
@@ -79,22 +79,36 @@ export function createContainerNode(
     base.audioTrack = {
       id: `aud-${Date.now()}`,
       name: `Audio Track ${index}`,
+      sampleType: 'custom',
       durationBeats: 4,
-      sampleRate: 44100,
-      peaksL: new Float32Array(128),
-      peaksR: new Float32Array(128),
       gain: 1.0,
+      pan: 0,
+      pitchShift: 0,
+      filterCutoff: 16000,
+      fadeInBeats: 0,
+      fadeOutBeats: 0,
+      trimStartBeats: 0,
+      trimEndBeats: 4,
+      isReversed: false,
     };
   }
   
   if (type === 'curve') {
-    base.curveData = [
-      { id: 'p0', x: 0, y: 0.2, tension: 0 },
-      { id: 'p1', x: 1, y: 0.9, tension: 0 },
-      { id: 'p2', x: 2, y: 0.4, tension: 0 },
-      { id: 'p3', x: 3, y: 0.85, tension: 0 },
-      { id: 'p4', x: 4, y: 0.2, tension: 0 },
-    ];
+    base.curveData = {
+      id: `crv-${Date.now()}`,
+      name: `Curve Track ${index}`,
+      lengthInBeats: 4,
+      targetParam: 'cutoff',
+      minValue: 0,
+      maxValue: 1,
+      points: [
+        { id: 'p0', x: 0, y: 0.2, tension: 0 },
+        { id: 'p1', x: 1, y: 0.9, tension: 0 },
+        { id: 'p2', x: 2, y: 0.4, tension: 0 },
+        { id: 'p3', x: 3, y: 0.85, tension: 0 },
+        { id: 'p4', x: 4, y: 0.2, tension: 0 },
+      ],
+    };
   }
 
   return base;

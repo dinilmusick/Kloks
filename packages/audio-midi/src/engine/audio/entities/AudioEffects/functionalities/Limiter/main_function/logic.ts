@@ -1,4 +1,4 @@
-import { LimiterEffectConfig } from '../../../../../legacyTypes';
+import { LimiterEffectConfig } from '@kloks/state-graph';
 import { initialLimiterState } from '../state_data/state';
 
 export function updateLimiterParams(

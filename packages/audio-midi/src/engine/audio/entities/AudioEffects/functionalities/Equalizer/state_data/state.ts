@@ -1,4 +1,4 @@
-import { EqEffectConfig, EqBandConfig } from '../../../../../legacyTypes';
+import { EqEffectConfig, EqBandConfig } from '@kloks/state-graph';
 
 export const DEFAULT_EQ_BANDS: EqBandConfig[] = [
   { id: 'b1', type: 'lowshelf', frequency: 100, gain: 0, q: 0.7, enabled: true, label: 'LOW' },

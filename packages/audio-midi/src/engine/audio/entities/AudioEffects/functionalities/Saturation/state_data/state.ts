@@ -1,4 +1,4 @@
-import { SaturationEffectConfig } from '../../../../../legacyTypes';
+import { SaturationEffectConfig } from '@kloks/state-graph';
 
 export const initialSaturationState: SaturationEffectConfig = {
   drive: 1.8, // 0.1 to 10

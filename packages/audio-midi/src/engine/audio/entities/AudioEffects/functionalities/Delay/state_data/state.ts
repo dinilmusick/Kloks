@@ -1,4 +1,4 @@
-import { DelayEffectConfig } from '../../../../../legacyTypes';
+import { DelayEffectConfig } from '@kloks/state-graph';
 
 export const initialDelayState: DelayEffectConfig = {
   delayBeats: 0.5, // 0.25, 0.5, 0.75, 1.0, 2.0

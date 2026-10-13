@@ -1,4 +1,4 @@
-import { MultibandCompressorEffectConfig, MultibandBandConfig } from '../../../../../legacyTypes';
+import { MultibandCompressorEffectConfig, MultibandBandConfig } from '@kloks/state-graph';
 import { initialMultibandState } from '../state_data/state';
 
 export function updateBandParams(

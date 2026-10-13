@@ -1,4 +1,4 @@
-import { ReverbEffectConfig } from '../../../../../legacyTypes';
+import { ReverbEffectConfig } from '@kloks/state-graph';
 
 export const initialReverbState: ReverbEffectConfig = {
   decayTime: 2.5, // 0.1 to 10s

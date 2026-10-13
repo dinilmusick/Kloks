@@ -1,4 +1,4 @@
-import { CompressorEffectConfig } from '../../../../../legacyTypes';
+import { CompressorEffectConfig } from '@kloks/state-graph';
 
 export const initialCompressorState: CompressorEffectConfig = {
   threshold: -20, // -60 to 0 dB

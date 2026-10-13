@@ -1,4 +1,4 @@
-import { EqBandConfig } from '../../../../../legacyTypes';
+import { EqBandConfig } from '@kloks/state-graph';
 
 export function calculateEqCurvePoints(bands: EqBandConfig[], numPoints: number = 60): { x: number; y: number }[] {
   const points: { x: number; y: number }[] = [];
