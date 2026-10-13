@@ -4,7 +4,7 @@ import { CompatibilityMatrix } from './CompatibilityMatrix.js';
 
 export function initializeDefaultGraphRules(): void {
   // 1. Register Data Handle Types
-  const types = ['STRING', 'NUMBER', 'BOOLEAN', 'VECTOR2', 'COLOR', 'OBJECT', 'ARRAY', 'ANY'];
+  const types = ['STRING', 'NUMBER', 'BOOLEAN', 'OBJECT', 'ARRAY', 'ANY'];
   for (const t of types) {
     HandleTypeRegistry.register({ dataType: t, category: 'DATA' });
   }
@@ -15,8 +15,6 @@ export function initializeDefaultGraphRules(): void {
   WireTypeRegistry.register({ wireType: 'STRING', color: '#98c379', strokeWidth: 2.5, style: 'bezier' });
   WireTypeRegistry.register({ wireType: 'NUMBER', color: '#61afef', strokeWidth: 2.5, style: 'bezier' });
   WireTypeRegistry.register({ wireType: 'BOOLEAN', color: '#e5c07b', strokeWidth: 2.5, style: 'bezier' });
-  WireTypeRegistry.register({ wireType: 'VECTOR2', color: '#56b6c2', strokeWidth: 2.5, style: 'bezier' });
-  WireTypeRegistry.register({ wireType: 'COLOR', color: '#e06c75', strokeWidth: 2.5, style: 'bezier' });
   WireTypeRegistry.register({ wireType: 'OBJECT', color: '#c678dd', strokeWidth: 2.5, style: 'bezier' });
   WireTypeRegistry.register({ wireType: 'ARRAY', color: '#e06c75', strokeWidth: 2.5, style: 'bezier' });
   WireTypeRegistry.register({ wireType: 'VIEW', color: '#c678dd', strokeWidth: 2.0, dashArray: '5,5', style: 'bezier' });

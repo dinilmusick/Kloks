@@ -8,7 +8,7 @@ import {
   type IService,
   type ServiceDefinition,
   type OperationContext,
-} from '@dinilmusick/krnl';
+} from '@ultrst-armada/krnl';
 
 export class CompositeBackend implements IService {
   public readonly id: string;

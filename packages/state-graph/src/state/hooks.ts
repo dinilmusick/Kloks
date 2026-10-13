@@ -10,7 +10,7 @@ import { LifecycleDescriptor, LifecycleScopeType, StateUpdater } from './types.j
 
 export function useSkipoState<T>(
   id: string,
-  initialValue?: T,
+  initialValue?: T | (() => T),
   lifecycle: LifecycleDescriptor = { type: 'APP' }
 ): [T, (valOrUpdater: T | StateUpdater<T>) => void] {
   const initializedRef = useRef(false);
@@ -18,7 +18,9 @@ export function useSkipoState<T>(
   if (!initializedRef.current) {
     const existing = SKIPO_STATE.get<T>(id);
     if (existing === undefined && initialValue !== undefined) {
-      SKIPO_STATE.create<T>(id, lifecycle, initialValue, id);
+      const resolvedInitial =
+        typeof initialValue === 'function' ? (initialValue as () => T)() : initialValue;
+      SKIPO_STATE.create<T>(id, lifecycle, resolvedInitial, id);
     }
     initializedRef.current = true;
   }

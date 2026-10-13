@@ -9,7 +9,7 @@ import {
   createServiceDefinition,
   type IService,
   type ServiceDefinition,
-} from '@dinilmusick/krnl';
+} from '@ultrst-armada/krnl';
 import {
   AudioInputManager,
   type AudioBusConfig,
@@ -319,3 +319,6 @@ export const AudioMidiOrchestratorFacade = {
     };
   },
 };
+
+export * from './engine/index.js';
+

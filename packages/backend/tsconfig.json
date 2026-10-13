@@ -3,7 +3,35 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
-    "lib": ["ES2022", "DOM"]
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "strict": false,
+    "noImplicitAny": false,
+    "baseUrl": ".",
+    "paths": {
+      "@kloks/functions": [
+        "../functions/dist/index.d.ts"
+      ],
+      "@kloks/state-graph": [
+        "../state-graph/dist/index.d.ts"
+      ],
+      "@kloks/services": [
+        "../services/dist/index.d.ts"
+      ],
+      "@kloks/backend": [
+        "../backend/dist/index.d.ts"
+      ],
+      "@kloks/audio-midi": [
+        "../audio-midi/dist/index.d.ts"
+      ],
+      "@kloks/orchestrations": [
+        "../orchestrations/dist/index.d.ts"
+      ]
+    }
   },
-  "include": ["src"]
+  "include": [
+    "src"
+  ]
 }

@@ -13,7 +13,7 @@ import {
   createServiceDefinition,
   type IService,
   type ServiceDefinition,
-} from '@dinilmusick/krnl';
+} from '@ultrst-armada/krnl';
 import { SessionManager } from './auth/SessionManager.js';
 import { RateLimiter } from './auth/RateLimiter.js';
 import type { UserRole } from './auth/types.js';

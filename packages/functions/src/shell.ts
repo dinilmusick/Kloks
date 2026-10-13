@@ -3,7 +3,8 @@
  * @description Safe promise-based exec and spawn wrappers with cross-platform command routing.
  */
 
-import { exec, spawn, ExecOptions, SpawnOptions } from "child_process";
+import childProcess from "child_process";
+import type { ExecOptions, SpawnOptions } from "child_process";
 import path from "path";
 import fs from "fs";
 
@@ -19,7 +20,7 @@ export interface SpawnHandle {
 export function execCmd(cmd: string, opts: ExecOptions & { timeout?: number } = {}): Promise<{ stdout: string; stderr: string }> {
   const timeout = opts.timeout || 30000;
   return new Promise((resolve, reject) => {
-    exec(cmd, { ...opts, timeout }, (error, stdout, stderr) => {
+    childProcess.exec(cmd, { ...opts, timeout }, (error, stdout, stderr) => {
       if (error) {
         reject(new Error(`[SkipoShellError] Command failed: ${cmd}\nExit Code: ${error.code}\nStderr: ${String(stderr)}`));
       } else {
@@ -33,7 +34,7 @@ export function execCmd(cmd: string, opts: ExecOptions & { timeout?: number } = 
  * Streaming command execution.
  */
 export function spawnCmd(cmd: string, args: string[], opts: SpawnOptions = {}): SpawnHandle {
-  const child = spawn(cmd, args, opts);
+  const child = childProcess.spawn(cmd, args, opts);
 
   const promise = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
     child.on("close", (code, signal) => {

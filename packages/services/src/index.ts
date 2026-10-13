@@ -14,7 +14,7 @@ import {
   type ServiceDefinition,
   type EndpointDescriptor,
   type ProtocolAdapter,
-} from '@dinilmusick/krnl';
+} from '@ultrst-armada/krnl';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -273,3 +273,6 @@ export const ServiceDFacade: ServiceFacade = {
   createInstance: () => createService(ServiceDDefinition),
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await defaultServiceD.start(); return defaultServiceD.call<TIn, TOut>(op, input); },
 };
+
+export * from './client-services/index.js';
+

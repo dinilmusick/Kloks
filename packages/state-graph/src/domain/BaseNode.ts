@@ -31,7 +31,6 @@ export interface BaseNodeProps {
   metadata?: Record<string, unknown>;
   settings?: Record<string, unknown>;
   positionLocked?: boolean;
-  minimized?: boolean;
 }
 
 export abstract class BaseNode {
@@ -45,7 +44,6 @@ export abstract class BaseNode {
   public metadata: Record<string, unknown>;
   public settings: Record<string, unknown>;
   public positionLocked: boolean;
-  public minimized: boolean;
 
   constructor(props: BaseNodeProps) {
     this.id = props.id;
@@ -58,7 +56,6 @@ export abstract class BaseNode {
     this.metadata = props.metadata ? { ...props.metadata } : {};
     this.settings = props.settings ? { ...props.settings } : {};
     this.positionLocked = props.positionLocked ?? false;
-    this.minimized = props.minimized ?? false;
   }
 
   public getHandle(handleId: string): BaseHandle | undefined {
@@ -80,6 +77,62 @@ export abstract class BaseNode {
 
   public unlockPosition(): void {
     this.positionLocked = false;
+  }
+
+  /**
+   * Calculates spawn and constrained positions for handles ensuring they are placed just outside
+   * the node body and cannot be pushed into the node body area.
+   */
+  public calculateConstrainedHandleOffset(
+    handleId: string,
+    isOutput: boolean,
+    index: number,
+    totalHandles: number,
+    clearance: number = 14
+  ): { x: number; y: number } {
+    const halfWidth = this.size.width / 2;
+    const halfHeight = this.size.height / 2;
+    const count = Math.max(1, totalHandles);
+    const availableHeight = Math.max(60, this.size.height - 40);
+    const pitch = Math.min(40, availableHeight / count);
+    const totalSpan = (count - 1) * pitch;
+    const baseY = count === 1 ? 0 : -totalSpan / 2 + index * pitch;
+
+    const effectiveClearance = Math.max(12, clearance);
+    const baseX = isOutput ? halfWidth + effectiveClearance : -halfWidth - effectiveClearance;
+
+    const existingHandle = this.getHandle(handleId);
+    const offset = existingHandle?.offset || { x: 0, y: 0 };
+
+    const targetX = baseX + offset.x;
+    const targetY = baseY + offset.y;
+
+    const minMargin = 4;
+    const bodyLeft = -halfWidth;
+    const bodyRight = halfWidth;
+    const bodyTop = -halfHeight;
+    const bodyBottom = halfHeight;
+
+    let constrainedX = targetX;
+    let constrainedY = targetY;
+
+    if (
+      targetX > bodyLeft - minMargin &&
+      targetX < bodyRight + minMargin &&
+      targetY > bodyTop - minMargin &&
+      targetY < bodyBottom + minMargin
+    ) {
+      if (isOutput) {
+        constrainedX = bodyRight + Math.max(minMargin, effectiveClearance / 2);
+      } else {
+        constrainedX = bodyLeft - Math.max(minMargin, effectiveClearance / 2);
+      }
+    }
+
+    return {
+      x: constrainedX,
+      y: constrainedY,
+    };
   }
 }
 

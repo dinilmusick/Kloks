@@ -1,32 +1,123 @@
 {
-  "name": "kloks",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Kloks — Public Backend & Service Package Library built on KrnlTS (@kloks/*)",
+  "name": "@ultrst-armada/kloks",
+  "version": "1.0.1",
+  "private": false,
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "description": "Kloks — Public Backend, State-Graph, Audio/MIDI & Service Package Library built on KrnlTS (@kloks/*)",
   "type": "module",
+  "main": "./index.js",
+  "module": "./index.js",
+  "types": "./index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "packages/*/dist/**",
+    "packages/*/package.json",
+    "packages/*/kloks.manifest.json"
+  ],
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "default": "./index.js"
+    },
+    "./functions": {
+      "types": "./packages/functions/dist/index.d.ts",
+      "import": "./packages/functions/dist/index.js",
+      "default": "./packages/functions/dist/index.js"
+    },
+    "./state-graph": {
+      "types": "./packages/state-graph/dist/index.d.ts",
+      "import": "./packages/state-graph/dist/index.js",
+      "default": "./packages/state-graph/dist/index.js"
+    },
+    "./state-graph/state": {
+      "types": "./packages/state-graph/dist/state/index.d.ts",
+      "import": "./packages/state-graph/dist/state/index.js",
+      "default": "./packages/state-graph/dist/state/index.js"
+    },
+    "./state-graph/execution": {
+      "types": "./packages/state-graph/dist/execution/index.d.ts",
+      "import": "./packages/state-graph/dist/execution/index.js",
+      "default": "./packages/state-graph/dist/execution/index.js"
+    },
+    "./state-graph/domain": {
+      "types": "./packages/state-graph/dist/domain/index.d.ts",
+      "import": "./packages/state-graph/dist/domain/index.js",
+      "default": "./packages/state-graph/dist/domain/index.js"
+    },
+    "./state-graph/rules": {
+      "types": "./packages/state-graph/dist/rules/index.d.ts",
+      "import": "./packages/state-graph/dist/rules/index.js",
+      "default": "./packages/state-graph/dist/rules/index.js"
+    },
+    "./state-graph/spatial": {
+      "types": "./packages/state-graph/dist/spatial/index.d.ts",
+      "import": "./packages/state-graph/dist/spatial/index.js",
+      "default": "./packages/state-graph/dist/spatial/index.js"
+    },
+    "./state-graph/store": {
+      "types": "./packages/state-graph/dist/store/index.d.ts",
+      "import": "./packages/state-graph/dist/store/index.js",
+      "default": "./packages/state-graph/dist/store/index.js"
+    },
+    "./audio-midi": {
+      "types": "./packages/audio-midi/dist/index.d.ts",
+      "import": "./packages/audio-midi/dist/index.js",
+      "default": "./packages/audio-midi/dist/index.js"
+    },
+    "./services": {
+      "types": "./packages/services/dist/index.d.ts",
+      "import": "./packages/services/dist/index.js",
+      "default": "./packages/services/dist/index.js"
+    },
+    "./backend": {
+      "types": "./packages/backend/dist/index.d.ts",
+      "import": "./packages/backend/dist/index.js",
+      "default": "./packages/backend/dist/index.js"
+    },
+    "./backend/execution": {
+      "types": "./packages/backend/dist/execution/index.d.ts",
+      "import": "./packages/backend/dist/execution/index.js",
+      "default": "./packages/backend/dist/execution/index.js"
+    },
+    "./orchestrations": {
+      "types": "./packages/orchestrations/dist/index.d.ts",
+      "import": "./packages/orchestrations/dist/index.js",
+      "default": "./packages/orchestrations/dist/index.js"
+    }
+  },
   "scripts": {
     "build": "pnpm -r run build",
+    "postbuild": "node -e \"import('fs').then(fs => { for (const pkg of fs.readdirSync('packages')) { const d = 'packages/' + pkg + '/dist'; if (!fs.existsSync(d)) continue; for (const f of fs.readdirSync(d, { recursive: true })) { const p = d + '/' + f; if (fs.statSync(p).isFile() && (p.endsWith('.js') || p.endsWith('.d.ts'))) { const c = fs.readFileSync(p, 'utf8'); const n = c.replaceAll('@kloks/', '@ultrst-armada/kloks/').replaceAll('@ultrst/kloks/', '@ultrst-armada/kloks/').replaceAll('\\\"kloks/', '\\\"@ultrst-armada/kloks/').replaceAll('\\'kloks/', '\\'@ultrst-armada/kloks/'); if (c !== n) fs.writeFileSync(p, n); } } } })\"",
     "test": "vitest run",
     "typecheck": "pnpm -r run typecheck",
     "clean": "pnpm -r run clean"
   },
+  "dependencies": {
+    "bullmq": "^6.3.8",
+    "zod": "^3.24.1",
+    "zustand": "^5.0.15"
+  },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.600.0",
     "@aws-sdk/lib-storage": "^3.600.0",
-    "@dinilmusick/krnl": "file:../KrnlTS",
     "@neondatabase/serverless": "^0.10.0",
     "@supabase/supabase-js": "^2.45.0",
     "@types/bcryptjs": "^2.4.0",
     "@types/better-sqlite3": "^7.6.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
+    "@ultrst-armada/krnl": "^1.0.0",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.0.0",
     "react": "^19.0.1",
     "tsup": "^8.4.0",
     "typescript": "^5.7.3",
-    "vitest": "^3.1.0",
-    "zod": "^3.24.1"
+    "vitest": "^3.1.0"
   },
   "packageManager": "pnpm@9.15.0"
 }

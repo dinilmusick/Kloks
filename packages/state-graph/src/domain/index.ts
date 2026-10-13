@@ -3,4 +3,5 @@ export * from './BaseNode.js';
 export * from './BaseConnection.js';
 export * from './BaseViewWindow.js';
 export * from './BaseGraph.js';
-export * from './primitives/index.js';
+export * from './GroupNode.js';
+export * from './SubgraphNode.js';

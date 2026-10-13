@@ -39,7 +39,7 @@ export class TraceEngine {
       for (const inp of inputPairs) {
         if (out.node.id === inp.node.id) continue; // Same node connections ignored in basic trace
 
-        const resolution = CompatibilityMatrix.resolve(out.handle, inp.handle);
+        const resolution = CompatibilityMatrix.resolve(out.handle, inp.handle, out.node, inp.node);
         if (!resolution.allowed) continue;
 
         const inpPos = SpatialEngine.calculateEffectiveHandlePosition(inp.node, inp.handle);
@@ -47,7 +47,7 @@ export class TraceEngine {
 
         if (distance <= cutoffDistance) {
           traces.push({
-            id: `trace-${out.handle.id}->${inp.handle.id}`,
+            id: `trace-${out.node.id}:${out.handle.id}->${inp.node.id}:${inp.handle.id}`,
             sourceNodeId: out.node.id,
             sourceHandleId: out.handle.id,
             targetNodeId: inp.node.id,

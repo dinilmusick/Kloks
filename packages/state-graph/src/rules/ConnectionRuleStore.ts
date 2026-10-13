@@ -4,7 +4,6 @@ import { CompatibilityMatrix, type CompatibilityRule, type CompatibilityResoluti
 import { HandleTypeRegistry, type HandleTypeDefinition } from './HandleTypeRegistry.js';
 import { WireTypeRegistry, type WireTypeDefinition } from './WireTypeRegistry.js';
 import { initializeDefaultGraphRules } from './DefaultRules.js';
-import { PRIMITIVE_NODE_DEFINITIONS } from '../domain/primitives/PrimitiveNodeDefs.js';
 
 export interface HandleDescriptor {
   dataType?: string;
@@ -26,7 +25,6 @@ export class ConnectionRuleStore {
 
   public static initializeDefaults(): void {
     initializeDefaultGraphRules();
-    this.registerNodeTypes(PRIMITIVE_NODE_DEFINITIONS);
     this.initialized = true;
     this.notify();
   }

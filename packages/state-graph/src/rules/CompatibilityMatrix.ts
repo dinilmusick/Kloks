@@ -17,8 +17,24 @@ export interface CompatibilityResolution {
   reason?: string;
 }
 
+export type CompatibilityResolverDelegate = (
+  sourceHandle: BaseHandle | Pick<BaseHandle, 'handleCategory' | 'dataType' | 'direction'>,
+  targetHandle: BaseHandle | Pick<BaseHandle, 'handleCategory' | 'dataType' | 'direction'>,
+  sourceNode?: any,
+  targetNode?: any
+) => CompatibilityResolution | null;
+
 export class CompatibilityMatrix {
   private static rules: CompatibilityRule[] = [];
+  private static customResolver: CompatibilityResolverDelegate | null = null;
+
+  public static setCustomResolver(resolver: CompatibilityResolverDelegate | null): void {
+    this.customResolver = resolver;
+  }
+
+  public static getCustomResolver(): CompatibilityResolverDelegate | null {
+    return this.customResolver;
+  }
 
   public static registerRule(rule: CompatibilityRule): void {
     this.rules.push(rule);
@@ -30,8 +46,10 @@ export class CompatibilityMatrix {
   }
 
   public static resolve(
-    sourceHandle: Pick<BaseHandle, 'handleCategory' | 'dataType' | 'direction'>,
-    targetHandle: Pick<BaseHandle, 'handleCategory' | 'dataType' | 'direction'>
+    sourceHandle: BaseHandle | Pick<BaseHandle, 'handleCategory' | 'dataType' | 'direction'>,
+    targetHandle: BaseHandle | Pick<BaseHandle, 'handleCategory' | 'dataType' | 'direction'>,
+    sourceNode?: any,
+    targetNode?: any
   ): CompatibilityResolution {
     if (sourceHandle.direction === targetHandle.direction) {
       return { allowed: false, reason: 'Cannot connect handles of the same direction' };
@@ -40,6 +58,14 @@ export class CompatibilityMatrix {
     const isViewConnection = sourceHandle.handleCategory === 'VIEW' || targetHandle.handleCategory === 'VIEW';
     if (isViewConnection) {
       return { allowed: false, reason: 'View handles do not connect via data compatibility matrix' };
+    }
+
+    // If an authoritative universal resolver is registered, execute it first
+    if (this.customResolver) {
+      const customRes = this.customResolver(sourceHandle, targetHandle, sourceNode, targetNode);
+      if (customRes !== null) {
+        return customRes;
+      }
     }
 
     const sType = sourceHandle.dataType.toUpperCase();

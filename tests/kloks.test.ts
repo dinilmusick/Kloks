@@ -16,31 +16,31 @@ import {
   ServiceCFacade,
   ServiceDFacade,
   exposeServiceD,
-} from '../packages/services/dist/index.js';
+} from '@kloks/services';
 import {
   OrchestratorAFacade,
   OrchestratorBFacade,
-} from '../packages/orchestrations/dist/index.js';
+} from '@kloks/orchestrations';
 import {
   AudioHardwareServiceFacade,
   MidiServiceFacade,
   AudioMidiOrchestratorFacade,
-} from '../packages/audio-midi/src/index.js';
+} from '@kloks/audio-midi';
 import {
   FunctionsServiceFacade,
   toKebabCase,
-} from '../packages/functions/src/index.js';
+} from '@kloks/functions';
 import {
   AuthServiceFacade,
   StorageServiceFacade,
   WorkspaceServiceFacade,
   ControlPlaneServiceFacade,
   ExecutionServiceFacade,
-} from '../packages/backend/src/krnl-services.js';
+} from '@kloks/backend';
 import {
   StateLifecycleServiceFacade,
   NodeGraphEngineServiceFacade,
-} from '../packages/state-graph/src/index.js';
+} from '@kloks/state-graph';
 
 describe('Kloks Public Package Library (@kloks/* built on KrnlTS)', () => {
   it('Service A (Pure) & Service B (Stateful) execute and compose via Orchestrator A', async () => {

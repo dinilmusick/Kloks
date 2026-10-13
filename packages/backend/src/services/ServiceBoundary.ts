@@ -12,7 +12,7 @@ import {
   type ServiceDefinition,
   type EndpointDescriptor,
   type ProtocolAdapter,
-} from '@dinilmusick/krnl';
+} from '@ultrst-armada/krnl';
 
 export type LocalService = IService;
 export type RemoteServiceProxy = IService;

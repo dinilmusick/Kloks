@@ -4,7 +4,7 @@
  */
 
 import type { CompositeBackend } from './CompositeBackend.js';
-import type { EndpointDescriptor } from '@dinilmusick/krnl';
+import type { EndpointDescriptor } from '@ultrst-armada/krnl';
 
 export interface GeneratedEndpointSummary {
   httpRoutes: string[];

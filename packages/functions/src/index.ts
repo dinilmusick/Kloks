@@ -8,7 +8,7 @@ import {
   createServiceDefinition,
   type IService,
   type ServiceDefinition,
-} from '@dinilmusick/krnl';
+} from '@ultrst-armada/krnl';
 
 export * from './types.js';
 export * from './base.js';

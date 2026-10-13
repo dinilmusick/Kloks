@@ -1,5 +1,6 @@
 export interface SocketCoordOptions {
   cardWidth: number;
+  cardHeight?: number;
   isOutput: boolean;
   clearance?: number;
   nudge?: { x: number; y: number };
@@ -13,26 +14,53 @@ export interface SocketCoordResult {
 }
 
 /**
- * Calculates socket handle coordinates enforcing the 12px spatial clearance invariant
- * and applying custom nudge displacement offsets.
+ * Calculates socket handle coordinates enforcing that the handle always appears just
+ * outside the node body edge on spawn and cannot be pushed into the node body area.
  */
 export function calculateSocketCoordinates(
   baseY: number,
   options: SocketCoordOptions
 ): SocketCoordResult {
-  const clearance = options.clearance ?? 12;
+  const clearance = Math.max(12, options.clearance ?? 14);
   const nudge = options.nudge ?? { x: 0, y: 0 };
+  const halfWidth = options.cardWidth / 2;
+  const halfHeight = (options.cardHeight ?? 80) / 2;
   
-  // Anti-obscuring rule: pushed outward from node body edge by at least 12px
+  // Anti-obscuring rule: pushed outward from node body edge by at least clearance
   const baseX = options.isOutput 
-    ? (options.cardWidth / 2) + clearance 
-    : -(options.cardWidth / 2) - clearance;
+    ? halfWidth + clearance 
+    : -halfWidth - clearance;
+
+  let effectiveX = baseX + nudge.x;
+  let effectiveY = baseY + nudge.y;
+
+  const minMargin = 4;
+  const bodyLeft = -halfWidth;
+  const bodyRight = halfWidth;
+  const bodyTop = -halfHeight;
+  const bodyBottom = halfHeight;
+
+  if (
+    effectiveX > bodyLeft - minMargin &&
+    effectiveX < bodyRight + minMargin &&
+    effectiveY > bodyTop - minMargin &&
+    effectiveY < bodyBottom + minMargin
+  ) {
+    if (options.isOutput) {
+      effectiveX = bodyRight + Math.max(minMargin, clearance / 2);
+    } else {
+      effectiveX = bodyLeft - Math.max(minMargin, clearance / 2);
+    }
+  }
 
   return {
     baseX,
-    effectiveX: baseX + nudge.x,
-    effectiveY: baseY + nudge.y,
-    nudge
+    effectiveX,
+    effectiveY,
+    nudge: {
+      x: effectiveX - baseX,
+      y: effectiveY - baseY,
+    },
   };
 }
 

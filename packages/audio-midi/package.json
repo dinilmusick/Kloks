@@ -5,7 +5,8 @@
   "type": "module",
   "private": false,
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "skipoManifest": "./kloks.manifest.json",
   "main": "./dist/index.js",
@@ -14,15 +15,19 @@
   "exports": {
     ".": {
       "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean --external @dinilmusick/krnl",
+    "build": "tsup src/index.ts --format esm --dts --clean --external @kloks/state-graph --external ws",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@dinilmusick/krnl": "^1.0.0"
+    "@kloks/state-graph": "workspace:*"
+  },
+  "devDependencies": {
+    "@ultrst-armada/krnl": "^1.0.0"
   }
 }
