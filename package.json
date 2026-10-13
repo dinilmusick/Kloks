@@ -88,6 +88,11 @@
       "types": "./packages/orchestrations/dist/index.d.ts",
       "import": "./packages/orchestrations/dist/index.js",
       "default": "./packages/orchestrations/dist/index.js"
+    },
+    "./contracts": {
+      "types": "./packages/contracts/dist/index.d.ts",
+      "import": "./packages/contracts/dist/index.js",
+      "default": "./packages/contracts/dist/index.js"
     }
   },
   "scripts": {

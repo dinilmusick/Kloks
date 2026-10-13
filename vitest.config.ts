@@ -11,6 +11,7 @@ export default defineConfig({
       '@kloks/backend/execution': path.resolve(__dirname, 'packages/backend/dist/execution/index.js'),
       '@kloks/backend': path.resolve(__dirname, 'packages/backend/dist/index.js'),
       '@kloks/orchestrations': path.resolve(__dirname, 'packages/orchestrations/dist/index.js'),
+      '@kloks/contracts': path.resolve(__dirname, 'packages/contracts/dist/index.js'),
       '@ultrst-armada/kloks/functions': path.resolve(__dirname, 'packages/functions/dist/index.js'),
       '@ultrst-armada/kloks/state-graph': path.resolve(__dirname, 'packages/state-graph/dist/index.js'),
       '@ultrst-armada/kloks/audio-midi': path.resolve(__dirname, 'packages/audio-midi/dist/index.js'),
@@ -18,6 +19,7 @@ export default defineConfig({
       '@ultrst-armada/kloks/backend/execution': path.resolve(__dirname, 'packages/backend/dist/execution/index.js'),
       '@ultrst-armada/kloks/backend': path.resolve(__dirname, 'packages/backend/dist/index.js'),
       '@ultrst-armada/kloks/orchestrations': path.resolve(__dirname, 'packages/orchestrations/dist/index.js'),
+      '@ultrst-armada/kloks/contracts': path.resolve(__dirname, 'packages/contracts/dist/index.js'),
     },
   },
 });

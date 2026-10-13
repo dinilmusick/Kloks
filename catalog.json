@@ -8,6 +8,7 @@
     "@kloks/functions",
     "@kloks/audio-midi",
     "@kloks/backend",
-    "@kloks/state-graph"
+    "@kloks/state-graph",
+    "@kloks/contracts"
   ]
 }
