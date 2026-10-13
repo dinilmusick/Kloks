@@ -27,9 +27,18 @@ import {
   type MidiSubsystemState,
 } from './midiManager.js';
 
+import {
+  AudioConcepts,
+  BufferConcepts,
+  type BufferCycleCalculation,
+} from '@kloks/state-graph';
+
 export {
   AudioInputManager,
   MidiManager,
+  AudioConcepts,
+  BufferConcepts,
+  type BufferCycleCalculation,
   type AudioBusConfig,
   type AudioDeviceDescriptor,
   type AudioHardwareState,
@@ -41,6 +50,7 @@ export {
   type MidiStateListener,
   type MidiSubsystemState,
 };
+
 
 // ══════════════════════════════════════════════════════════════════════════════
 // 1. AUDIO HARDWARE KRNLTS SERVICE

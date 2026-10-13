@@ -2,9 +2,10 @@
 // 1. IMPORTS & EXTERNAL DEPENDENCIES
 // ══════════════════════════════════════════════════════════════════════════════════════════
 
-export type QwnsrAssetType = 'node' | 'wire' | 'socket' | 'ui' | 'panel' | 'effect' | 'module';
+export type GraphAssetType = 'node' | 'wire' | 'socket' | 'ui' | 'panel' | 'effect' | 'module';
+export type QwnsrAssetType = GraphAssetType;
 
-export interface QwnsrMetadata {
+export interface GraphMetadata {
   description?: string;
   author?: string;
   version?: string;
@@ -15,13 +16,18 @@ export interface QwnsrMetadata {
   [key: string]: any;
 }
 
-export interface QwnsrTransform {
+export type GraphEntityMetadata = GraphMetadata;
+export type QwnsrMetadata = GraphMetadata;
+
+export interface GraphTransform {
   position: [number, number, number];
   rotation?: [number, number, number];
   scale?: [number, number, number];
 }
+export type QwnsrTransform = GraphTransform;
 
-export type QwnsrEventListener = (payload: any) => void;
+export type GraphEventListener = (payload: any) => void;
+export type QwnsrEventListener = GraphEventListener;
 
 /**
  * ══════════════════════════════════════════════════════════════════════════════════════════
@@ -33,12 +39,13 @@ export type QwnsrEventListener = (payload: any) => void;
 export abstract class GraphEntityParent {
   public readonly id: string;
   public name: string;
-  public readonly assetType: QwnsrAssetType;
+  public readonly assetType: GraphAssetType;
   public isActive: boolean;
   public createdAt: number;
   public updatedAt: number;
-  public metadata: QwnsrMetadata;
-  protected eventListeners: Map<string, Set<QwnsrEventListener>>;
+  public metadata: GraphMetadata;
+  protected eventListeners: Map<string, Set<GraphEventListener>>;
+
 
   constructor(id: string, name: string, assetType: QwnsrAssetType, metadata: QwnsrMetadata = {}) {
     this.id = id;

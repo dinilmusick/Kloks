@@ -6,7 +6,7 @@ import { SignalType, SIGNAL_TYPES } from '../../../functions/canonicalSignalTabl
 
 export type SocketDirection = 'in' | 'out';
 
-export interface QwnsrSocketDescriptor {
+export interface GraphSocketDescriptor {
   portId: string;
   label: string;
   signalType: SignalType;
@@ -15,6 +15,8 @@ export interface QwnsrSocketDescriptor {
   description: string;
   maxConnections?: number;
 }
+export type QwnsrSocketDescriptor = GraphSocketDescriptor;
+
 
 /**
  * ══════════════════════════════════════════════════════════════════════════════════════════

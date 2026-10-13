@@ -6,7 +6,7 @@ import { NodeConnection, SpaceNode, EffectNode } from "../../../types/index.js";
 import { SignalType, SIGNAL_TYPES } from '../../../functions/canonicalSignalTable';
 import { isWireAffectedByEffect } from '../../../functions/graphManager';
 
-export interface QwnsrWireDescriptor {
+export interface GraphWireDescriptor {
   id: string;
   fromNodeId: string;
   toNodeId: string;
@@ -16,6 +16,8 @@ export interface QwnsrWireDescriptor {
   signalType: SignalType;
   controlPoint?: [number, number, number];
 }
+export type QwnsrWireDescriptor = GraphWireDescriptor;
+
 
 /**
  * ══════════════════════════════════════════════════════════════════════════════════════════

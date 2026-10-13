@@ -10,7 +10,7 @@ import { validateUniversalConnection, areSignalsCompatible } from '../../../func
 
 export const COORD_SCALE = 40;
 
-export class QwnsrBridgeNode extends BaseNode {
+export class GraphBridgeNode extends BaseNode {
   public readonly originalSpaceNode: SpaceNode;
 
   constructor(spaceNode: SpaceNode, handles: DataHandle[]) {
@@ -27,11 +27,16 @@ export class QwnsrBridgeNode extends BaseNode {
   }
 }
 
+export type QwnsrBridgeNode = GraphBridgeNode;
+export const QwnsrBridgeNode = GraphBridgeNode;
+export const initializeQwnsrMagneticRules = initializeMagneticRules;
+
 let rulesInitialized = false;
 
-export function initializeQwnsrMagneticRules(): void {
+export function initializeMagneticRules(): void {
   if (rulesInitialized) return;
   rulesInitialized = true;
+
 
   const signals = [
     { type: 'AUDIO_STEREO', color: '#00ffff' },
@@ -94,8 +99,8 @@ export function initializeQwnsrMagneticRules(): void {
   });
 }
 
-export function mapSpaceNodeToBridgeNode(spaceNode: SpaceNode): QwnsrBridgeNode {
-  initializeQwnsrMagneticRules();
+export function mapSpaceNodeToBridgeNode(spaceNode: SpaceNode): GraphBridgeNode {
+  initializeMagneticRules();
   const { inputs, outputs } = getNodeSockets(spaceNode);
   const handles: DataHandle[] = [];
   const customOffsets = spaceNode.socketOffsets;
@@ -145,5 +150,6 @@ export function mapSpaceNodeToBridgeNode(spaceNode: SpaceNode): QwnsrBridgeNode 
   inputs.forEach((sock, idx) => handles.push(mapSocket(sock, 'INPUT', idx, inputs.length)));
   outputs.forEach((sock, idx) => handles.push(mapSocket(sock, 'OUTPUT', idx, outputs.length)));
 
-  return new QwnsrBridgeNode(spaceNode, handles);
+  return new GraphBridgeNode(spaceNode, handles);
 }
+

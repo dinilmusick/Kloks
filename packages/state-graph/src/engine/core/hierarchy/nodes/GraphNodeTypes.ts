@@ -118,3 +118,101 @@ export function createQwnsrNodeInstance(node: SpaceNode): GraphNodeParent {
       return new QwnsrGenericNodeModel(node);
   }
 }
+
+// ── Standard Node Parent Archetypes ──
+export class DataProcessingNodeParent<T extends SpaceNode = SpaceNode> extends GraphNodeParent<T> {
+  public trigger(timestamp?: number): void {
+    this.emit('data_processed', { timestamp: timestamp || Date.now() });
+  }
+}
+
+export class SignalGeneratorNodeParent<T extends SpaceNode = SpaceNode> extends GraphNodeParent<T> {
+  public trigger(timestamp?: number): void {
+    this.emit('signal_generated', { timestamp: timestamp || Date.now() });
+  }
+}
+
+export class RoutingNodeParent<T extends SpaceNode = SpaceNode> extends GraphNodeParent<T> {
+  public trigger(timestamp?: number): void {
+    this.emit('routing_evaluated', { timestamp: timestamp || Date.now() });
+  }
+}
+
+export class ControlNodeParent<T extends SpaceNode = SpaceNode> extends GraphNodeParent<T> {
+  public trigger(timestamp?: number): void {
+    this.emit('control_dispatched', { timestamp: timestamp || Date.now() });
+  }
+}
+
+// ── Standard Node Archetype Models ──
+export class TriggerNodeModel extends QwnsrTriggerNodeModel {}
+export class ContainerNodeModel extends QwnsrContainerNodeModel {}
+export class ModuleNodeModel extends QwnsrModuleNodeModel {}
+export class EffectNodeModel extends QwnsrEffectNodeModel {}
+
+export class CodeNodeModel extends DataProcessingNodeParent {
+  public trigger(timestamp?: number): void {
+    this.emit('code_executed', { timestamp: timestamp || Date.now() });
+  }
+}
+
+export class ArrangementNodeModel extends ControlNodeParent {
+  public trigger(timestamp?: number): void {
+    this.emit('arrangement_clock_pulsed', { timestamp: timestamp || Date.now() });
+  }
+}
+
+export class RouterNodeModel extends RoutingNodeParent {}
+export class StripNodeModel extends ControlNodeParent {}
+export class ControlNodeModel extends ControlNodeParent {}
+export class PrimitiveNodeModel extends QwnsrGenericNodeModel {}
+export class GroupNodeModel extends ModuleNodeModel {}
+
+export function createNodeInstance(node: SpaceNode): GraphNodeParent {
+  switch (node.type) {
+    case 'trigger':
+      return new TriggerNodeModel(node as TriggerNode);
+    case 'container':
+      return new ContainerNodeModel(node as ContainerNode);
+    case 'effect':
+      return new EffectNodeModel(node as EffectNode);
+    case 'module':
+      return new ModuleNodeModel(node as ModuleNode);
+    case 'code':
+      return new CodeNodeModel(node);
+    case 'arrangement':
+      return new ArrangementNodeModel(node);
+    case 'multiplexer':
+    case 'combiner':
+      return new RouterNodeModel(node);
+    case 'input_strip':
+    case 'output_strip':
+      return new StripNodeModel(node);
+    case 'group':
+      return new GroupNodeModel(node as ModuleNode);
+    default:
+      return new PrimitiveNodeModel(node);
+  }
+}
+
+export interface NodeDimensions2D {
+  width: number;
+  height: number;
+}
+
+export interface NodeScreenRect2D {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+}
+
+export interface NodeHeaderStyle {
+  background?: string;
+  color?: string;
+  accentColor?: string;
+  borderBottom?: string;
+}
+

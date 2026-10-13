@@ -1,6 +1,7 @@
 // ══════════════════════════════════════════════════════════════════════════════════════════
-// QWNSR CORE UNIFIED ARCHITECTURE INDEX (BASE CLASSES & MAGNETIC ENGINE)
+// KLOKS CORE UNIFIED ARCHITECTURE INDEX (BASE CLASSES & MAGNETIC ENGINE)
 // ══════════════════════════════════════════════════════════════════════════════════════════
+
 
 // 1. Core Parent Base
 export * from './core/GraphEntityParent';

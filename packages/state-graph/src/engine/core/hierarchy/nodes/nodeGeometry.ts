@@ -10,6 +10,8 @@ export interface NodeDimensions {
   halfHeight: number;
 }
 
+
+
 /**
  * Resolves exact card width and height for any SpaceNode based on its archetype.
  */

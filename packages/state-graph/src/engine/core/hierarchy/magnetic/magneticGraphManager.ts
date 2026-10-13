@@ -3,7 +3,7 @@ import { TraceEngine, Trace } from '../../../../spatial/TraceEngine.js';
 import { AutoSolidify } from '../../../../spatial/AutoSolidify.js';
 import { AttractionEngine } from '../../../../spatial/AttractionEngine.js';
 import { SolidConnection } from '../../../../domain/BaseConnection.js';
-import { mapSpaceNodeToBridgeNode, QwnsrBridgeNode, COORD_SCALE } from './magneticGraphBridge.js';
+import { mapSpaceNodeToBridgeNode, GraphBridgeNode, COORD_SCALE } from './magneticGraphBridge.js';
 
 export interface Landmark {
   id: string;
@@ -28,9 +28,10 @@ export class MagneticGraphManager {
     return this.cutoffDistance;
   }
 
-  public getBridgeNodes(nodes: SpaceNode[]): QwnsrBridgeNode[] {
+  public getBridgeNodes(nodes: SpaceNode[]): GraphBridgeNode[] {
     return nodes.map(mapSpaceNodeToBridgeNode);
   }
+
 
   public computeTraces(nodes: SpaceNode[]): Trace[] {
     const bridgeNodes = this.getBridgeNodes(nodes);

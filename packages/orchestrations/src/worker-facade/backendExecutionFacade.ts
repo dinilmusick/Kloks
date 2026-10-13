@@ -12,7 +12,10 @@ import {
 } from '@kloks/backend/execution';
 import { SKIPO_EXECUTION } from '@kloks/state-graph';
 
-export const backendFacade = new ExecutableBackendFacade('WorkspaceBackendFacade');
+export class WorkspaceBackendFacade extends ExecutableBackendFacade {}
+
+export const backendFacade = new WorkspaceBackendFacade('WorkspaceBackendFacade');
+
 
 // 1. Project Service
 const projectService = new ServiceDispatcher('project');

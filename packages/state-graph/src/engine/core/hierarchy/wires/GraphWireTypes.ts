@@ -66,3 +66,82 @@ export function createQwnsrWireInstance(descriptor: QwnsrWireDescriptor): GraphW
       return new QwnsrTriggerWire(descriptor);
   }
 }
+
+// Standard Wire Archetypes & Variants
+export class TriggerWire extends QwnsrTriggerWire {}
+export class MidiStreamWire extends QwnsrMidiWire {}
+export class MidiPacketWire extends QwnsrMidiWire {}
+
+export class AudioStereoWire extends GraphWireParent {
+  constructor(descriptor: Omit<QwnsrWireDescriptor, 'signalType'>) {
+    super({ ...descriptor, signalType: 'audio_stereo' });
+    this.flowSpeedMultiplier = 1.5;
+  }
+}
+
+export class AudioMonoWire extends GraphWireParent {
+  constructor(descriptor: Omit<QwnsrWireDescriptor, 'signalType'>) {
+    super({ ...descriptor, signalType: 'audio_mono' });
+    this.flowSpeedMultiplier = 1.5;
+  }
+}
+
+export class AudioPacketWire extends AudioStereoWire {}
+export class CurveStreamWire extends QwnsrCurveWire {}
+export class CurvePacketWire extends QwnsrCurveWire {}
+export class ComponentWire extends QwnsrComponentWire {}
+
+export class PrimitiveWire extends GraphWireParent {
+  constructor(descriptor: Omit<QwnsrWireDescriptor, 'signalType'>) {
+    super({ ...descriptor, signalType: 'trigger' });
+    this.flowSpeedMultiplier = 1.0;
+  }
+}
+
+export function createWireInstance(descriptor: QwnsrWireDescriptor): GraphWireParent {
+  switch (descriptor.signalType) {
+    case 'trigger':
+      return new TriggerWire(descriptor);
+    case 'midi':
+      return new MidiStreamWire(descriptor);
+    case 'audio_mono':
+      return new AudioMonoWire(descriptor);
+    case 'audio':
+    case 'audio_stereo':
+      return new AudioStereoWire(descriptor);
+    case 'curve':
+      return new CurveStreamWire(descriptor);
+    case 'component':
+      return new ComponentWire(descriptor);
+    case 'effect':
+      return new QwnsrEffectWire(descriptor);
+    default:
+      return new PrimitiveWire(descriptor);
+  }
+}
+
+export interface WireEndpoint2D {
+  x: number;
+  y: number;
+  direction?: 'in' | 'out';
+}
+
+export interface WireCurveStyle {
+  curvature?: number;
+  tension?: number;
+  style?: 'bezier' | 'linear' | 'step';
+}
+
+export interface WireAnimationConfig {
+  pulseSpeed?: number;
+  flowSpeed?: number;
+  particleCount?: number;
+}
+
+export interface WireVisualConfig {
+  strokeWidth?: number;
+  color?: string;
+  glowColor?: string;
+  glowBlur?: number;
+}
+
