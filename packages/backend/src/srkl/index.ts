@@ -9,6 +9,12 @@
 export { SrklClient, createSrklClient, CANONICAL_SRKL_URL } from './SrklClient.js';
 export { getPrimarySrklDeploymentUrl, getSrklAccounts, srklListBackblazeBuckets } from './SrklDiscoveryService.js';
 export { useSrklServices } from './useSrklServices.js';
+export { decryptVaultBufferInBrowser, hexToBytes } from './SrklCryptoClient.js';
+export { SrklCredentialRegistry, globalCredentialRegistry } from './SrklCredentialRegistry.js';
+export { SrklVaultAccessClient } from './SrklVaultAccessClient.js';
+export type { VaultAccessClientOptions } from './SrklVaultAccessClient.js';
+export { syncSrklAccounts } from './srklSyncBridge.js';
+export { srklService } from './srkl.js';
 export type { UseSrklServicesOptions, UseSrklServicesResult } from './useSrklServices.js';
 export type {
   EcosystemServiceCategory,
@@ -22,4 +28,8 @@ export type {
   SrklEcosystemResponse,
   AppServiceDeclaration,
   AdaptedStorageConnection,
+  KeyMaterial,
+  SrklVaultAccessResponse,
+  ServiceAccountEntry,
+  CredentialRegistryMap,
 } from './types.js';
