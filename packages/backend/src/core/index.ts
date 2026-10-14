@@ -10,9 +10,16 @@ export {
   getSrklAccounts as getSrklCoreAccounts,
   srklListBackblazeBuckets as srklCoreListBackblazeBuckets,
 } from './srklCore.js';
-export {
-  saveWorkspaceClonesState,
-  syncPrimaryToClones,
-  addWorkspaceSecondaryClone,
-  removeWorkspaceSecondaryClone,
-} from './workspaceCloneSyncCore.js';
+export * from './credentialVaultCore.js';
+export * from './routesCore.js';
+export * from './dynamicRouteResolver.js';
+export * from './publicRoutesStore.js';
+export * from './workspaceCore.js';
+export * from './workspaceDataCore.js';
+export * from './workspaceFileCore.js';
+export * from './workspaceBucketSyncCore.js';
+export * from './workspaceStorageDetailsCore.js';
+export * from './cloudflareIntegrationCore.js';
+export * from './vercelIntegrationCore.js';
+export * from './vercelTransformer.js';
+
