@@ -8,9 +8,18 @@ importers:
 
   .:
     dependencies:
+      '@aws-sdk/client-s3':
+        specifier: ^3.600.0
+        version: 3.1149.0
+      bcryptjs:
+        specifier: ^2.4.3
+        version: 2.4.3
       bullmq:
         specifier: ^6.3.8
         version: 6.3.13
+      ws:
+        specifier: ^8.18.0
+        version: 8.22.0
       zod:
         specifier: ^3.24.1
         version: 3.25.76
@@ -18,9 +27,6 @@ importers:
         specifier: ^5.0.15
         version: 5.0.15(@types/react@19.3.0)(react@19.3.0)
     devDependencies:
-      '@aws-sdk/client-s3':
-        specifier: ^3.600.0
-        version: 3.1149.0
       '@aws-sdk/lib-storage':
         specifier: ^3.600.0
         version: 3.1149.0(@aws-sdk/client-s3@3.1149.0)
@@ -43,11 +49,8 @@ importers:
         specifier: ^19.0.0
         version: 19.3.0
       '@ultrst-armada/krnl':
-        specifier: ^1.0.0
-        version: 1.0.0
-      bcryptjs:
-        specifier: ^2.4.3
-        version: 2.4.3
+        specifier: ^1.0.2
+        version: 1.0.2
       better-sqlite3:
         specifier: ^11.0.0
         version: 11.10.0
@@ -71,8 +74,8 @@ importers:
         version: link:../state-graph
     devDependencies:
       '@ultrst-armada/krnl':
-        specifier: ^1.0.0
-        version: 1.0.0
+        specifier: ^1.0.2
+        version: 1.0.2
 
   packages/backend:
     dependencies:
@@ -108,8 +111,31 @@ importers:
         version: 3.25.76
     devDependencies:
       '@ultrst-armada/krnl':
-        specifier: ^1.0.0
-        version: 1.0.0
+        specifier: ^1.0.2
+        version: 1.0.2
+
+  packages/client:
+    dependencies:
+      react:
+        specifier: ^18.0.0 || ^19.0.0
+        version: 19.3.0
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@ultrst-armada/krnl':
+        specifier: ^1.0.2
+        version: 1.0.2
+
+  packages/contracts:
+    dependencies:
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@ultrst-armada/krnl':
+        specifier: ^1.0.2
+        version: 1.0.2
 
   packages/functions:
     dependencies:
@@ -118,8 +144,8 @@ importers:
         version: 3.25.76
     devDependencies:
       '@ultrst-armada/krnl':
-        specifier: ^1.0.0
-        version: 1.0.0
+        specifier: ^1.0.2
+        version: 1.0.2
 
   packages/orchestrations:
     dependencies:
@@ -134,8 +160,8 @@ importers:
         version: link:../state-graph
     devDependencies:
       '@ultrst-armada/krnl':
-        specifier: ^1.0.0
-        version: 1.0.0
+        specifier: ^1.0.2
+        version: 1.0.2
 
   packages/services:
     dependencies:
@@ -144,8 +170,8 @@ importers:
         version: link:../state-graph
     devDependencies:
       '@ultrst-armada/krnl':
-        specifier: ^1.0.0
-        version: 1.0.0
+        specifier: ^1.0.2
+        version: 1.0.2
 
   packages/state-graph:
     dependencies:
@@ -163,8 +189,8 @@ importers:
         version: 5.0.15(@types/react@19.3.0)(react@19.3.0)
     devDependencies:
       '@ultrst-armada/krnl':
-        specifier: ^1.0.0
-        version: 1.0.0
+        specifier: ^1.0.2
+        version: 1.0.2
 
 packages:
 
@@ -815,8 +841,8 @@ packages:
   '@types/react@19.3.0':
     resolution: {integrity: sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==}
 
-  '@ultrst-armada/krnl@1.0.0':
-    resolution: {integrity: sha512-TYl7og9JYknBEO9SYhf3NWtgeaPwGrYcvSiRxwR2FZwTUSYeSsz/hFRVur5+tAKw3Wmwj+flKdt5TO8bzMtpnA==}
+  '@ultrst-armada/krnl@1.0.2':
+    resolution: {integrity: sha512-1sL9yEgdMV6OyWQASWhjfqBrAJij/5ExoU/r1mGC/1x2YXEXhxvtv44XVaps9qX1OtA83nih6wGyJh1JEdxgeQ==}
     hasBin: true
 
   '@vitest/expect@3.2.7':
@@ -1446,6 +1472,18 @@ packages:
   wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
 
+  ws@8.22.0:
+    resolution: {integrity: sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
@@ -2008,7 +2046,7 @@ snapshots:
     dependencies:
       csstype: 3.2.3
 
-  '@ultrst-armada/krnl@1.0.0': {}
+  '@ultrst-armada/krnl@1.0.2': {}
 
   '@vitest/expect@3.2.7':
     dependencies:
@@ -2663,6 +2701,8 @@ snapshots:
       stackback: 0.0.2
 
   wrappy@1.0.2: {}
+
+  ws@8.22.0: {}
 
   zod@3.25.76: {}
 

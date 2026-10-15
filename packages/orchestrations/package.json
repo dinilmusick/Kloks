@@ -30,6 +30,6 @@
     "@kloks/backend": "workspace:*"
   },
   "devDependencies": {
-    "@ultrst-armada/krnl": "^1.0.0"
+    "@ultrst-armada/krnl": "^1.0.2"
   }
 }
