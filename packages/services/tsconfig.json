@@ -10,6 +10,9 @@
       "@kloks/functions": [
         "../functions/dist/index.d.ts"
       ],
+      "@kloks/contracts": [
+        "../contracts/dist/index.d.ts"
+      ],
       "@kloks/state-graph": [
         "../state-graph/dist/index.d.ts"
       ],

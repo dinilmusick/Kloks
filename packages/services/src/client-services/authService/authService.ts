@@ -4,10 +4,15 @@ import { AuthListener } from './types';
 import * as session from './session';
 import * as authOps from './authOps';
 import * as workspaceOps from './workspaceOps';
+import { AuthServiceUISchema } from './auth.ui.js';
+import type { ServiceUISchema } from '@kloks/contracts';
 
 const STORAGE_KEY_USER = 'docustack_user_account';
 
 export class AuthService {
+  static readonly ui: ServiceUISchema = AuthServiceUISchema;
+  readonly ui: ServiceUISchema = AuthServiceUISchema;
+
   users: Map<string, UserAccount> = new Map();
   currentUser: Omit<UserAccount, 'passwordHash'> | null = null;
   token: string | null = null;

@@ -20,11 +20,12 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean --external @kloks/state-graph --external ws",
+    "build": "tsup src/index.ts --format esm --dts --clean --external @kloks/state-graph --external @kloks/contracts --external ws",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@kloks/contracts": "workspace:*",
     "@kloks/state-graph": "workspace:*"
   },
   "devDependencies": {

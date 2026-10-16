@@ -1,8 +1,69 @@
 {
   "$schema": "https://skipo.dev/schemas/kloks-manifest.v1.json",
   "package": "@kloks/services",
+  "packageType": "backend",
   "version": "1.0.0",
   "services": [
+    {
+      "id": "kloks.service.auth",
+      "name": "AuthClientService",
+      "version": "1.0.0",
+      "description": "Canonical user and workspace authentication service.",
+      "backend": {
+        "package": "@kloks/services",
+        "export": "AuthClientServiceFacade",
+        "facade": "AuthClientServiceFacade"
+      },
+      "ui": {
+        "requirementMode": "required",
+        "schema": "AuthServiceUISchema",
+        "page": "Auth.ui",
+        "section": "Auth.ui.LoginSection",
+        "component": "AuthPage",
+        "package": "@ultrst-armada/floks",
+        "export": "ui"
+      },
+      "modes": ["client", "backend"],
+      "targets": { "backend": ["BackendFacade.services"] }
+    },
+    {
+      "id": "kloks.service.storage",
+      "name": "StorageClientService",
+      "version": "1.0.0",
+      "description": "User storage connections and cluster persistence service.",
+      "backend": {
+        "package": "@kloks/services",
+        "export": "StorageClientServiceFacade",
+        "facade": "StorageClientServiceFacade"
+      },
+      "ui": {
+        "requirementMode": "optional",
+        "schema": "StorageServiceUISchema",
+        "page": "Storage.ui",
+        "section": "Storage.ui.TilesSection",
+        "component": "WorkspaceTilesMenu",
+        "package": "@ultrst-armada/floks",
+        "export": "ui"
+      },
+      "modes": ["client", "backend"],
+      "targets": { "backend": ["BackendFacade.services"] }
+    },
+    {
+      "id": "kloks.service.systemDb",
+      "name": "SystemDbClientService",
+      "version": "1.0.0",
+      "description": "System database environment and cluster health monitoring.",
+      "backend": {
+        "package": "@kloks/services",
+        "export": "SystemDbClientServiceFacade",
+        "facade": "SystemDbClientServiceFacade"
+      },
+      "ui": {
+        "requirementMode": "none"
+      },
+      "modes": ["client", "backend"],
+      "targets": { "backend": ["BackendFacade.services"] }
+    },
     {
       "id": "service-a",
       "name": "Canonical Service A (Pure)",

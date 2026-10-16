@@ -22,7 +22,12 @@ export interface SystemTelemetry {
   activeConnections: number;
 }
 
+import { SystemDbServiceUISchema } from './systemDb.ui.js';
+import type { ServiceUISchema } from '@kloks/contracts';
+
 export class SystemDbService {
+  static readonly ui: ServiceUISchema = SystemDbServiceUISchema;
+  readonly ui: ServiceUISchema = SystemDbServiceUISchema;
   private envStatus: SystemEnvironmentStatus = {
     databaseUrlConfigured: false,
     databaseUrlMasked: null,

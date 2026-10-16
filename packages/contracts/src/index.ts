@@ -7,6 +7,7 @@
 export * from './schemas.js';
 export * from './surface.js';
 export * from './snapshot.js';
+export * from './serviceUiSchema.js';
 
 import { createKloksSnapshot } from './snapshot.js';
 import { KLOKS_PUBLIC_SURFACE, QWNSR_REQUIRED_SURFACE, validateConsumerSurfaceCompatibility } from './surface.js';

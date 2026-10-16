@@ -12,10 +12,16 @@ import {
 export * from './authService.js';
 export * from './storageService.js';
 export * from './systemDbService.js';
+export * from './authService/auth.ui.js';
+export * from './storageService/storage.ui.js';
+export * from './systemDb.ui.js';
 
 import { authService } from './authService.js';
 import { storageService } from './storageService.js';
 import { systemDbService } from './systemDbService.js';
+import { AuthServiceUISchema } from './authService/auth.ui.js';
+import { StorageServiceUISchema } from './storageService/storage.ui.js';
+import { SystemDbServiceUISchema } from './systemDb.ui.js';
 
 export const AuthClientServiceDefinition: ServiceDefinition = createServiceDefinition({
   id: 'kloks.service.auth',
@@ -40,6 +46,7 @@ export const AuthClientServiceFacade = {
   deployment: 'local' as const,
   definition: AuthClientServiceDefinition,
   service: authService,
+  ui: AuthServiceUISchema,
   createInstance: () => createService(AuthClientServiceDefinition),
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => {
     await authClientInstance.start();
@@ -70,6 +77,7 @@ export const StorageClientServiceFacade = {
   deployment: 'local' as const,
   definition: StorageClientServiceDefinition,
   service: storageService,
+  ui: StorageServiceUISchema,
   createInstance: () => createService(StorageClientServiceDefinition),
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => {
     await storageClientInstance.start();
@@ -105,6 +113,7 @@ export const SystemDbClientServiceFacade = {
   deployment: 'local' as const,
   definition: SystemDbClientServiceDefinition,
   service: systemDbService,
+  ui: SystemDbServiceUISchema,
   createInstance: () => createService(SystemDbClientServiceDefinition),
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => {
     await systemDbClientInstance.start();

@@ -10,10 +10,15 @@ import {
   CLEAN_DATABASE_CLUSTER,
   DEFAULT_CONNECTIONS,
 } from './helpers';
+import { StorageServiceUISchema } from './storage.ui.js';
+import type { ServiceUISchema } from '@kloks/contracts';
 
 type StorageListener = () => void;
 
 class StorageService {
+  static readonly ui: ServiceUISchema = StorageServiceUISchema;
+  readonly ui: ServiceUISchema = StorageServiceUISchema;
+
   private connections: UserStorageConnection[] = [];
   private clusterConfig: AdminDatabaseClusterConfig = CLEAN_DATABASE_CLUSTER;
   private listeners: Set<StorageListener> = new Set();
