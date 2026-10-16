@@ -47,7 +47,7 @@ export const StorageServiceUISchema: ServiceUISchema = {
       name: 'Storage.ui.TilesSection',
       assetRef: {
         packageId: '@ultrst-armada/floks',
-        packageVersion: '^1.2.3',
+        packageVersion: '^1.2.4',
         exportPath: 'ui',
         assetId: 'WorkspaceTilesMenu',
         assetVersion: '1.0.0',
@@ -71,7 +71,7 @@ export const StorageServiceUISchema: ServiceUISchema = {
       name: 'WorkspaceTilesMenu',
       assetRef: {
         packageId: '@ultrst-armada/floks',
-        packageVersion: '^1.2.3',
+        packageVersion: '^1.2.4',
         exportPath: 'ui',
         assetId: 'WorkspaceTilesMenu',
         assetVersion: '1.0.0',
@@ -81,7 +81,7 @@ export const StorageServiceUISchema: ServiceUISchema = {
   assetRefs: [
     {
       packageId: '@ultrst-armada/floks',
-      packageVersion: '^1.2.3',
+      packageVersion: '^1.2.4',
       exportPath: 'ui',
       assetId: 'WorkspaceTilesMenu',
       assetVersion: '1.0.0',

@@ -57,7 +57,7 @@ export const AuthServiceUISchema: ServiceUISchema = {
       name: 'Auth.ui.LoginSection',
       assetRef: {
         packageId: '@ultrst-armada/floks',
-        packageVersion: '^1.2.3',
+        packageVersion: '^1.2.4',
         exportPath: 'ui',
         assetId: 'AuthPage',
         assetVersion: '1.0.0',
@@ -81,7 +81,7 @@ export const AuthServiceUISchema: ServiceUISchema = {
       name: 'AuthPage',
       assetRef: {
         packageId: '@ultrst-armada/floks',
-        packageVersion: '^1.2.3',
+        packageVersion: '^1.2.4',
         exportPath: 'ui',
         assetId: 'AuthPage',
         assetVersion: '1.0.0',
@@ -91,7 +91,7 @@ export const AuthServiceUISchema: ServiceUISchema = {
       name: 'LoginModal',
       assetRef: {
         packageId: '@ultrst-armada/floks',
-        packageVersion: '^1.2.3',
+        packageVersion: '^1.2.4',
         exportPath: 'ui',
         assetId: 'LoginModal',
         assetVersion: '1.0.0',
@@ -101,14 +101,14 @@ export const AuthServiceUISchema: ServiceUISchema = {
   assetRefs: [
     {
       packageId: '@ultrst-armada/floks',
-      packageVersion: '^1.2.3',
+      packageVersion: '^1.2.4',
       exportPath: 'ui',
       assetId: 'AuthPage',
       assetVersion: '1.0.0',
     },
     {
       packageId: '@ultrst-armada/floks',
-      packageVersion: '^1.2.3',
+      packageVersion: '^1.2.4',
       exportPath: 'ui',
       assetId: 'LoginModal',
       assetVersion: '1.0.0',
