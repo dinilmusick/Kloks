@@ -89,8 +89,9 @@ export const KLOKS_PUBLIC_SURFACE: ExportSymbolEntry[] = [
   { name: 'MidiEventPayload', subpath: 'audio-midi', category: 'audio-midi', hasZodSchema: true },
 
   // ── orchestrations ──
-  { name: 'OrchestratorAFacade', subpath: 'orchestrations', category: 'orchestrations', hasZodSchema: false },
-  { name: 'OrchestratorBFacade', subpath: 'orchestrations', category: 'orchestrations', hasZodSchema: false },
+  { name: 'OrchestratorADefinition', subpath: 'orchestrations', category: 'orchestrations', hasZodSchema: false },
+  { name: 'OrchestratorBDefinition', subpath: 'orchestrations', category: 'orchestrations', hasZodSchema: false },
+  { name: 'AudioMidiOrchestratorDefinition', subpath: 'orchestrations', category: 'orchestrations', hasZodSchema: false },
 
   // ── backend ──
   { name: 'AuthServiceFacade', subpath: 'backend', category: 'backend', hasZodSchema: false },

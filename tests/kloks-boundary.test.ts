@@ -57,9 +57,11 @@ describe('Kloks Clean Distribution & Architectural Boundary', () => {
     const orchestrations = await import('../packages/orchestrations/src/index.js');
 
     expect(services.ServiceAFacade).toBeDefined();
-    expect(orchestrations.OrchestratorAFacade).toBeDefined();
+    expect(orchestrations.OrchestratorADefinition).toBeDefined();
+    expect(orchestrations.OrchestratorBDefinition).toBeDefined();
 
     // Verify no execution or worker symbols are exposed on orchestrations
+    expect((orchestrations.OrchestratorADefinition as any).execute).toBeUndefined();
     expect((orchestrations as any).WorkerExecutionBoundary).toBeUndefined();
     expect((orchestrations as any).workerExecutionBoundary).toBeUndefined();
     expect((orchestrations as any).backendFacade).toBeUndefined();

@@ -1,25 +1,12 @@
 /**
  * @file index.ts
- * @description @kloks/orchestrations — Canonical Orchestrators A & B built on KrnlTS & @kloks/services.
- * Orchestrator A: Service A (Pure) -> Service B (Stateful)
- * Orchestrator B: Service B (Stateful) -> Service C (Event-Emitting)
+ * @description @kloks/orchestrations — Canonical pure Orchestration Definitions A & B.
+ * STRICT INVARIANT: Kloks is a pure distribution catalog and NEVER owns execution,
+ * queues, workers, schedulers, or dispatchers. Kloks exports pure serializable definitions
+ * conforming to OrchestrationDefinition<TInput, TOutput>.
  */
 
-import {
-  ServiceAFacade,
-  ServiceBFacade,
-  ServiceCFacade,
-  type CounterState,
-  type TelemetryEvents,
-} from '@kloks/services';
-
-export interface OrchestratorFacade<TInput = unknown, TOutput = unknown> {
-  readonly id: string;
-  readonly name: string;
-  readonly version: string;
-  readonly dependencies: string[];
-  execute(input: TInput): Promise<TOutput>;
-}
+import type { OrchestrationDefinition } from '@ultrst-armada/krnl';
 
 export interface OrchestratorAInput {
   a: number;
@@ -29,31 +16,43 @@ export interface OrchestratorAInput {
 
 export interface OrchestratorAOutput {
   computed: number;
-  state: CounterState;
+  state: { count: number };
 }
 
 /**
- * Orchestrator A: Sequences Service A (Pure Math) -> Service B (Stateful Counter)
+ * Pure serializable definition for Orchestrator A.
+ * Sequences Service A (Pure Math) -> Service B (Stateful Counter).
+ * Free from execution machinery. To be instantiated and executed by Skipo/runtime.
  */
-export const OrchestratorAFacade: OrchestratorFacade<OrchestratorAInput, OrchestratorAOutput> = {
+export const OrchestratorADefinition: OrchestrationDefinition<OrchestratorAInput, OrchestratorAOutput> = {
   id: 'kloks.orchestrator.a',
   name: 'OrchestratorA',
   version: '1.0.0',
-  dependencies: [ServiceAFacade.id, ServiceBFacade.id],
-  execute: async (input: OrchestratorAInput): Promise<OrchestratorAOutput> => {
-    const op = input.operation ?? 'add';
-    const mathOut = await ServiceAFacade.execute<{ a: number; b: number }, { result: number }>(op, {
-      a: input.a,
-      b: input.b,
-    });
-    const stateOut = await ServiceBFacade.execute<{ delta: number }, CounterState>('increment', {
-      delta: mathOut.result,
-    });
-    return {
-      computed: mathOut.result,
-      state: stateOut,
-    };
-  },
+  description: 'Pure serializable orchestration definition: Service A -> Service B',
+  scope: 'service',
+  dependencies: ['kloks.service.a', 'kloks.service.b'],
+  steps: [
+    {
+      id: 'step_math',
+      name: 'Execute Math Operation',
+      type: 'task',
+      target: 'kloks.service.a',
+      operation: 'add',
+      retryPolicy: {
+        maxAttempts: 2,
+        backoff: 'exponential',
+        backoffMs: 50,
+      },
+    },
+    {
+      id: 'step_counter',
+      name: 'Increment Counter',
+      type: 'task',
+      target: 'kloks.service.b',
+      operation: 'increment',
+      dependsOn: ['step_math'],
+    },
+  ],
 };
 
 export interface OrchestratorBInput {
@@ -62,33 +61,67 @@ export interface OrchestratorBInput {
 }
 
 export interface OrchestratorBOutput {
-  state: CounterState;
-  emitted: TelemetryEvents['reading'];
+  state: { count: number };
+  emitted: { metric: string; value: number; timestamp: number };
 }
 
 /**
- * Orchestrator B: Sequences Service B (Stateful Counter) -> Service C (Event-Emitting Telemetry)
+ * Pure serializable definition for Orchestrator B.
+ * Sequences Service B (Stateful Counter) -> Service C (Event-Emitting Telemetry).
+ * Free from execution machinery. To be instantiated and executed by Skipo/runtime.
  */
-export const OrchestratorBFacade: OrchestratorFacade<OrchestratorBInput, OrchestratorBOutput> = {
+export const OrchestratorBDefinition: OrchestrationDefinition<OrchestratorBInput, OrchestratorBOutput> = {
   id: 'kloks.orchestrator.b',
   name: 'OrchestratorB',
   version: '1.0.0',
-  dependencies: [ServiceBFacade.id, ServiceCFacade.id],
-  execute: async (input: OrchestratorBInput = {}): Promise<OrchestratorBOutput> => {
-    const state = await ServiceBFacade.execute<{ delta: number }, CounterState>('increment', {
-      delta: input.delta ?? 1,
-    });
-    const emitted = await ServiceCFacade.execute<
-      { metric: string; value: number },
-      TelemetryEvents['reading']
-    >('publishReading', {
-      metric: input.metricName ?? 'counter.value',
-      value: state.count,
-    });
-    return {
-      state,
-      emitted,
-    };
-  },
+  description: 'Pure serializable orchestration definition: Service B -> Service C',
+  scope: 'service',
+  dependencies: ['kloks.service.b', 'kloks.service.c'],
+  steps: [
+    {
+      id: 'step_counter',
+      name: 'Increment Counter',
+      type: 'task',
+      target: 'kloks.service.b',
+      operation: 'increment',
+    },
+    {
+      id: 'step_telemetry',
+      name: 'Publish Telemetry Reading',
+      type: 'task',
+      target: 'kloks.service.c',
+      operation: 'publishReading',
+      dependsOn: ['step_counter'],
+    },
+  ],
 };
 
+/**
+ * Pure serializable definition for Audio-Midi Orchestrator.
+ * Sequences MidiService -> AudioHardwareService.
+ */
+export const AudioMidiOrchestratorDefinition: OrchestrationDefinition = {
+  id: 'kloks.orchestrator.audioMidi',
+  name: 'AudioMidiOrchestrator',
+  version: '1.0.0',
+  description: 'Pure serializable orchestration definition: Midi -> AudioHardware',
+  scope: 'service',
+  dependencies: ['kloks.midi.subsystem', 'kloks.audio.hardware'],
+  steps: [
+    {
+      id: 'step_midi',
+      name: 'Emit Virtual MIDI',
+      type: 'task',
+      target: 'kloks.midi.subsystem',
+      operation: 'emitVirtualMidi',
+    },
+    {
+      id: 'step_audio',
+      name: 'Get Audio Hardware State',
+      type: 'task',
+      target: 'kloks.audio.hardware',
+      operation: 'getState',
+      dependsOn: ['step_midi'],
+    },
+  ],
+};

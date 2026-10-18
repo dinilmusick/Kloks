@@ -8,7 +8,7 @@
       "name": "Orchestrator A (Service A -> Service B)",
       "version": "1.0.0",
       "package": "@kloks/orchestrations",
-      "export": "OrchestratorAFacade",
+      "export": "OrchestratorADefinition",
       "targetTypes": ["BackendFacade.orchestrations"]
     },
     {
@@ -16,7 +16,15 @@
       "name": "Orchestrator B (Service B -> Service C)",
       "version": "1.0.0",
       "package": "@kloks/orchestrations",
-      "export": "OrchestratorBFacade",
+      "export": "OrchestratorBDefinition",
+      "targetTypes": ["BackendFacade.orchestrations"]
+    },
+    {
+      "id": "orchestrator-audio-midi",
+      "name": "Audio-Midi Orchestrator (Midi -> AudioHardware)",
+      "version": "1.0.0",
+      "package": "@kloks/orchestrations",
+      "export": "AudioMidiOrchestratorDefinition",
       "targetTypes": ["BackendFacade.orchestrations"]
     }
   ]

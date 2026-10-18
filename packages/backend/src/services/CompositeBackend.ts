@@ -44,16 +44,34 @@ export class CompositeBackend implements IService {
     return this;
   }
 
+  private status: import('@ultrst-armada/krnl').ServiceStatus = 'uninitialized';
+
+  getStatus(): import('@ultrst-armada/krnl').ServiceStatus {
+    return this.status;
+  }
+
   async start(): Promise<void> {
+    this.status = 'starting';
     for (const service of this.services.values()) {
       await service.start();
     }
+    this.status = 'ready';
   }
 
   async stop(): Promise<void> {
+    this.status = 'stopping';
     for (const service of this.services.values()) {
       await service.stop();
     }
+    this.status = 'stopped';
+  }
+
+  async dispose(): Promise<void> {
+    for (const service of this.services.values()) {
+      await service.dispose();
+    }
+    this.services.clear();
+    this.status = 'stopped';
   }
 
   async call<TIn = unknown, TOut = unknown>(

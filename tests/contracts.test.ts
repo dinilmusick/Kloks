@@ -48,8 +48,8 @@ import {
 } from '@kloks/audio-midi';
 
 import {
-  OrchestratorAFacade,
-  OrchestratorBFacade,
+  OrchestratorADefinition,
+  OrchestratorBDefinition,
 } from '@kloks/orchestrations';
 
 describe('Kloks 01 — Contract Foundation Verification Suite', () => {
@@ -148,12 +148,14 @@ describe('Kloks 01 — Contract Foundation Verification Suite', () => {
     );
     expect(ruleRes.initialized).toBe(true);
 
-    // 4. Orchestrators A & B
-    const orchA = await OrchestratorAFacade.execute({ a: 10, b: 2 });
-    expect(orchA.computed).toBe(12);
+    // 4. Orchestrators A & B (Pure definitions in Kloks distribution)
+    expect(OrchestratorADefinition.id).toBe('kloks.orchestrator.a');
+    expect(OrchestratorADefinition.scope).toBe('service');
+    expect((OrchestratorADefinition as any).execute).toBeUndefined();
 
-    const orchB = await OrchestratorBFacade.execute({ delta: 5 });
-    expect(orchB.emitted.value).toBe(orchB.state.count);
+    expect(OrchestratorBDefinition.id).toBe('kloks.orchestrator.b');
+    expect(OrchestratorBDefinition.scope).toBe('service');
+    expect((OrchestratorBDefinition as any).execute).toBeUndefined();
   });
 
   // ── T4: Semantic Invariants ──

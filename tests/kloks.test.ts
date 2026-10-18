@@ -18,8 +18,8 @@ import {
   exposeServiceD,
 } from '@kloks/services';
 import {
-  OrchestratorAFacade,
-  OrchestratorBFacade,
+  OrchestratorADefinition,
+  OrchestratorBDefinition,
 } from '@kloks/orchestrations';
 import {
   AudioHardwareServiceFacade,
@@ -42,7 +42,7 @@ import {
 } from '@kloks/state-graph';
 
 describe('Kloks Public Package Library (@kloks/* built on KrnlTS)', () => {
-  it('Service A (Pure) & Service B (Stateful) execute and compose via Orchestrator A', async () => {
+  it('Service A (Pure) & Service B (Stateful) have pure serializable Orchestrator A definition with zero execution machinery', async () => {
     await ServiceBFacade.execute('reset');
     const sum = await ServiceAFacade.execute<{ a: number; b: number }, { result: number }>('add', {
       a: 12,
@@ -50,17 +50,21 @@ describe('Kloks Public Package Library (@kloks/* built on KrnlTS)', () => {
     });
     expect(sum.result).toBe(20);
 
-    const orchA = await OrchestratorAFacade.execute({ a: 5, b: 7, operation: 'multiply' });
-    expect(orchA.computed).toBe(35);
-    expect(orchA.state.count).toBe(35);
+    expect(OrchestratorADefinition.id).toBe('kloks.orchestrator.a');
+    expect(OrchestratorADefinition.steps).toHaveLength(2);
+    expect(OrchestratorADefinition.dependencies).toContain('kloks.service.a');
+    expect(OrchestratorADefinition.dependencies).toContain('kloks.service.b');
+    // Enforce ZERO execution machinery in Kloks
+    expect((OrchestratorADefinition as any).execute).toBeUndefined();
   });
 
-  it('Service B (Stateful) & Service C (Event-Emitting) compose via Orchestrator B', async () => {
-    await ServiceBFacade.execute('reset');
-    const orchB = await OrchestratorBFacade.execute({ delta: 10, metricName: 'requests.count' });
-    expect(orchB.state.count).toBe(10);
-    expect(orchB.emitted.metric).toBe('requests.count');
-    expect(orchB.emitted.value).toBe(10);
+  it('Service B (Stateful) & Service C (Event-Emitting) have pure serializable Orchestrator B definition with zero execution machinery', async () => {
+    expect(OrchestratorBDefinition.id).toBe('kloks.orchestrator.b');
+    expect(OrchestratorBDefinition.steps).toHaveLength(2);
+    expect(OrchestratorBDefinition.dependencies).toContain('kloks.service.b');
+    expect(OrchestratorBDefinition.dependencies).toContain('kloks.service.c');
+    // Enforce ZERO execution machinery in Kloks
+    expect((OrchestratorBDefinition as any).execute).toBeUndefined();
   });
 
   it('Service D (Protocol-Enabled) exposes over HTTP and responds via KrnlTS ServiceProxy', async () => {
