@@ -39,11 +39,6 @@
       "import": "./packages/state-graph/dist/state/index.js",
       "default": "./packages/state-graph/dist/state/index.js"
     },
-    "./state-graph/execution": {
-      "types": "./packages/state-graph/dist/execution/index.d.ts",
-      "import": "./packages/state-graph/dist/execution/index.js",
-      "default": "./packages/state-graph/dist/execution/index.js"
-    },
     "./state-graph/domain": {
       "types": "./packages/state-graph/dist/domain/index.d.ts",
       "import": "./packages/state-graph/dist/domain/index.js",
@@ -79,11 +74,6 @@
       "import": "./packages/backend/dist/index.js",
       "default": "./packages/backend/dist/index.js"
     },
-    "./backend/execution": {
-      "types": "./packages/backend/dist/execution/index.d.ts",
-      "import": "./packages/backend/dist/execution/index.js",
-      "default": "./packages/backend/dist/execution/index.js"
-    },
     "./backend/krnl-services": {
       "types": "./packages/backend/dist/krnl-services.d.ts",
       "import": "./packages/backend/dist/krnl-services.js",
@@ -113,11 +103,6 @@
       "types": "./packages/client/dist/index.d.ts",
       "import": "./packages/client/dist/index.js",
       "default": "./packages/client/dist/index.js"
-    },
-    "./backend/worker": {
-      "types": "./packages/backend/dist/execution/WorkerExecutionBoundary.d.ts",
-      "import": "./packages/backend/dist/execution/WorkerExecutionBoundary.js",
-      "default": "./packages/backend/dist/execution/WorkerExecutionBoundary.js"
     }
   },
   "scripts": {
@@ -131,7 +116,6 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.600.0",
     "bcryptjs": "^2.4.3",
-    "bullmq": "^6.3.8",
     "ws": "^8.18.0",
     "zod": "^3.24.1",
     "zustand": "^5.0.15"

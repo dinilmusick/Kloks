@@ -17,7 +17,6 @@ export type {
   ServiceRegistryRecord,
 } from './architecture/types.js';
 export { validateServiceDefinition } from './architecture/types.js';
-export * from './execution/index.js';
 export * from './services/index.js';
 export * from './core/index.js';
 export * from './server/index.js';

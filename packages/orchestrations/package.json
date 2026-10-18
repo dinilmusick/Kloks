@@ -20,7 +20,7 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean --external @kloks/services --external @kloks/state-graph --external @kloks/backend --external @kloks/backend/execution --external ws",
+    "build": "tsup src/index.ts --format esm --dts --clean --external @kloks/services --external @kloks/state-graph --external @kloks/backend --external ws",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },

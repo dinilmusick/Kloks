@@ -19,9 +19,6 @@
       "@kloks/backend": [
         "../backend/dist/index.d.ts"
       ],
-      "@kloks/backend/execution": [
-        "../backend/dist/execution/index.d.ts"
-      ],
       "@kloks/audio-midi": [
         "../audio-midi/dist/index.d.ts"
       ],

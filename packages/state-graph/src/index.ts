@@ -11,7 +11,6 @@ import {
 } from '@ultrst-armada/krnl';
 
 export * from './state/index.js';
-export * from './execution/index.js';
 export * from './domain/index.js';
 export * from './rules/index.js';
 export * from './spatial/index.js';

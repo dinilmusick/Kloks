@@ -23,11 +23,6 @@
       "types": "./dist/state/index.d.ts",
       "default": "./dist/state/index.js"
     },
-    "./execution": {
-      "import": "./dist/execution/index.js",
-      "types": "./dist/execution/index.d.ts",
-      "default": "./dist/execution/index.js"
-    },
     "./domain": {
       "import": "./dist/domain/index.js",
       "types": "./dist/domain/index.d.ts",
@@ -50,13 +45,12 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts src/state/index.ts src/execution/index.ts src/domain/index.ts src/rules/index.ts src/spatial/index.ts src/store/index.ts --format esm --dts --clean --external zustand --external bullmq --external react --external ws",
+    "build": "tsup src/index.ts src/state/index.ts src/domain/index.ts src/rules/index.ts src/spatial/index.ts src/store/index.ts --format esm --dts --clean --external zustand --external react --external ws",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "dependencies": {
     "@kloks/functions": "workspace:*",
-    "bullmq": "^6.3.8",
     "zustand": "^5.0.15"
   },
   "peerDependencies": {

@@ -129,27 +129,6 @@
       "dependencies": []
     },
     {
-      "id": "execution",
-      "name": "Execution & Worker Boundary",
-      "version": "1.0.0",
-      "description": "Executable backend facade with isolated background worker boundary.",
-      "backend": {
-        "package": "@kloks/backend",
-        "subpath": "krnl-services",
-        "export": "ExecutionServiceFacade",
-        "facade": "ExecutionServiceFacade"
-      },
-      "modes": [
-        "backend"
-      ],
-      "targets": {
-        "backend": [
-          "BackendFacade.services"
-        ]
-      },
-      "dependencies": []
-    },
-    {
       "id": "database",
       "name": "Database Service",
       "version": "1.0.0",

@@ -225,6 +225,14 @@ export const ServiceDDefinition: ServiceDefinition = createServiceDefinition({
         timestamp: Date.now(),
       }),
     },
+    uppercase: {
+      id: 'ServiceD.uppercase',
+      name: 'uppercase',
+      protocols: ['http', 'ws', 'udp', 'p2p'],
+      handler: async (input: { text?: string } | string) => ({
+        result: (typeof input === 'string' ? input : (input as any)?.text ?? '').toUpperCase(),
+      }),
+    },
   },
 });
 

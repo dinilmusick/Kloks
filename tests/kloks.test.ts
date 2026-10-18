@@ -35,7 +35,6 @@ import {
   StorageServiceFacade,
   WorkspaceServiceFacade,
   ControlPlaneServiceFacade,
-  ExecutionServiceFacade,
 } from '@kloks/backend';
 import {
   StateLifecycleServiceFacade,
@@ -115,12 +114,6 @@ describe('Kloks Public Package Library (@kloks/* built on KrnlTS)', () => {
       'status'
     );
     expect(cpStatus.healthy).toBe(true);
-
-    const execBoundary = await ExecutionServiceFacade.execute<
-      { name: string },
-      { facadeName: string; workerReady: boolean }
-    >('createWorkerBoundary', { name: 'TestApp' });
-    expect(execBoundary.workerReady).toBe(true);
 
     const storageStatus = await StorageServiceFacade.execute<
       { provider: 'local' },

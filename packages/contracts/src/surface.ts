@@ -91,17 +91,12 @@ export const KLOKS_PUBLIC_SURFACE: ExportSymbolEntry[] = [
   // ── orchestrations ──
   { name: 'OrchestratorAFacade', subpath: 'orchestrations', category: 'orchestrations', hasZodSchema: false },
   { name: 'OrchestratorBFacade', subpath: 'orchestrations', category: 'orchestrations', hasZodSchema: false },
-  { name: 'WorkspaceBackendFacade', subpath: 'orchestrations', category: 'orchestrations', hasZodSchema: false },
-  { name: 'backendFacade', subpath: 'orchestrations', category: 'orchestrations', hasZodSchema: false },
-  { name: 'workerExecutionBoundary', subpath: 'orchestrations', category: 'orchestrations', hasZodSchema: false },
 
   // ── backend ──
   { name: 'AuthServiceFacade', subpath: 'backend', category: 'backend', hasZodSchema: false },
   { name: 'StorageServiceFacade', subpath: 'backend', category: 'backend', hasZodSchema: false },
   { name: 'WorkspaceServiceFacade', subpath: 'backend', category: 'backend', hasZodSchema: false },
   { name: 'ControlPlaneServiceFacade', subpath: 'backend', category: 'backend', hasZodSchema: false },
-  { name: 'ExecutionServiceFacade', subpath: 'backend', category: 'backend', hasZodSchema: false },
-  { name: 'ExecutableBackendFacade', subpath: 'backend', category: 'backend', hasZodSchema: false },
 
   // ── services ──
   { name: 'ServiceAFacade', subpath: 'services', category: 'services', hasZodSchema: false },
@@ -143,7 +138,6 @@ export const QWNSR_REQUIRED_SURFACE: string[] = [
   'createNodeInstance',
   'StateLifecycleServiceFacade',
   'NodeGraphEngineServiceFacade',
-  'WorkspaceBackendFacade',
   'AudioHardwareServiceFacade',
   'MidiServiceFacade',
   'AudioMidiOrchestratorFacade',

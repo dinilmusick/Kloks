@@ -5,7 +5,6 @@
  * - StorageServiceFacade
  * - WorkspaceServiceFacade
  * - ControlPlaneServiceFacade
- * - ExecutionServiceFacade
  */
 
 import {
@@ -22,8 +21,6 @@ import {
   formatCanonicalWorkspaceFolderName,
   sanitizeWorkspaceName,
 } from './workspace/WorkspaceCanonical.js';
-import { ExecutableBackendFacade } from './execution/BackendFacade.js';
-import { WorkerExecutionBoundary } from './execution/WorkerExecutionBoundary.js';
 
 // 1. AuthService (KrnlTS Service)
 export const AuthServiceDefinition: ServiceDefinition = createServiceDefinition({
@@ -175,41 +172,7 @@ export const ControlPlaneServiceFacade = {
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await controlPlaneServiceInstance.start(); return controlPlaneServiceInstance.call<TIn, TOut>(op, input); },
 };
 
-// 5. ExecutionService (KrnlTS Service)
-export const ExecutionServiceDefinition: ServiceDefinition = createServiceDefinition({
-  id: 'kloks.backend.execution',
-  name: 'ExecutionService',
-  version: '1.0.0',
-  operations: {
-    createWorkerBoundary: {
-      id: 'ExecutionService.createWorkerBoundary',
-      name: 'createWorkerBoundary',
-      handler: async (input: { name: string }) => {
-        const facade = new ExecutableBackendFacade(input.name);
-        const worker = new WorkerExecutionBoundary(`${input.name}Worker`, facade);
-        return {
-          facadeName: facade.name,
-          workerReady: Boolean(worker),
-        };
-      },
-    },
-  },
-});
-
-const executionServiceInstance: IService = createService(ExecutionServiceDefinition);
-
-export const ExecutionServiceFacade = {
-  id: ExecutionServiceDefinition.id,
-  name: ExecutionServiceDefinition.name,
-  version: ExecutionServiceDefinition.version,
-  runtime: 'server' as const,
-  deployment: 'local' as const,
-  definition: ExecutionServiceDefinition,
-  createInstance: () => createService(ExecutionServiceDefinition),
-  execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await executionServiceInstance.start(); return executionServiceInstance.call<TIn, TOut>(op, input); },
-};
-
-// 6. DatabaseService (KrnlTS Service)
+// 5. DatabaseService (KrnlTS Service)
 export const DatabaseServiceDefinition: ServiceDefinition = createServiceDefinition({
   id: 'kloks.backend.database',
   name: 'DatabaseService',

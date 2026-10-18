@@ -48,8 +48,6 @@ import {
 } from '@kloks/audio-midi';
 
 import {
-  WorkspaceBackendFacade,
-  backendFacade,
   OrchestratorAFacade,
   OrchestratorBFacade,
 } from '@kloks/orchestrations';
@@ -137,11 +135,7 @@ describe('Kloks 01 — Contract Foundation Verification Suite', () => {
 
   // ── T3: Facade Behavior ──
   it('T3: verifies stable facades execute according to their public contract', async () => {
-    // 1. WorkspaceBackendFacade
-    expect(backendFacade.name).toBe('WorkspaceBackendFacade');
-    expect(WorkspaceBackendFacade.prototype).toBeDefined();
-
-    // 2. StateLifecycleServiceFacade
+    // 1. StateLifecycleServiceFacade
     const stateRes = await StateLifecycleServiceFacade.execute<{ from: string; to: string }, { graphReady: boolean }>(
       'validateTransition',
       { from: 'IDLE', to: 'READY' }

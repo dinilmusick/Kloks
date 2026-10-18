@@ -58,11 +58,6 @@
       "types": "./dist/srkl/index.d.ts",
       "default": "./dist/srkl/index.js"
     },
-    "./execution": {
-      "import": "./dist/execution/index.js",
-      "types": "./dist/execution/index.d.ts",
-      "default": "./dist/execution/index.js"
-    },
     "./services": {
       "import": "./dist/services/index.js",
       "types": "./dist/services/index.d.ts",
@@ -75,7 +70,7 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts src/krnl-services.ts src/services/index.ts src/auth/index.ts src/storage/index.ts src/workspace/index.ts src/control-plane/index.ts src/api/index.ts src/connectivity/index.ts src/client/index.ts src/srkl/index.ts src/execution/index.ts --format esm --dts --clean --external @kloks/functions --external react --external @kloks/state-graph --external @neondatabase/serverless --external @supabase/supabase-js --external @aws-sdk/client-s3 --external @aws-sdk/lib-storage --external bcryptjs --external better-sqlite3 --external zod --external ws",
+    "build": "tsup src/index.ts src/krnl-services.ts src/services/index.ts src/auth/index.ts src/storage/index.ts src/workspace/index.ts src/control-plane/index.ts src/api/index.ts src/connectivity/index.ts src/client/index.ts src/srkl/index.ts --format esm --dts --clean --external @kloks/functions --external react --external @kloks/state-graph --external @neondatabase/serverless --external @supabase/supabase-js --external @aws-sdk/client-s3 --external @aws-sdk/lib-storage --external bcryptjs --external better-sqlite3 --external zod --external ws",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
