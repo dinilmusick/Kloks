@@ -24,7 +24,7 @@ import {
 import {
   AudioHardwareServiceFacade,
   MidiServiceFacade,
-  AudioMidiOrchestratorFacade,
+  AudioMidiOrchestratorDefinition,
 } from '@kloks/audio-midi';
 import {
   FunctionsServiceFacade,
@@ -88,15 +88,11 @@ describe('Kloks Public Package Library (@kloks/* built on KrnlTS)', () => {
     expect(parsed.note).toBe(64);
     expect(parsed.velocity).toBe(110);
 
-    const routed = await AudioMidiOrchestratorFacade.execute({
-      midiCommand: 'NOTE_ON',
-      note: 60,
-      velocity: 100,
-      channel: 1,
-    });
-    expect(routed.midiEvent.command).toBe('NOTE_ON');
-    expect(routed.midiEvent.note).toBe(60);
-    expect(routed.audioState.sampleRate).toBeGreaterThan(0);
+    expect(AudioMidiOrchestratorDefinition.id).toBe('kloks.orchestrator.audioMidi');
+    expect(AudioMidiOrchestratorDefinition.steps).toHaveLength(2);
+    expect(AudioMidiOrchestratorDefinition.dependencies).toContain(MidiServiceFacade.id);
+    expect(AudioMidiOrchestratorDefinition.dependencies).toContain(AudioHardwareServiceFacade.id);
+    expect((AudioMidiOrchestratorDefinition as any).execute).toBeUndefined();
   });
 
   it('@kloks/functions FunctionsServiceFacade and pure utilities execute', async () => {

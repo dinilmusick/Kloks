@@ -44,7 +44,7 @@ import {
 import {
   AudioHardwareServiceFacade,
   MidiServiceFacade,
-  AudioMidiOrchestratorFacade,
+  AudioMidiOrchestratorDefinition,
 } from '@kloks/audio-midi';
 
 import {

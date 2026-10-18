@@ -60,7 +60,7 @@
       "name": "Audio & MIDI Orchestrator",
       "version": "1.0.0",
       "package": "@kloks/audio-midi",
-      "export": "AudioMidiOrchestratorFacade",
+      "export": "AudioMidiOrchestratorDefinition",
       "targetTypes": [
         "BackendFacade.orchestrations"
       ]

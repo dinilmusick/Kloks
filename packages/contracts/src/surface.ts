@@ -82,7 +82,7 @@ export const KLOKS_PUBLIC_SURFACE: ExportSymbolEntry[] = [
   { name: 'MidiManager', subpath: 'audio-midi', category: 'audio-midi', hasZodSchema: false },
   { name: 'AudioHardwareServiceFacade', subpath: 'audio-midi', category: 'audio-midi', hasZodSchema: false },
   { name: 'MidiServiceFacade', subpath: 'audio-midi', category: 'audio-midi', hasZodSchema: false },
-  { name: 'AudioMidiOrchestratorFacade', subpath: 'audio-midi', category: 'audio-midi', hasZodSchema: false },
+  { name: 'AudioMidiOrchestratorDefinition', subpath: 'audio-midi', category: 'audio-midi', hasZodSchema: false },
   { name: 'AudioBusConfig', subpath: 'audio-midi', category: 'audio-midi', hasZodSchema: true },
   { name: 'AudioHardwareState', subpath: 'audio-midi', category: 'audio-midi', hasZodSchema: true },
   { name: 'MidiCommandType', subpath: 'audio-midi', category: 'audio-midi', hasZodSchema: true },
@@ -141,7 +141,7 @@ export const QWNSR_REQUIRED_SURFACE: string[] = [
   'NodeGraphEngineServiceFacade',
   'AudioHardwareServiceFacade',
   'MidiServiceFacade',
-  'AudioMidiOrchestratorFacade',
+  'AudioMidiOrchestratorDefinition',
 ];
 
 export interface CompatibilityCheckResult {

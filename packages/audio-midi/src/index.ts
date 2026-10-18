@@ -130,7 +130,14 @@ export function createAudioHardwareService(
       getState: {
         id: 'AudioHardwareService.getState',
         name: 'getState',
-        handler: async () => manager.getState(),
+        handler: async (input?: any) => {
+          const state = manager.getState();
+          return {
+            ...state,
+            ...(input && typeof input === 'object' ? input : {}),
+            audioState: state,
+          };
+        },
       },
       dispose: {
         id: 'AudioHardwareService.dispose',
@@ -229,17 +236,18 @@ export function createMidiService(
       emitVirtualMidi: {
         id: 'MidiService.emitVirtualMidi',
         name: 'emitVirtualMidi',
-        handler: async (payload: Partial<MidiEventPayload> & { command: MidiCommandType }) => {
+        handler: async (payload: any) => {
           let captured: MidiEventPayload | null = null;
           const unsub = manager.subscribeEvents((ev) => {
             captured = ev;
           });
-          manager.emitVirtualMidi(payload);
+          const cmd = payload.command || payload.midiCommand || 'NOTE_ON';
+          manager.emitVirtualMidi({ ...payload, command: cmd });
           unsub();
           if (captured && svcRef) {
             svcRef.emit('midiEvent', captured);
           }
-          return captured;
+          return { midiEvent: captured, success: true };
         },
       },
       parseRawBytes: {
@@ -296,38 +304,35 @@ export const MidiServiceFacade = {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 3. AUDIO-MIDI ORCHESTRATOR FACADE
+// 3. AUDIO-MIDI ORCHESTRATION DEFINITION (Pure serializable asset)
 // ══════════════════════════════════════════════════════════════════════════════
 
-export const AudioMidiOrchestratorFacade = {
+import type { OrchestrationDefinition } from '@ultrst-armada/krnl';
+
+export const AudioMidiOrchestratorDefinition: OrchestrationDefinition = {
   id: 'kloks.orchestrator.audioMidi',
   name: 'AudioMidiOrchestrator',
   version: '1.0.0',
+  description: 'Pure serializable orchestration definition: Midi -> AudioHardware',
+  scope: 'service',
   dependencies: [AudioHardwareServiceFacade.id, MidiServiceFacade.id],
-  execute: async (input: {
-    midiCommand: MidiCommandType;
-    note?: number;
-    velocity?: number;
-    channel?: number;
-  }) => {
-    const midiEvent = await MidiServiceFacade.execute<
-      Partial<MidiEventPayload> & { command: MidiCommandType },
-      MidiEventPayload
-    >('emitVirtualMidi', {
-      command: input.midiCommand,
-      note: input.note ?? 60,
-      velocity: input.velocity ?? 100,
-      channel: input.channel ?? 1,
-    });
-    const audioState = await AudioHardwareServiceFacade.execute<undefined, AudioHardwareState>(
-      'getState'
-    );
-    return {
-      midiEvent,
-      audioState,
-      routedAt: Date.now(),
-    };
-  },
+  steps: [
+    {
+      id: 'step_midi',
+      name: 'Emit Virtual MIDI',
+      type: 'task',
+      target: MidiServiceFacade.id,
+      operation: 'emitVirtualMidi',
+    },
+    {
+      id: 'step_audio',
+      name: 'Get Audio Hardware State',
+      type: 'task',
+      target: AudioHardwareServiceFacade.id,
+      operation: 'getState',
+      dependsOn: ['step_midi'],
+    },
+  ],
 };
 
 export * from './engine/index.js';
