@@ -335,5 +335,16 @@ export const AudioMidiOrchestratorDefinition: OrchestrationDefinition = {
   ],
 };
 
+// ══════════════════════════════════════════════════════════════════════════════
+// KRNL CANONICAL SERVICE EXPORTS (Standardized krnl* Prefix Rule)
+// ══════════════════════════════════════════════════════════════════════════════
+export const krnlAudioHardwareServiceDefinition = AudioHardwareServiceDefinition;
+export const krnlAudioHardwareServiceFacade = AudioHardwareServiceFacade;
+export const krnlMidiServiceDefinition = MidiServiceDefinition;
+export const krnlMidiServiceFacade = MidiServiceFacade;
+export const krnlAudioMidiOrchestratorDefinition = AudioMidiOrchestratorDefinition;
+
 export * from './engine/index.js';
+
+
 

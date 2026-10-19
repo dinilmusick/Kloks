@@ -125,3 +125,11 @@ export const AudioMidiOrchestratorDefinition: OrchestrationDefinition = {
     },
   ],
 };
+
+// ══════════════════════════════════════════════════════════════════════════════
+// KRNL CANONICAL ORCHESTRATION EXPORTS (Standardized krnl* Prefix Rule)
+// ══════════════════════════════════════════════════════════════════════════════
+export const krnlOrchestratorADefinition = OrchestratorADefinition;
+export const krnlOrchestratorBDefinition = OrchestratorBDefinition;
+export const krnlAudioMidiOrchestratorDefinition = AudioMidiOrchestratorDefinition;
+

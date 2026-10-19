@@ -72,3 +72,10 @@ export const FunctionsServiceFacade = {
   createInstance: () => createService(FunctionsServiceDefinition),
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await defaultFunctionsService.start(); return defaultFunctionsService.call<TIn, TOut>(op, input); },
 };
+
+// ══════════════════════════════════════════════════════════════════════════════
+// KRNL CANONICAL SERVICE EXPORTS (Standardized krnl* Prefix Rule)
+// ══════════════════════════════════════════════════════════════════════════════
+export const krnlFunctionsServiceDefinition = FunctionsServiceDefinition;
+export const krnlFunctionsServiceFacade = FunctionsServiceFacade;
+

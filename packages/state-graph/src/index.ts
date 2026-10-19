@@ -206,3 +206,14 @@ export const PredictiveGraphServiceFacade = {
   createInstance: () => createService(PredictiveGraphServiceDefinition),
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await predictiveGraphServiceInstance.start(); return predictiveGraphServiceInstance.call<TIn, TOut>(op, input); },
 };
+
+// ══════════════════════════════════════════════════════════════════════════════
+// KRNL CANONICAL SERVICE EXPORTS (Standardized krnl* Prefix Rule)
+// ══════════════════════════════════════════════════════════════════════════════
+export const krnlStateLifecycleServiceDefinition = StateLifecycleServiceDefinition;
+export const krnlStateLifecycleServiceFacade = StateLifecycleServiceFacade;
+export const krnlNodeGraphEngineServiceDefinition = NodeGraphEngineServiceDefinition;
+export const krnlNodeGraphEngineServiceFacade = NodeGraphEngineServiceFacade;
+export const krnlPredictiveGraphServiceDefinition = PredictiveGraphServiceDefinition;
+export const krnlPredictiveGraphServiceFacade = PredictiveGraphServiceFacade;
+
