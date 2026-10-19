@@ -235,3 +235,20 @@ export const GeminiServiceFacade = {
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await geminiServiceInstance.start(); return geminiServiceInstance.call<TIn, TOut>(op, input); },
 };
 
+// ══════════════════════════════════════════════════════════════════════════════
+// KRNL CANONICAL BACKEND SERVICE EXPORTS (Standardized krnl* Prefix Rule)
+// ══════════════════════════════════════════════════════════════════════════════
+export const krnlAuthServiceDefinition = AuthServiceDefinition;
+export const krnlAuthServiceFacade = AuthServiceFacade;
+export const krnlStorageServiceDefinition = StorageServiceDefinition;
+export const krnlStorageServiceFacade = StorageServiceFacade;
+export const krnlWorkspaceServiceDefinition = WorkspaceServiceDefinition;
+export const krnlWorkspaceServiceFacade = WorkspaceServiceFacade;
+export const krnlControlPlaneServiceDefinition = ControlPlaneServiceDefinition;
+export const krnlControlPlaneServiceFacade = ControlPlaneServiceFacade;
+export const krnlDatabaseServiceDefinition = DatabaseServiceDefinition;
+export const krnlDatabaseServiceFacade = DatabaseServiceFacade;
+export const krnlGeminiServiceDefinition = GeminiServiceDefinition;
+export const krnlGeminiServiceFacade = GeminiServiceFacade;
+
+

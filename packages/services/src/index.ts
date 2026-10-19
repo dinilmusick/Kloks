@@ -282,5 +282,21 @@ export const ServiceDFacade: ServiceFacade = {
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await defaultServiceD.start(); return defaultServiceD.call<TIn, TOut>(op, input); },
 };
 
+// ══════════════════════════════════════════════════════════════════════════════
+// KRNL CANONICAL SERVICE EXPORTS (Standardized krnl* Prefix Rule)
+// ══════════════════════════════════════════════════════════════════════════════
+export const krnlServiceADefinition = ServiceADefinition;
+export const krnlServiceAFacade = ServiceAFacade;
+export const krnlServiceBDefinition = ServiceBDefinition;
+export const krnlServiceBFacade = ServiceBFacade;
+export const krnlCreateServiceB = createServiceB;
+export const krnlServiceCDefinition = ServiceCDefinition;
+export const krnlServiceCFacade = ServiceCFacade;
+export const krnlCreateServiceC = createServiceC;
+export const krnlServiceDDefinition = ServiceDDefinition;
+export const krnlServiceDFacade = ServiceDFacade;
+export const krnlExposeServiceD = exposeServiceD;
+
 export * from './client-services/index.js';
+
 
