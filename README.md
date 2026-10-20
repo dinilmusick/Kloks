@@ -1,2 +1,3 @@
 # Kloks
-Kloks stands for KrnlTS BLOcKS. So this will be a libraries repository that will be used to store and get ready to use KrnlTS services and their component (entities, functionalities and concept libraries) assets. These make assembling KrnlTS services like modular blocks based construction.
+
+Kloks stands for KrnlTS BLOcKS. It is the reusable library layer for services built on KrnlTS, including service definitions, functionalities, functionality orchestrations, and concept libraries. These assets make assembling KrnlTS services similar to building with modular blocks.
