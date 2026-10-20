@@ -1,7 +1,7 @@
 {
   "name": "@kloks/services",
-  "version": "1.0.0",
-  "description": "Kloks Canonical Services A-D (Pure, Stateful, Event-Emitting, Protocol-Enabled) built on KrnlTS",
+  "version": "1.4.4",
+  "description": "Kloks canonical reusable backend services built on KrnlTS",
   "type": "module",
   "private": false,
   "publishConfig": {
