@@ -14,9 +14,14 @@ import {
   type ServiceDefinition,
 } from '@ultrst-armada/krnl';
 import { SessionManager } from './auth/SessionManager.js';
+import { loginSystemUser, resolveUserFromToken } from './auth/UnifiedAuthCore.js';
+import { queryUnifiedDb } from './core/unifiedDb.js';
 import { RateLimiter } from './auth/RateLimiter.js';
 import type { UserRole } from './auth/types.js';
 import { StorageAdapterFactory } from './storage/StorageAdapterFactory.js';
+import { b2ListBuckets } from './storage/B2DirectClient.js';
+import { getSrklAccounts, srklListBackblazeBuckets } from './srkl/SrklDiscoveryService.js';
+import { findUserWorkspace, getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace } from './core/workspaceCore.js';
 import {
   formatCanonicalWorkspaceFolderName,
   sanitizeWorkspaceName,
@@ -38,6 +43,18 @@ export const AuthServiceDefinition: ServiceDefinition = createServiceDefinition(
         const sm = new SessionManager();
         return sm.createSession(input.userId, input.role ?? 'user');
       },
+    },
+    login: {
+      id: 'AuthService.login',
+      name: 'login',
+      handler: async (input: { email: string; password: string; isAdmin?: boolean; env?: Record<string, unknown> }) =>
+        loginSystemUser(input.email, input.password, Boolean(input.isAdmin), (sql, params) => queryUnifiedDb(sql, params, input.env)),
+    },
+    resolveUser: {
+      id: 'AuthService.resolveUser',
+      name: 'resolveUser',
+      handler: async (input: { tokenOrUserId: string; env?: Record<string, unknown> }) =>
+        resolveUserFromToken(input.tokenOrUserId, (sql, params) => queryUnifiedDb(sql, params, input.env)),
     },
     checkRateLimit: {
       id: 'AuthService.checkRateLimit',
@@ -70,6 +87,11 @@ export const StorageServiceDefinition: ServiceDefinition = createServiceDefiniti
   name: 'StorageService',
   version: '1.0.0',
   operations: {
+    listBackblazeBuckets: {
+      id: 'StorageService.listBackblazeBuckets',
+      name: 'listBackblazeBuckets',
+      handler: async (input: { keyId: string; applicationKey: string }) => b2ListBuckets(input.keyId, input.applicationKey),
+    },
     resolveAdapterType: {
       id: 'StorageService.resolveAdapterType',
       name: 'resolveAdapterType',
@@ -107,6 +129,31 @@ export const WorkspaceServiceDefinition: ServiceDefinition = createServiceDefini
   name: 'WorkspaceService',
   version: '1.0.0',
   operations: {
+    listWorkspaces: {
+      id: 'WorkspaceService.listWorkspaces',
+      name: 'listWorkspaces',
+      handler: async (input: { userId?: string; env?: Record<string, unknown> }) => getWorkspaces(input.userId, input.env),
+    },
+    findWorkspace: {
+      id: 'WorkspaceService.findWorkspace',
+      name: 'findWorkspace',
+      handler: async (input: { workspaceId: string; env?: Record<string, unknown> }) => findUserWorkspace(input.workspaceId, input.env),
+    },
+    createWorkspace: {
+      id: 'WorkspaceService.createWorkspace',
+      name: 'createWorkspace',
+      handler: async (input: { userId: string; workspace: Record<string, unknown>; env?: Record<string, unknown> }) => createWorkspace(input.userId, input.workspace, input.env),
+    },
+    updateWorkspace: {
+      id: 'WorkspaceService.updateWorkspace',
+      name: 'updateWorkspace',
+      handler: async (input: { userId: string; params: Record<string, unknown>; env?: Record<string, unknown> }) => updateWorkspace(input.userId, input.params, input.env),
+    },
+    deleteWorkspace: {
+      id: 'WorkspaceService.deleteWorkspace',
+      name: 'deleteWorkspace',
+      handler: async (input: { userId: string; workspaceId: string; env?: Record<string, unknown> }) => deleteWorkspace(input.userId, input.workspaceId, input.env),
+    },
     validateWorkspaceConfig: {
       id: 'WorkspaceService.validateWorkspaceConfig',
       name: 'validateWorkspaceConfig',
@@ -252,3 +299,38 @@ export const krnlGeminiServiceDefinition = GeminiServiceDefinition;
 export const krnlGeminiServiceFacade = GeminiServiceFacade;
 
 
+
+// 6. SrklService (credential discovery + Backblaze federation)
+export const SrklServiceDefinition: ServiceDefinition = createServiceDefinition({
+  id: 'kloks.backend.srkl',
+  name: 'SrklService',
+  version: '1.0.0',
+  operations: {
+    getAccounts: {
+      id: 'SrklService.getAccounts',
+      name: 'getAccounts',
+      handler: async (input: { userId: string; service?: string; env?: Record<string, unknown> }) => getSrklAccounts(input.userId, input.service, (sql, params) => queryUnifiedDb(sql, params, input.env)),
+    },
+    listBackblazeBuckets: {
+      id: 'SrklService.listBackblazeBuckets',
+      name: 'listBackblazeBuckets',
+      handler: async (input: { keyId?: string; applicationKey?: string; userId?: string; env?: Record<string, unknown> }) => srklListBackblazeBuckets(input.keyId, input.applicationKey, undefined, undefined, input.userId, (sql, params) => queryUnifiedDb(sql, params, input.env)),
+    },
+  },
+});
+
+const srklServiceInstance: IService = createService(SrklServiceDefinition);
+
+export const SrklServiceFacade = {
+  id: SrklServiceDefinition.id,
+  name: SrklServiceDefinition.name,
+  version: SrklServiceDefinition.version,
+  runtime: 'server' as const,
+  deployment: 'remote' as const,
+  definition: SrklServiceDefinition,
+  createInstance: () => createService(SrklServiceDefinition),
+  execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await srklServiceInstance.start(); return srklServiceInstance.call<TIn, TOut>(op, input); },
+};
+
+export const krnlSrklServiceDefinition = SrklServiceDefinition;
+export const krnlSrklServiceFacade = SrklServiceFacade;
