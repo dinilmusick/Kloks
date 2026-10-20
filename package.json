@@ -6,7 +6,7 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
-  "description": "Kloks — Public Backend, State-Graph, Audio/MIDI & Service Package Library built on KrnlTS (@kloks/*)",
+  "description": "Kloks \u2014 Public Backend, State-Graph, Audio/MIDI & Service Package Library built on KrnlTS (@kloks/*)",
   "type": "module",
   "main": "./index.js",
   "module": "./index.js",
@@ -149,7 +149,7 @@
     "@types/better-sqlite3": "^7.6.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
-    "@ultrst-armada/krnl": "^1.0.2",
+    "@ultrst-armada/krnl": "^1.0.3",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.0.0",
     "react": "^19.0.1",

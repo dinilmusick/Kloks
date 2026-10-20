@@ -62,6 +62,6 @@
     }
   },
   "devDependencies": {
-    "@ultrst-armada/krnl": "^1.0.2"
+    "@ultrst-armada/krnl": "^1.0.3"
   }
 }

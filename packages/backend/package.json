@@ -1,7 +1,7 @@
 {
   "name": "@kloks/backend",
   "version": "1.0.0",
-  "description": "Kloks Backend Services — Auth, Storage, Workspace, Control Plane, API, Connectivity & Execution built on KrnlTS",
+  "description": "Kloks Backend Services \u2014 Auth, Storage, Workspace, Control Plane, API, Connectivity & Execution built on KrnlTS",
   "type": "module",
   "private": false,
   "publishConfig": {
@@ -115,6 +115,6 @@
     }
   },
   "devDependencies": {
-    "@ultrst-armada/krnl": "^1.0.2"
+    "@ultrst-armada/krnl": "^1.0.3"
   }
 }

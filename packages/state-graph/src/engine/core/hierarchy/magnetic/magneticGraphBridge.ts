@@ -1,5 +1,5 @@
 import { SpaceNode, UniversalSocketDefinition } from "../../../types/index.js";
-import { getNodeSockets } from '../../nodeSocketRegistry.js';
+import { getNodeSockets, createPackagedSocket } from '../../nodeSocketRegistry.js';
 import { GraphNodeParent } from '../nodes/GraphNodeParent.js';
 import { BaseNode } from '../../../../domain/BaseNode.js';
 import { DataHandle } from '../../../../domain/BaseHandle.js';
@@ -15,11 +15,16 @@ export class GraphBridgeNode extends BaseNode {
 
   constructor(spaceNode: SpaceNode, handles: DataHandle[]) {
     const dims = GraphNodeParent.getNodeDimensions(spaceNode);
+    const pos = Array.isArray(spaceNode.position)
+      ? { x: spaceNode.position[0] * COORD_SCALE, y: (spaceNode.position[2] ?? spaceNode.position[1] ?? 0) * COORD_SCALE }
+      : spaceNode.position && typeof spaceNode.position === 'object'
+      ? { x: Number((spaceNode.position as any).x ?? 0), y: Number((spaceNode.position as any).y ?? 0) }
+      : { x: 0, y: 0 };
     super({
       id: spaceNode.id,
       type: spaceNode.type,
-      label: spaceNode.name || spaceNode.id,
-      position: { x: spaceNode.position[0] * COORD_SCALE, y: spaceNode.position[2] * COORD_SCALE }, // 2D projection on XZ plane
+      label: spaceNode.name || (spaceNode as any).label || spaceNode.id,
+      position: pos,
       size: { width: dims.width, height: dims.height },
       handles,
     });
@@ -101,7 +106,31 @@ export function initializeMagneticRules(): void {
 
 export function mapSpaceNodeToBridgeNode(spaceNode: SpaceNode): GraphBridgeNode {
   initializeMagneticRules();
-  const { inputs, outputs } = getNodeSockets(spaceNode);
+  let { inputs, outputs } = getNodeSockets(spaceNode);
+  const rawInputs = (spaceNode as any).inputs;
+  const rawOutputs = (spaceNode as any).outputs;
+  if (Array.isArray(rawInputs)) {
+    inputs = rawInputs.map((inp: any, idx: number) => createPackagedSocket({
+      socketId: inp.id || `in_${idx}`,
+      label: inp.label || inp.id || 'IN',
+      polarity: 'input',
+      medium: (inp.dataType?.toLowerCase().includes('audio') ? 'audio_stereo' : 'trigger') as any,
+      dataType: 'stream',
+      signalType: (inp.dataType?.toLowerCase() || 'audio_stereo') as any,
+      description: inp.label || 'Input Socket',
+    }));
+  }
+  if (Array.isArray(rawOutputs)) {
+    outputs = rawOutputs.map((out: any, idx: number) => createPackagedSocket({
+      socketId: out.id || `out_${idx}`,
+      label: out.label || out.id || 'OUT',
+      polarity: 'output',
+      medium: (out.dataType?.toLowerCase().includes('audio') ? 'audio_stereo' : 'trigger') as any,
+      dataType: 'stream',
+      signalType: (out.dataType?.toLowerCase() || 'audio_stereo') as any,
+      description: out.label || 'Output Socket',
+    }));
+  }
   const handles: DataHandle[] = [];
   const customOffsets = spaceNode.socketOffsets;
   const dims = GraphNodeParent.getNodeDimensions(spaceNode);

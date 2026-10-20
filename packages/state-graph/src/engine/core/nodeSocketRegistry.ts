@@ -126,6 +126,31 @@ export function getNodeSockets(node: SpaceNode): NodeSocketsResult {
     return { inputs, outputs };
   }
 
+  // 2b. Dynamic support for GraphNode explicit inputs/outputs arrays
+  const rawInputs = (node as any).inputs;
+  const rawOutputs = (node as any).outputs;
+  if (Array.isArray(rawInputs) || Array.isArray(rawOutputs)) {
+    const inputs = Array.isArray(rawInputs) ? rawInputs.map((inp: any, idx: number) => createPackagedSocket({
+      socketId: inp.id || `in_${idx}`,
+      label: inp.label || inp.id || 'IN',
+      polarity: 'input',
+      medium: (inp.dataType?.toLowerCase().includes('audio') ? 'audio_stereo' : 'trigger') as any,
+      dataType: 'stream',
+      signalType: (inp.dataType?.toLowerCase() || 'audio_stereo') as any,
+      description: inp.label || 'Input Socket',
+    })) : [];
+    const outputs = Array.isArray(rawOutputs) ? rawOutputs.map((out: any, idx: number) => createPackagedSocket({
+      socketId: out.id || `out_${idx}`,
+      label: out.label || out.id || 'OUT',
+      polarity: 'output',
+      medium: (out.dataType?.toLowerCase().includes('audio') ? 'audio_stereo' : 'trigger') as any,
+      dataType: 'stream',
+      signalType: (out.dataType?.toLowerCase() || 'audio_stereo') as any,
+      description: out.label || 'Output Socket',
+    })) : [];
+    return { inputs, outputs };
+  }
+
   // 3. Built-in Core Node Archetypes
 
   // ── INPUT STRIP LANDMARK NODE (Originates Graph Inputs) ──────────────────────
