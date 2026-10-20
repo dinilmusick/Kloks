@@ -1,12 +1,12 @@
 {
   "name": "@ultrst-armada/kloks",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "private": false,
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
-  "description": "Kloks \u2014 Public Backend, State-Graph, Audio/MIDI & Service Package Library built on KrnlTS (@kloks/*)",
+  "description": "Kloks — Public Backend, State-Graph, Audio/MIDI & Service Package Library built on KrnlTS (@kloks/*)",
   "type": "module",
   "main": "./index.js",
   "module": "./index.js",
