@@ -56,7 +56,9 @@
           "App.main-content"
         ]
       },
-      "dependencies": [],
+      "dependencies": [
+        "srkl"
+      ],
       "defaultFrontend": {
         "component": "WorkspaceTilesMenu",
         "package": "@ultrst-armada/floks/ui",
@@ -86,7 +88,11 @@
           "App.main-content"
         ]
       },
-      "dependencies": [],
+      "dependencies": [
+        "auth",
+        "storage",
+        "srkl"
+      ],
       "defaultFrontend": {
         "component": "WorkspaceTilesMenu",
         "package": "@ultrst-armada/floks/ui",
@@ -157,6 +163,28 @@
       },
       "modes": [
         "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      },
+      "dependencies": []
+    },
+    {
+      "id": "srkl",
+      "name": "SRKL Credential Federation",
+      "version": "1.0.0",
+      "description": "Service-account discovery and Backblaze B2 bucket federation for reusable application modules.",
+      "backend": {
+        "package": "@kloks/backend",
+        "subpath": "krnl-services",
+        "export": "SrklServiceFacade",
+        "facade": "SrklServiceFacade"
+      },
+      "modes": [
+        "backend",
+        "fullstack"
       ],
       "targets": {
         "backend": [
