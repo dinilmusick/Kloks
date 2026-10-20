@@ -68,7 +68,7 @@ export class CompositeBackend implements IService {
 
   async dispose(): Promise<void> {
     for (const service of this.services.values()) {
-      await service.dispose();
+      await service.stop();
     }
     this.services.clear();
     this.status = 'stopped';
