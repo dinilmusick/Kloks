@@ -1,16 +1,16 @@
 {
   "$schema": "https://skipo.dev/schemas/kloks-manifest.v1.json",
-  "package": "@kloks/services",
+  "package": "@ultrst-armada/kloks/services",
   "packageType": "backend",
-  "version": "1.0.0",
+  "version": "1.4.4",
   "services": [
     {
       "id": "kloks.service.auth",
       "name": "AuthClientService",
-      "version": "1.0.0",
+      "version": "1.4.4",
       "description": "Canonical user and workspace authentication service.",
       "backend": {
-        "package": "@kloks/services",
+        "package": "@ultrst-armada/kloks/services",
         "export": "AuthClientServiceFacade",
         "facade": "AuthClientServiceFacade"
       },
@@ -20,19 +20,26 @@
         "page": "Auth.ui",
         "section": "Auth.ui.LoginSection",
         "component": "AuthPage",
-        "package": "@ultrst-armada/floks",
+        "package": "@ultrst-armada/floks/ui",
         "export": "ui"
       },
-      "modes": ["client", "backend"],
-      "targets": { "backend": ["BackendFacade.services"] }
+      "modes": [
+        "client",
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      }
     },
     {
       "id": "kloks.service.storage",
       "name": "StorageClientService",
-      "version": "1.0.0",
+      "version": "1.4.4",
       "description": "User storage connections and cluster persistence service.",
       "backend": {
-        "package": "@kloks/services",
+        "package": "@ultrst-armada/kloks/services",
         "export": "StorageClientServiceFacade",
         "facade": "StorageClientServiceFacade"
       },
@@ -42,79 +49,118 @@
         "page": "Storage.ui",
         "section": "Storage.ui.TilesSection",
         "component": "WorkspaceTilesMenu",
-        "package": "@ultrst-armada/floks",
+        "package": "@ultrst-armada/floks/ui",
         "export": "ui"
       },
-      "modes": ["client", "backend"],
-      "targets": { "backend": ["BackendFacade.services"] }
+      "modes": [
+        "client",
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      }
     },
     {
       "id": "kloks.service.systemDb",
       "name": "SystemDbClientService",
-      "version": "1.0.0",
+      "version": "1.4.4",
       "description": "System database environment and cluster health monitoring.",
       "backend": {
-        "package": "@kloks/services",
+        "package": "@ultrst-armada/kloks/services",
         "export": "SystemDbClientServiceFacade",
         "facade": "SystemDbClientServiceFacade"
       },
       "ui": {
         "requirementMode": "none"
       },
-      "modes": ["client", "backend"],
-      "targets": { "backend": ["BackendFacade.services"] }
+      "modes": [
+        "client",
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      }
     },
     {
       "id": "service-a",
       "name": "Canonical Service A (Pure)",
-      "version": "1.0.0",
+      "version": "1.4.4",
       "description": "Deterministic pure calculation service.",
       "backend": {
-        "package": "@kloks/services",
+        "package": "@ultrst-armada/kloks/services",
         "export": "ServiceAFacade",
         "facade": "ServiceAFacade"
       },
-      "modes": ["backend"],
-      "targets": { "backend": ["BackendFacade.services"] }
+      "modes": [
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      }
     },
     {
       "id": "service-b",
       "name": "Canonical Service B (Stateful)",
-      "version": "1.0.0",
+      "version": "1.4.4",
       "description": "Stateful key-value tracking service.",
       "backend": {
-        "package": "@kloks/services",
+        "package": "@ultrst-armada/kloks/services",
         "export": "ServiceBFacade",
         "facade": "ServiceBFacade"
       },
-      "modes": ["backend"],
-      "targets": { "backend": ["BackendFacade.services"] }
+      "modes": [
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      }
     },
     {
       "id": "service-c",
       "name": "Canonical Service C (Event-Emitting)",
-      "version": "1.0.0",
+      "version": "1.4.4",
       "description": "Reactive event publisher service.",
       "backend": {
-        "package": "@kloks/services",
+        "package": "@ultrst-armada/kloks/services",
         "export": "ServiceCFacade",
         "facade": "ServiceCFacade"
       },
-      "modes": ["backend"],
-      "targets": { "backend": ["BackendFacade.services"] }
+      "modes": [
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      }
     },
     {
       "id": "service-d",
       "name": "Canonical Service D (Protocol-Enabled)",
-      "version": "1.0.0",
+      "version": "1.4.4",
       "description": "Multi-transport HTTP/WS/UDP/P2P protocol service.",
       "backend": {
-        "package": "@kloks/services",
+        "package": "@ultrst-armada/kloks/services",
         "export": "ServiceDFacade",
         "facade": "ServiceDFacade"
       },
-      "modes": ["backend"],
-      "targets": { "backend": ["BackendFacade.services"] }
+      "modes": [
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      }
     }
-  ]
+  ],
+  "alias": "@kloks/services"
 }
