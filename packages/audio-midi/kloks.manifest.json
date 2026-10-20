@@ -13,12 +13,6 @@
         "export": "AudioHardwareServiceFacade",
         "facade": "AudioHardwareServiceFacade"
       },
-      "ui": {
-        "package": "@floks/ui",
-        "components": [
-          "BaseCard"
-        ]
-      },
       "modes": [
         "backend",
         "fullstack"
@@ -31,7 +25,12 @@
           "App.main-content"
         ]
       },
-      "dependencies": []
+      "dependencies": [],
+      "defaultFrontend": {
+        "component": "AudioHardwarePanel",
+        "package": "@ultrst-armada/floks/ui",
+        "relationship": "recommended"
+      }
     },
     {
       "id": "midi",
