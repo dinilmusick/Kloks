@@ -35,6 +35,7 @@ import {
   StorageServiceFacade,
   WorkspaceServiceFacade,
   ControlPlaneServiceFacade,
+  SrklServiceFacade,
 } from '@kloks/backend';
 import {
   StateLifecycleServiceFacade,
@@ -126,6 +127,12 @@ describe('Kloks Public Package Library (@kloks/* built on KrnlTS)', () => {
       { key: 'user-1' }
     );
     expect(authLimit.allowed).toBe(true);
+
+    const backendExports = [AuthServiceFacade, StorageServiceFacade, WorkspaceServiceFacade, SrklServiceFacade];
+    expect(backendExports.every((service) => typeof service.execute === 'function')).toBe(true);
+    expect(SrklServiceFacade.id).toBe('kloks.backend.srkl');
+    expect((WorkspaceServiceFacade as any).definition.operations.listWorkspaces).toBeDefined();
+    expect((StorageServiceFacade as any).definition.operations.listBackblazeBuckets).toBeDefined();
 
     const stateRes = await StateLifecycleServiceFacade.execute<
       { from: string; to: string },
