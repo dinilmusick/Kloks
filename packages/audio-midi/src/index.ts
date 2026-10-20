@@ -307,7 +307,22 @@ export const MidiServiceFacade = {
 // 3. AUDIO-MIDI ORCHESTRATION DEFINITION (Pure serializable asset)
 // ══════════════════════════════════════════════════════════════════════════════
 
-import type { OrchestrationDefinition } from '@ultrst-armada/krnl';
+interface AudioMidiOrchestrationDefinition {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  scope: 'service';
+  dependencies: string[];
+  steps: Array<{
+    id: string;
+    name: string;
+    type: 'task';
+    target: string;
+    operation: string;
+    dependsOn?: string[];
+  }>;
+}
 
 export const AudioMidiOrchestratorDefinition: OrchestrationDefinition = {
   id: 'kloks.orchestrator.audioMidi',
