@@ -307,7 +307,7 @@ export const MidiServiceFacade = {
 // 3. AUDIO-MIDI ORCHESTRATION DEFINITION (Pure serializable asset)
 // ══════════════════════════════════════════════════════════════════════════════
 
-interface AudioMidiOrchestrationDefinition {
+interface OrchestrationDefinition {
   id: string;
   name: string;
   version: string;
