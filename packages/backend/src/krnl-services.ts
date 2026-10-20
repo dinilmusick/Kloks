@@ -314,7 +314,17 @@ export const SrklServiceDefinition: ServiceDefinition = createServiceDefinition(
     listBackblazeBuckets: {
       id: 'SrklService.listBackblazeBuckets',
       name: 'listBackblazeBuckets',
-      handler: async (input: { keyId?: string; applicationKey?: string; userId?: string; env?: Record<string, unknown> }) => srklListBackblazeBuckets(input.keyId, input.applicationKey, undefined, undefined, input.userId, (sql, params) => queryUnifiedDb(sql, params, input.env)),
+      handler: async (input: { keyId?: string; applicationKey?: string; accountId?: string; userId?: string; env?: Record<string, unknown> }) => {
+        let keyId = input.keyId;
+        let applicationKey = input.applicationKey;
+        if ((!keyId || !applicationKey) && input.accountId && input.userId) {
+          const accounts = await getSrklAccounts(input.userId, 'backblaze', (sql, params) => queryUnifiedDb(sql, params, input.env));
+          const account = accounts.accounts.find((item: any) => item.id === input.accountId);
+          keyId = account?.credentials?.keyId || account?.credentials?.b2KeyId;
+          applicationKey = account?.credentials?.applicationKey || account?.credentials?.b2ApplicationKey;
+        }
+        return srklListBackblazeBuckets(keyId, applicationKey, undefined, undefined, input.userId, (sql, params) => queryUnifiedDb(sql, params, input.env));
+      },
     },
   },
 });
