@@ -14,13 +14,6 @@
         "export": "AuthServiceFacade",
         "facade": "AuthServiceFacade"
       },
-      "ui": {
-        "package": "@floks/ui",
-        "components": [
-          "LoginModal",
-          "CredentialField"
-        ]
-      },
       "modes": [
         "backend",
         "fullstack"
@@ -33,7 +26,12 @@
           "App.main-content"
         ]
       },
-      "dependencies": []
+      "dependencies": [],
+      "defaultFrontend": {
+        "component": "AuthPage",
+        "package": "@ultrst-armada/floks/ui",
+        "relationship": "recommended"
+      }
     },
     {
       "id": "storage",
@@ -46,12 +44,6 @@
         "export": "StorageServiceFacade",
         "facade": "StorageServiceFacade"
       },
-      "ui": {
-        "package": "@floks/ui",
-        "components": [
-          "BaseCard"
-        ]
-      },
       "modes": [
         "backend",
         "fullstack"
@@ -64,7 +56,12 @@
           "App.main-content"
         ]
       },
-      "dependencies": []
+      "dependencies": [],
+      "defaultFrontend": {
+        "component": "WorkspaceTilesMenu",
+        "package": "@ultrst-armada/floks/ui",
+        "relationship": "recommended"
+      }
     },
     {
       "id": "workspace",
@@ -77,12 +74,6 @@
         "export": "WorkspaceServiceFacade",
         "facade": "WorkspaceServiceFacade"
       },
-      "ui": {
-        "package": "@floks/ui",
-        "components": [
-          "WorkspaceTilesMenu"
-        ]
-      },
       "modes": [
         "backend",
         "fullstack"
@@ -95,7 +86,12 @@
           "App.main-content"
         ]
       },
-      "dependencies": []
+      "dependencies": [],
+      "defaultFrontend": {
+        "component": "WorkspaceTilesMenu",
+        "package": "@ultrst-armada/floks/ui",
+        "relationship": "recommended"
+      }
     },
     {
       "id": "control-plane",
@@ -107,12 +103,6 @@
         "subpath": "krnl-services",
         "export": "ControlPlaneServiceFacade",
         "facade": "ControlPlaneServiceFacade"
-      },
-      "ui": {
-        "package": "@floks/ui",
-        "components": [
-          "StatusIndicator"
-        ]
       },
       "modes": [
         "backend",
@@ -126,7 +116,12 @@
           "App.footer"
         ]
       },
-      "dependencies": []
+      "dependencies": [],
+      "defaultFrontend": {
+        "component": "StatusIndicator",
+        "package": "@ultrst-armada/floks/ui",
+        "relationship": "recommended"
+      }
     },
     {
       "id": "database",
