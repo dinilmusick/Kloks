@@ -16,7 +16,8 @@
     "index.d.ts",
     "packages/*/dist/**",
     "packages/*/package.json",
-    "packages/*/kloks.manifest.json"
+    "packages/*/kloks.manifest.json",
+    "kloks.manifest.json"
   ],
   "exports": {
     ".": {
