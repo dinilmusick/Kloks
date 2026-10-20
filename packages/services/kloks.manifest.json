@@ -14,17 +14,21 @@
         "export": "AuthClientServiceFacade",
         "facade": "AuthClientServiceFacade"
       },
-      "ui": {
-        "requirementMode": "required",
-        "schema": "AuthServiceUISchema",
-        "page": "Auth.ui",
-        "section": "Auth.ui.LoginSection",
-        "component": "AuthPage",
-        "package": "@ultrst-armada/floks",
-        "export": "ui"
+      "modes": [
+        "client",
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
       },
-      "modes": ["client", "backend"],
-      "targets": { "backend": ["BackendFacade.services"] }
+      "defaultFrontend": {
+        "component": "AuthPage",
+        "package": "@ultrst-armada/floks/ui",
+        "relationship": "recommended",
+        "requirementMode": "required"
+      }
     },
     {
       "id": "kloks.service.storage",
@@ -36,17 +40,21 @@
         "export": "StorageClientServiceFacade",
         "facade": "StorageClientServiceFacade"
       },
-      "ui": {
-        "requirementMode": "optional",
-        "schema": "StorageServiceUISchema",
-        "page": "Storage.ui",
-        "section": "Storage.ui.TilesSection",
-        "component": "WorkspaceTilesMenu",
-        "package": "@ultrst-armada/floks",
-        "export": "ui"
+      "modes": [
+        "client",
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
       },
-      "modes": ["client", "backend"],
-      "targets": { "backend": ["BackendFacade.services"] }
+      "defaultFrontend": {
+        "component": "WorkspaceTilesMenu",
+        "package": "@ultrst-armada/floks/ui",
+        "relationship": "recommended",
+        "requirementMode": "optional"
+      }
     },
     {
       "id": "kloks.service.systemDb",
@@ -58,11 +66,15 @@
         "export": "SystemDbClientServiceFacade",
         "facade": "SystemDbClientServiceFacade"
       },
-      "ui": {
-        "requirementMode": "none"
-      },
-      "modes": ["client", "backend"],
-      "targets": { "backend": ["BackendFacade.services"] }
+      "modes": [
+        "client",
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      }
     },
     {
       "id": "service-a",
@@ -74,8 +86,14 @@
         "export": "ServiceAFacade",
         "facade": "ServiceAFacade"
       },
-      "modes": ["backend"],
-      "targets": { "backend": ["BackendFacade.services"] }
+      "modes": [
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      }
     },
     {
       "id": "service-b",
@@ -87,8 +105,14 @@
         "export": "ServiceBFacade",
         "facade": "ServiceBFacade"
       },
-      "modes": ["backend"],
-      "targets": { "backend": ["BackendFacade.services"] }
+      "modes": [
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      }
     },
     {
       "id": "service-c",
@@ -100,8 +124,14 @@
         "export": "ServiceCFacade",
         "facade": "ServiceCFacade"
       },
-      "modes": ["backend"],
-      "targets": { "backend": ["BackendFacade.services"] }
+      "modes": [
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      }
     },
     {
       "id": "service-d",
@@ -113,8 +143,14 @@
         "export": "ServiceDFacade",
         "facade": "ServiceDFacade"
       },
-      "modes": ["backend"],
-      "targets": { "backend": ["BackendFacade.services"] }
+      "modes": [
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      }
     }
   ]
 }
