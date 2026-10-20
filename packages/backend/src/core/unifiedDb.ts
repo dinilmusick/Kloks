@@ -4,7 +4,7 @@
  * Operates identically across Node.js, Vercel Serverless, and Cloudflare Workers.
  */
 
-import { neon } from '@neondatabase/serverless';
+let neon: any;
 
 export interface UnifiedQueryResult<T = any> {
   rows: T[];
@@ -45,6 +45,11 @@ export async function queryUnifiedDb<T = any>(
   const dbUrl = getUnifiedDbUrl(env);
   if (!dbUrl) {
     throw new Error('[UnifiedDB] No database URL configured in environment.');
+  }
+
+  if (!neon) {
+    const mod = await import('@neondatabase/serverless');
+    neon = mod.neon;
   }
 
   const sql = neon(dbUrl);
