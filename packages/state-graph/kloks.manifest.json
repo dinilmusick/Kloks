@@ -13,8 +13,14 @@
         "export": "StateLifecycleServiceFacade",
         "facade": "StateLifecycleServiceFacade"
       },
-      "modes": ["backend"],
-      "targets": { "backend": ["BackendFacade.services"] }
+      "modes": [
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      }
     },
     {
       "id": "node-graph",
@@ -26,15 +32,25 @@
         "export": "NodeGraphEngineServiceFacade",
         "facade": "NodeGraphEngineServiceFacade"
       },
-      "ui": {
-        "package": "@floks/canvas-ui",
-        "components": ["InfiniteCanvas"]
-      },
-      "modes": ["backend", "fullstack"],
+      "modes": [
+        "backend",
+        "fullstack"
+      ],
       "targets": {
-        "backend": ["BackendFacade.services"],
-        "frontend": ["App.main-content"]
-      }
+        "backend": [
+          "BackendFacade.services"
+        ],
+        "frontend": [
+          "App.main-content"
+        ]
+      },
+      "defaultFrontend": {
+        "component": "FrnlEditableNodeGraph",
+        "package": "@ultrst-armada/floks/canvas-ui",
+        "export": "FrnlEditableNodeGraph",
+        "relationship": "recommended"
+      },
+      "dependencies": []
     }
   ]
 }
