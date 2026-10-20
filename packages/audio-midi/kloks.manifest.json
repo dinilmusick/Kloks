@@ -27,8 +27,9 @@
       },
       "dependencies": [],
       "defaultFrontend": {
-        "component": "AudioHardwarePanel",
+        "component": "BaseCard",
         "package": "@ultrst-armada/floks/ui",
+        "export": "BaseCard",
         "relationship": "recommended"
       }
     },
