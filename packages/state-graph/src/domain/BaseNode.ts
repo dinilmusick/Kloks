@@ -14,6 +14,12 @@ export interface NodeDefinition {
   type: string;
   label: string;
   description?: string;
+  /** Automatic node-menu grouping category. */
+  category?: string;
+  /** Controls whether this node is discoverable from generic graph spawn menus. */
+  menu?: {
+    visible?: boolean;
+  };
   inputs?: HandleDefinition[];
   outputs?: HandleDefinition[];
   views?: string[];
