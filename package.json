@@ -4,7 +4,8 @@
   "private": false,
   "publishConfig": {
     "access": "public",
-    "registry": "https://registry.npmjs.org/"
+    "registry": "https://registry.npmjs.org/",
+    "provenance": true
   },
   "description": "Kloks — Public Backend, State-Graph, Audio/MIDI & Service Package Library built on KrnlTS (@kloks/*)",
   "type": "module",
@@ -16,7 +17,8 @@
     "index.d.ts",
     "packages/*/dist/**",
     "packages/*/package.json",
-    "packages/*/kloks.manifest.json"
+    "packages/*/kloks.manifest.json",
+    ".krusbl-release-attestation.json"
   ],
   "exports": {
     ".": {
