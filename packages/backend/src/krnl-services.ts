@@ -347,7 +347,7 @@ export const krnlSrklServiceFacade = SrklServiceFacade;
 
 
 // Universal workspace graph persistence service.
-import { workspaceGraphService, type WorkspaceGraphDocument } from './services/workspaceGraphService.js';
+import { workspaceGraphService } from './services/workspaceGraphService.js';
 import type { UniversalGraphNode, UniversalGraphEdge } from './services/nodeGraphPersistence/types.js';
 
 export const WorkspaceGraphServiceDefinition: ServiceDefinition = createServiceDefinition({
