@@ -5,3 +5,5 @@ export * from './developmentService.js';
 export * from './codeValidationTypes.js';
 export * from './codeValidationService.js';
 export * from './codeDiagnosticsService.js';
+export * from './typescriptLanguageServerTypes.js';
+export * from './typescriptLanguageServerService.js';
