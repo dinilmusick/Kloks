@@ -4,9 +4,9 @@ import type { CodeValidationInput, CodeValidationResult, ValidationDiagnostic, V
 
 const COMMANDS: Record<Exclude<ValidationLayer, 'law-l9'>, { command: string; args: string[] }> = {
   syntax: { command: 'pnpm', args: ['exec', 'tsc', '--noEmit'] },
-  lint: { command: 'pnpm', args: ['lint'] },
-  test: { command: 'pnpm', args: ['test'] },
-  build: { command: 'pnpm', args: ['build'] },
+  lint: { command: 'pnpm', args: ['run', 'lint', '--if-present'] },
+  test: { command: 'pnpm', args: ['run', 'test', '--if-present'] },
+  build: { command: 'pnpm', args: ['run', 'build', '--if-present'] },
   krnl: { command: 'pnpm', args: ['exec', 'krnl', 'validate'] },
   frnl: { command: 'pnpm', args: ['exec', 'frnl', 'validate'] },
 };
