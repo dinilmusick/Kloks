@@ -258,7 +258,8 @@
       },
       "dependencies": [
         "github-actions",
-        "web-container"
+        "web-container",
+        "code-validation"
       ]
     },
     {
