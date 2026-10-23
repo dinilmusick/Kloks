@@ -1,7 +1,7 @@
 {
   "name": "@kloks/backend",
-  "version": "1.0.0",
-  "description": "Kloks Backend Services \u2014 Auth, Storage, Workspace, Control Plane, API, Connectivity & Execution built on KrnlTS",
+  "version": "1.1.0",
+  "description": "Kloks Backend Services — Auth, Storage, Workspace, Control Plane, API, Connectivity & Execution built on KrnlTS",
   "type": "module",
   "private": false,
   "publishConfig": {
@@ -76,7 +76,8 @@
   },
   "dependencies": {
     "@kloks/functions": "workspace:*",
-    "@kloks/state-graph": "workspace:*"
+    "@kloks/state-graph": "workspace:*",
+    "@webcontainer/api": "^1.6.4"
   },
   "peerDependencies": {
     "better-sqlite3": "^11.0.0",

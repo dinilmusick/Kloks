@@ -23,6 +23,9 @@ importers:
       zustand:
         specifier: ^5.0.15
         version: 5.0.15(@types/react@19.3.0)(react@19.3.0)
+      '@webcontainer/api':
+        specifier: ^1.6.4
+        version: 1.6.4
     devDependencies:
       '@aws-sdk/lib-storage':
         specifier: ^3.600.0
@@ -94,6 +97,9 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.45.0
         version: 2.117.3
+      '@webcontainer/api':
+        specifier: ^1.6.4
+        version: 1.6.4
       bcryptjs:
         specifier: ^2.4.3
         version: 2.4.3
@@ -190,6 +196,9 @@ importers:
         version: 1.0.3
 
 packages:
+
+  '@webcontainer/api@1.6.4':
+    resolution: {integrity: sha512-r9sHCXg1FcC1AMgppGwAc0vYWaQhqvg282cnsuPbJEzYnWifAdCVvg+8ngJUEHyHcomhJJp+/zuytite4ITHLw==}
 
   '@aws-sdk/checksums@3.1001.2':
     resolution: {integrity: sha512-gKRj5IXZ/O0ehk2rwfb55YygdNKNhK5N1l/Ztg/w06tk21AJtCPuyErETk2RS/6XOmpBkcZY6CN3GlQ2fWTh1g==}

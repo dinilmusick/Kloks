@@ -1,7 +1,7 @@
 {
   "$schema": "https://skipo.dev/schemas/kloks-manifest.v1.json",
   "package": "@kloks/backend",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "services": [
     {
       "id": "auth",
@@ -192,6 +192,74 @@
         ]
       },
       "dependencies": []
+    },
+    {
+      "id": "github-actions",
+      "name": "GitHub Actions Execution",
+      "version": "1.0.0",
+      "description": "Authenticated GitHub Actions workflow dispatch, observation, logs, artifacts, cancellation and rerun service.",
+      "backend": {
+        "package": "@ultrst-armada/kloks",
+        "subpath": "development",
+        "export": "GitHubActionsServiceFacade",
+        "facade": "GitHubActionsServiceFacade"
+      },
+      "modes": [
+        "backend",
+        "fullstack"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      },
+      "dependencies": []
+    },
+    {
+      "id": "web-container",
+      "name": "WebContainer Runtime",
+      "version": "1.1.0",
+      "description": "Canonical browser WebContainer lifecycle, filesystem mounting and arbitrary development command execution.",
+      "backend": {
+        "package": "@ultrst-armada/kloks",
+        "subpath": "development",
+        "export": "WebContainerServiceFacade",
+        "facade": "WebContainerServiceFacade"
+      },
+      "modes": [
+        "fullstack"
+      ],
+      "targets": {
+        "backend": [
+          "App.main-content"
+        ]
+      },
+      "dependencies": []
+    },
+    {
+      "id": "development",
+      "name": "Development & Validation",
+      "version": "1.0.0",
+      "description": "Provider-neutral development execution planning and validation across WebContainer and GitHub Actions.",
+      "backend": {
+        "package": "@ultrst-armada/kloks",
+        "subpath": "development",
+        "export": "DevelopmentServiceFacade",
+        "facade": "DevelopmentServiceFacade"
+      },
+      "modes": [
+        "backend",
+        "fullstack"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      },
+      "dependencies": [
+        "github-actions",
+        "web-container"
+      ]
     }
   ]
 }
