@@ -13,8 +13,10 @@ import type {
   TypeScriptLanguageServerStatus,
 } from './typescriptLanguageServerTypes.js';
 
-const PACKAGE = 'typescript-language-server';
-const DEFAULT_VERSION = '6.0.2';
+export const TYPESCRIPT_LANGUAGE_SERVER_PACKAGE = 'typescript-language-server';
+export const TYPESCRIPT_LANGUAGE_SERVER_VERSION = '6.0.2';
+const PACKAGE = TYPESCRIPT_LANGUAGE_SERVER_PACKAGE;
+const DEFAULT_VERSION = TYPESCRIPT_LANGUAGE_SERVER_VERSION;
 
 type Pending = {
   resolve: (value: TypeScriptLanguageServerResponse) => void;
