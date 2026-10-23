@@ -14,7 +14,7 @@ import type {
 } from './typescriptLanguageServerTypes.js';
 
 const PACKAGE = 'typescript-language-server';
-const DEFAULT_VERSION = 'latest';
+const DEFAULT_VERSION = '6.0.2';
 
 type Pending = {
   resolve: (value: TypeScriptLanguageServerResponse) => void;
@@ -36,7 +36,7 @@ class TypeScriptLanguageServerRuntime {
     this.cwd = input.cwd ?? '.';
     this.version = input.version ?? DEFAULT_VERSION;
     if (input.install !== false) {
-      await this.runtime.runCommand('pnpm', ['add', '-D', PACKAGE + '@' + this.version], this.cwd);
+      await this.runtime.runCommand('pnpm', ['add', '-D', 'typescript@7.0.2', PACKAGE + '@' + this.version], this.cwd);
     }
     this.process = await this.runtime.spawnCommand('pnpm', ['exec', PACKAGE, '--stdio'], this.cwd);
     this.writer = this.process.input.getWriter();
