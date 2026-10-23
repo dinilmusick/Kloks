@@ -23,6 +23,9 @@ importers:
       zustand:
         specifier: ^5.0.15
         version: 5.0.15(@types/react@19.3.0)(react@19.3.0)
+      '@webcontainer/api':
+        specifier: ^1.6.4
+        version: 1.6.4
     devDependencies:
       '@aws-sdk/lib-storage':
         specifier: ^3.600.0
