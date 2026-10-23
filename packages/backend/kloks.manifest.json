@@ -339,6 +339,31 @@
       "dependencies": [
         "web-container"
       ]
+    },
+    {
+      "id": "agent-harness",
+      "name": "Agent Harness",
+      "version": "1.0.0",
+      "description": "Provider-neutral agent harness service with DeepSeek Harness execution and pluggable OpenAI Agents SDK and Google ADK providers.",
+      "backend": {
+        "package": "@ultrst-armada/kloks",
+        "subpath": "development",
+        "export": "AgentHarnessServiceFacade",
+        "facade": "AgentHarnessServiceFacade"
+      },
+      "modes": [
+        "backend",
+        "fullstack"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ],
+        "frontend": [
+          "App.main-content"
+        ]
+      },
+      "dependencies": []
     }
   ]
 }
