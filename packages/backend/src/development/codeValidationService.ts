@@ -16,8 +16,14 @@ const commandText = (command: string, args: string[]) => [command, ...args].join
 export class CodeValidationRuntime {
   constructor(private readonly runtime = new WebContainerRuntime()) {}
   async validate(input: CodeValidationInput = {}): Promise<CodeValidationResult> {
-    const layers = input.layers?.length ? input.layers : DEFAULT_LAYERS;
+    if (input.files) await this.runtime.mount(input.files);
     const diagnostics: ValidationDiagnostic[] = [];
+    if (input.install) {
+      const installed = await this.runtime.runCommand('pnpm', ['install', '--no-frozen-lockfile'], input.cwd, input.env);
+      diagnostics.push({ layer: 'lint', ok: installed.exitCode === 0, exitCode: installed.exitCode, output: installed.output, command: 'pnpm install --no-frozen-lockfile' });
+      if (installed.exitCode !== 0) return { ok: false, diagnostics, failedLayers: ['lint'] };
+    }
+    const layers = input.layers?.length ? input.layers : DEFAULT_LAYERS;
     for (const layer of layers) {
       if (layer === 'law-l9') {
         diagnostics.push(await this.validateLawL9(input.cwd, input.maxLines ?? 200));
