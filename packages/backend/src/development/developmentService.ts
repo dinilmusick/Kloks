@@ -38,7 +38,8 @@ export const DevelopmentServiceDefinition: ServiceDefinition = createServiceDefi
       name: 'describeProviders',
       handler: async () => ({
         providers: [
-          { id: 'webcontainer', capabilities: ['install', 'lint', 'test', 'build', 'validate', 'check'] },
+          { id: 'webcontainer', capabilities: ['install', 'lint', 'test', 'build', 'validate', 'check', 'process-host'] },
+          { id: 'typescript-language-server', capabilities: ['lsp', 'diagnostics', 'completion', 'hover', 'definition', 'references', 'rename', 'symbols'] },
           { id: 'github-actions', capabilities: ['dispatch', 'observe', 'rerun', 'cancel'] },
         ],
       }),
