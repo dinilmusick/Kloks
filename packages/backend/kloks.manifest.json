@@ -218,8 +218,8 @@
     {
       "id": "web-container",
       "name": "WebContainer Runtime",
-      "version": "1.0.0",
-      "description": "Krusbl-managed browser WebContainer lifecycle, filesystem mounting and deterministic development command execution.",
+      "version": "1.1.0",
+      "description": "Canonical browser WebContainer lifecycle, filesystem mounting and arbitrary development command execution.",
       "backend": {
         "package": "@ultrst-armada/kloks",
         "subpath": "development",
