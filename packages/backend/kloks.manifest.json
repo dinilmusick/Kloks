@@ -260,6 +260,32 @@
         "github-actions",
         "web-container"
       ]
+    },
+    {
+      "id": "code-validation",
+      "name": "Code Validation & Diagnostics",
+      "version": "1.0.0",
+      "description": "Shared syntax, lint, test, build, KrnlTS, FrnlTS and Law L9 validation pipeline backed by the canonical WebContainer runtime.",
+      "backend": {
+        "package": "@ultrst-armada/kloks",
+        "subpath": "development",
+        "export": "CodeValidationServiceFacade",
+        "facade": "CodeValidationServiceFacade"
+      },
+      "modes": [
+        "fullstack"
+      ],
+      "targets": {
+        "backend": [
+          "App.main-content"
+        ],
+        "frontend": [
+          "App.main-content"
+        ]
+      },
+      "dependencies": [
+        "web-container"
+      ]
     }
   ]
 }
