@@ -89,6 +89,11 @@ export class WebContainerRuntime {
     }
   }
 
+  async spawnCommand(command: string, args: string[] = [], cwd?: string, env?: Record<string, string | number | boolean>) {
+    const container = await this.boot();
+    return container.spawn(command, args, { cwd, env });
+  }
+
   async teardown() {
     const container = this.container;
     this.container = null;
