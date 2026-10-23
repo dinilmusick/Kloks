@@ -37,7 +37,7 @@ export class CodeValidationRuntime {
     return { ok: diagnostics.every((item) => item.ok), diagnostics, failedLayers: diagnostics.filter((item) => !item.ok).map((item) => item.layer) };
   }
   private async validateLawL9(cwd = '.', maxLines = 200): Promise<ValidationDiagnostic> {
-    const script = "python3 -c "import os,sys; bad=[]; root='src'; [bad.append(os.path.join(r,f)+': '+str(len(open(os.path.join(r,f),encoding='utf-8',errors='ignore').readlines()))+' lines') for r,_,fs in os.walk(root) for f in fs if f.endswith(('.ts','.tsx','.js','.jsx')) and not f.endswith('.d.ts') and len(open(os.path.join(r,f),encoding='utf-8',errors='ignore').readlines())>200]; print('\\n'.join(bad)); sys.exit(1 if bad else 0)"";
+    const script = "python3 -c 'import os,sys; bad=[]; root=\\"src\\"; [bad.append(os.path.join(r,f)+\\": \\"+str(len(open(os.path.join(r,f),encoding=\\"utf-8\\",errors=\\"ignore\\").readlines()))+\\" lines\\") for r,_,fs in os.walk(root) for f in fs if f.endswith((\\".ts\\",\\".tsx\\",\\".js\\",\\".jsx\\")) and not f.endswith(\\".d.ts\\") and len(open(os.path.join(r,f),encoding=\\"utf-8\\",errors=\\"ignore\\").readlines())>200]; print(\\"\\\\n\\".join(bad)); sys.exit(1 if bad else 0)'";
     const result = await this.runtime.runCommand('sh', ['-lc', script], cwd);
     return { layer: 'law-l9', ok: result.exitCode === 0, exitCode: result.exitCode, output: result.output, command: script };
   }
