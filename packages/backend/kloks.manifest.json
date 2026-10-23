@@ -313,6 +313,32 @@
       "dependencies": [
         "web-container"
       ]
+    },
+    {
+      "id": "typescript-language-server",
+      "name": "TypeScript Language Server",
+      "version": "1.0.0",
+      "description": "Reusable TypeScript Language Server Protocol service provisioned into a development runtime and consumable by IDEs and agents.",
+      "backend": {
+        "package": "@ultrst-armada/kloks",
+        "subpath": "development",
+        "export": "TypeScriptLanguageServerServiceFacade",
+        "facade": "TypeScriptLanguageServerServiceFacade"
+      },
+      "modes": [
+        "fullstack"
+      ],
+      "targets": {
+        "backend": [
+          "App.main-content"
+        ],
+        "frontend": [
+          "App.main-content"
+        ]
+      },
+      "dependencies": [
+        "web-container"
+      ]
     }
   ]
 }
