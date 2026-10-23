@@ -7,3 +7,5 @@ export * from './codeValidationService.js';
 export * from './codeDiagnosticsService.js';
 export * from './typescriptLanguageServerTypes.js';
 export * from './typescriptLanguageServerService.js';
+export * from './agentHarnessTypes.js';
+export * from './agentHarnessService.js';
