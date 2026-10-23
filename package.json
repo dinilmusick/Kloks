@@ -1,6 +1,6 @@
 {
   "name": "@ultrst-armada/kloks",
-  "version": "1.4.8",
+  "version": "1.5.0",
   "private": false,
   "publishConfig": {
     "access": "public",
@@ -104,6 +104,11 @@
       "types": "./packages/client/dist/index.d.ts",
       "import": "./packages/client/dist/index.js",
       "default": "./packages/client/dist/index.js"
+    },
+    "./development": {
+      "types": "./packages/backend/dist/development/index.d.ts",
+      "import": "./packages/backend/dist/development/index.js",
+      "default": "./packages/backend/dist/development/index.js"
     }
   },
   "scripts": {
