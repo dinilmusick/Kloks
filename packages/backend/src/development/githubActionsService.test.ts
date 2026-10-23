@@ -13,7 +13,7 @@ describe('GitHubActionsService', () => {
   });
 
   it('dispatches a workflow with an explicit ref and inputs', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(new Response('', { status: 204 }));
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     const client = new GitHubActionsClient({ token: 'secret-token', apiBaseUrl: 'https://example.test', fetchImpl });
     await client.dispatchWorkflow('owner/repo', 'development.yml', 'main', { task: 'test' });
     const [, init] = fetchImpl.mock.calls[0];
