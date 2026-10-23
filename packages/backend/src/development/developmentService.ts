@@ -39,7 +39,8 @@ export const DevelopmentServiceDefinition: ServiceDefinition = createServiceDefi
       handler: async () => ({
         providers: [
           { id: 'webcontainer', capabilities: ['install', 'lint', 'test', 'build', 'validate', 'check', 'process-host'] },
-          { id: 'typescript-language-server', capabilities: ['lsp', 'diagnostics', 'completion', 'hover', 'definition', 'references', 'rename', 'symbols'] },\n          { id: 'agent-harness', capabilities: ['deepseek', 'openai', 'google', 'headless', 'sdk', 'acp'] },
+          { id: 'typescript-language-server', capabilities: ['lsp', 'diagnostics', 'completion', 'hover', 'definition', 'references', 'rename', 'symbols'] },
+          { id: 'agent-harness', capabilities: ['deepseek', 'openai', 'google', 'headless', 'sdk', 'acp'] },
           { id: 'github-actions', capabilities: ['dispatch', 'observe', 'rerun', 'cancel'] },
         ],
       }),
