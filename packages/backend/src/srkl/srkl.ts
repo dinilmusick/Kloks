@@ -8,6 +8,8 @@ import { SrklVaultAccessClient } from './SrklVaultAccessClient.js';
 import { SrklCredentialRegistry } from './SrklCredentialRegistry.js';
 import { decryptVaultBufferInBrowser, hexToBytes } from './SrklCryptoClient.js';
 
+import { getSrklAccounts, listBackblazeBuckets, getSrklStatus, getPrimarySrklDeploymentUrl } from '../core/srklCore.js';
+
 export const runtime = {
   VaultAccessClient: SrklVaultAccessClient,
   CredentialRegistry: SrklCredentialRegistry,
@@ -26,6 +28,11 @@ export const service = {
   description: 'SRKL Ecosystem Volatile Memory Credential Vault Service',
   runtime,
   deployment,
+  getSrklAccounts: (userId?: string, serviceName?: string, env?: any) => getSrklAccounts(userId, serviceName, env),
+  getAccounts: (userId?: string, serviceName?: string, env?: any) => getSrklAccounts(userId, serviceName, env),
+  listBackblazeBuckets: (payload: any, userId?: string, env?: any) => listBackblazeBuckets(payload, userId, env),
+  getSrklStatus: (env?: any) => getSrklStatus(env),
+  getDeploymentUrl: (env?: any) => getPrimarySrklDeploymentUrl(env),
 };
 
 export const srklService = service;

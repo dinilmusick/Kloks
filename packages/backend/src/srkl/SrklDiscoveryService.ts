@@ -47,12 +47,12 @@ export async function getSrklAccounts(
       const uRes = await queryDb(`SELECT app_profiles FROM "ultrst-users" WHERE id = $1 LIMIT 1`, [userId]);
       if (uRes.rows.length > 0) {
         const p = typeof uRes.rows[0].app_profiles === 'string' ? JSON.parse(uRes.rows[0].app_profiles) : (uRes.rows[0].app_profiles || {});
-        const pool = [
-          ...(p.srkl?.storage_connections || []),
-          ...(p.depm?.storage_connections || []),
-          ...(p.qwnsr?.storage_connections || []),
-          ...(p.loky?.storage_connections || []),
-        ];
+        const pool: any[] = [];
+        for (const app of Object.values(p)) {
+          if (app && typeof app === 'object' && Array.isArray((app as any).storage_connections)) {
+            pool.push(...(app as any).storage_connections);
+          }
+        }
         for (const conn of pool) {
           if (service && !conn.provider?.toLowerCase().includes(service.toLowerCase())) continue;
           const kId = (conn.b2KeyId || conn.keyId || conn.accessKeyId || '').trim();
@@ -109,14 +109,15 @@ export async function srklListBackblazeBuckets(
   _bucketId?: string,
   _bucketName?: string,
   userId?: string,
-  queryDb?: (sql: string, params?: unknown[]) => Promise<{ rows: any[] }>
+  queryDb?: (sql: string, params?: unknown[]) => Promise<{ rows: any[] }>,
+  accountId?: string
 ): Promise<{ success: boolean; buckets: any[]; error?: string }> {
   let resolvedKeyId = (keyId || '').trim();
   let resolvedAppKey = (applicationKey || '').trim();
 
-  if ((!resolvedKeyId || !resolvedAppKey) && userId && queryDb) {
-    const accountsRes = await getSrklAccounts(userId, 'backblaze', queryDb);
-    const matched = accountsRes.accounts.find((a) => (a.credentials?.keyId || a.credentials?.b2KeyId) === resolvedKeyId) || accountsRes.accounts[0];
+  if ((!resolvedKeyId || !resolvedAppKey) && (userId || accountId)) {
+    const accountsRes = await getSrklAccounts(userId || '', 'backblaze', queryDb);
+    const matched = accountsRes.accounts.find((a) => (accountId && a.id === accountId) || (resolvedKeyId && (a.credentials?.keyId || a.credentials?.b2KeyId) === resolvedKeyId)) || accountsRes.accounts[0];
     if (matched) {
       resolvedKeyId = matched.credentials?.keyId || matched.credentials?.b2KeyId || resolvedKeyId;
       resolvedAppKey = matched.credentials?.applicationKey || matched.credentials?.b2ApplicationKey || resolvedAppKey;

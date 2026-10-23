@@ -70,12 +70,12 @@ export async function getSrklAccounts(
           ? JSON.parse(uRes.rows[0].app_profiles)
           : (uRes.rows[0].app_profiles || {});
         
-        const conns = [
-          ...(p.srkl?.storage_connections || []),
-          ...(p.depm?.storage_connections || []),
-          ...(p.qwnsr?.storage_connections || []),
-          ...(p.loky?.storage_connections || []),
-        ];
+        const conns: any[] = [];
+        for (const app of Object.values(p)) {
+          if (app && typeof app === 'object' && Array.isArray((app as any).storage_connections)) {
+            conns.push(...(app as any).storage_connections);
+          }
+        }
 
         for (const c of conns) {
           if (!service || (c.provider || '').toLowerCase().includes(service.toLowerCase())) {
@@ -215,8 +215,9 @@ export const srklListBackblazeBuckets = (
   applicationKey?: string,
   bucketId?: string,
   bucketName?: string,
-  userId?: string
-) => listBackblazeBuckets({ keyId, applicationKey, bucketId, bucketName }, userId);
+  userId?: string,
+  accountId?: string
+) => listBackblazeBuckets({ keyId, applicationKey, bucketId, bucketName, accountId }, userId);
 
 export async function getSrklStatus(env?: Record<string, unknown>) {
   const srklUrl = await getPrimarySrklDeploymentUrl(env);
