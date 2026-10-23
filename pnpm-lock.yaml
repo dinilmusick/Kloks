@@ -33,9 +33,6 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.45.0
         version: 2.117.3
-      '@webcontainer/api':
-        specifier: ^1.6.4
-        version: 1.6.4
       '@types/bcryptjs':
         specifier: ^2.4.0
         version: 2.4.6
@@ -97,6 +94,9 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.45.0
         version: 2.117.3
+      '@webcontainer/api':
+        specifier: ^1.6.4
+        version: 1.6.4
       bcryptjs:
         specifier: ^2.4.3
         version: 2.4.3
