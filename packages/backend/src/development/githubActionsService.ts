@@ -19,12 +19,6 @@ export interface WorkflowRun {
   html_url?: string;
 }
 
-export interface GitHubActionsResult<T = unknown> {
-  data: T;
-  status: number;
-  ok: boolean;
-}
-
 export class GitHubActionsClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
@@ -34,7 +28,7 @@ export class GitHubActionsClient {
     this.fetchImpl = config.fetchImpl ?? fetch;
   }
 
-  private async request<T>(path: string, init: RequestInit = {}): Promise<GitHubActionsResult<T>> {
+  private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await this.fetchImpl(this.baseUrl + path, {
       ...init,
       headers: {
@@ -49,26 +43,37 @@ export class GitHubActionsClient {
     if (!response.ok) {
       throw new Error(`GitHub Actions request failed (${response.status}): ${data?.message ?? response.statusText}`);
     }
-    return { data, status: response.status, ok: true };
+    return data as T;
   }
 
-  async listWorkflowRuns(repository: string, workflowId?: string | number, branch?: string) {
+  listWorkflowRuns(repository: string, workflowId?: string | number, branch?: string) {
     const suffix = workflowId ? `/actions/workflows/${workflowId}/runs` : '/actions/runs';
     const query = branch ? `?branch=${encodeURIComponent(branch)}` : '';
     return this.request<{ workflow_runs: WorkflowRun[] }>(`/repos/${repository}${suffix}${query}`);
   }
 
-  async getWorkflowRun(repository: string, runId: number) {
+  getWorkflowRun(repository: string, runId: number) {
     return this.request<WorkflowRun>(`/repos/${repository}/actions/runs/${runId}`);
   }
 
-  async getWorkflowJobs(repository: string, runId: number) {
+  getWorkflowJobs(repository: string, runId: number) {
     return this.request<{ jobs: Array<{ id: number; name: string; status: string; conclusion?: string | null }> }>(
       `/repos/${repository}/actions/runs/${runId}/jobs`,
     );
   }
 
-  async dispatchWorkflow(repository: string, workflowId: string | number, ref: string, inputs: Record<string, string> = {}) {
+  getJobLogs(repository: string, jobId: number) {
+    return this.request<string>(`/repos/${repository}/actions/jobs/${jobId}/logs`);
+  }
+
+  listArtifacts(repository: string, runId?: number) {
+    const path = runId
+      ? `/repos/${repository}/actions/runs/${runId}/artifacts`
+      : `/repos/${repository}/actions/artifacts`;
+    return this.request<{ artifacts: Array<{ id: number; name: string; expired: boolean }> }>(path);
+  }
+
+  dispatchWorkflow(repository: string, workflowId: string | number, ref: string, inputs: Record<string, string> = {}) {
     return this.request<void>(`/repos/${repository}/actions/workflows/${workflowId}/dispatches`, {
       method: 'POST',
       body: JSON.stringify({ ref, inputs }),
@@ -76,25 +81,44 @@ export class GitHubActionsClient {
     });
   }
 
-  async rerunWorkflow(repository: string, runId: number) {
+  rerunWorkflow(repository: string, runId: number) {
     return this.request<void>(`/repos/${repository}/actions/runs/${runId}/rerun`, { method: 'POST' });
   }
 
-  async rerunFailedJobs(repository: string, runId: number) {
+  rerunFailedJobs(repository: string, runId: number) {
     return this.request<void>(`/repos/${repository}/actions/runs/${runId}/rerun-failed-jobs`, { method: 'POST' });
   }
 
-  async cancelWorkflow(repository: string, runId: number) {
+  cancelWorkflow(repository: string, runId: number) {
     return this.request<void>(`/repos/${repository}/actions/runs/${runId}/cancel`, { method: 'POST' });
   }
 }
+
+type ActionInput = {
+  repository: string;
+  token: string;
+  workflowId?: string | number;
+  branch?: string;
+  runId?: number;
+  jobId?: number;
+  ref?: string;
+  inputs?: Record<string, string>;
+};
 
 export const GitHubActionsServiceDefinition: ServiceDefinition = createServiceDefinition({
   id: 'kloks.backend.githubActions',
   name: 'GitHubActionsService',
   version: '1.0.0',
   operations: {
-    listWorkflowRuns: { id: 'GitHubActionsService.listWorkflowRuns', name: 'listWorkflowRuns', handler: async (input: { repository: string; workflowId?: string | number; branch?: string }) => new GitHubActionsClient({ token: String(input.repository) }).listWorkflowRuns(input.repository, input.workflowId, input.branch) },
+    listWorkflowRuns: { id: 'GitHubActionsService.listWorkflowRuns', name: 'listWorkflowRuns', handler: async (i: ActionInput) => new GitHubActionsClient({ token: i.token }).listWorkflowRuns(i.repository, i.workflowId, i.branch) },
+    getWorkflowRun: { id: 'GitHubActionsService.getWorkflowRun', name: 'getWorkflowRun', handler: async (i: ActionInput) => new GitHubActionsClient({ token: i.token }).getWorkflowRun(i.repository, i.runId!) },
+    getWorkflowJobs: { id: 'GitHubActionsService.getWorkflowJobs', name: 'getWorkflowJobs', handler: async (i: ActionInput) => new GitHubActionsClient({ token: i.token }).getWorkflowJobs(i.repository, i.runId!) },
+    getJobLogs: { id: 'GitHubActionsService.getJobLogs', name: 'getJobLogs', handler: async (i: ActionInput) => new GitHubActionsClient({ token: i.token }).getJobLogs(i.repository, i.jobId!) },
+    listArtifacts: { id: 'GitHubActionsService.listArtifacts', name: 'listArtifacts', handler: async (i: ActionInput) => new GitHubActionsClient({ token: i.token }).listArtifacts(i.repository, i.runId) },
+    dispatchWorkflow: { id: 'GitHubActionsService.dispatchWorkflow', name: 'dispatchWorkflow', handler: async (i: ActionInput) => new GitHubActionsClient({ token: i.token }).dispatchWorkflow(i.repository, i.workflowId!, i.ref!, i.inputs) },
+    rerunWorkflow: { id: 'GitHubActionsService.rerunWorkflow', name: 'rerunWorkflow', handler: async (i: ActionInput) => new GitHubActionsClient({ token: i.token }).rerunWorkflow(i.repository, i.runId!) },
+    rerunFailedJobs: { id: 'GitHubActionsService.rerunFailedJobs', name: 'rerunFailedJobs', handler: async (i: ActionInput) => new GitHubActionsClient({ token: i.token }).rerunFailedJobs(i.repository, i.runId!) },
+    cancelWorkflow: { id: 'GitHubActionsService.cancelWorkflow', name: 'cancelWorkflow', handler: async (i: ActionInput) => new GitHubActionsClient({ token: i.token }).cancelWorkflow(i.repository, i.runId!) },
   },
 });
 
