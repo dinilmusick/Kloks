@@ -266,7 +266,7 @@
       "id": "code-validation",
       "name": "Code Validation & Diagnostics",
       "version": "1.0.0",
-      "description": "Shared syntax, lint, test, build, KrnlTS, FrnlTS and Law L9 validation pipeline backed by the canonical WebContainer runtime.",
+      "description": "Shared syntax, lint, test, build, KrnlTS, FrnlTS and Law L9 validation pipeline backed by the canonical WebContainer runtime; diagnostics are consumable by IDEs and agents.",
       "backend": {
         "package": "@ultrst-armada/kloks",
         "subpath": "development",
