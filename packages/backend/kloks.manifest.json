@@ -286,6 +286,32 @@
       "dependencies": [
         "web-container"
       ]
+    },
+    {
+      "id": "code-diagnostics",
+      "name": "TypeScript Code Diagnostics",
+      "version": "1.0.0",
+      "description": "Editor-facing TypeScript diagnostics runner for authored source.",
+      "backend": {
+        "package": "@ultrst-armada/kloks",
+        "subpath": "development",
+        "export": "codeDiagnosticsService",
+        "facade": "codeDiagnosticsService"
+      },
+      "modes": [
+        "fullstack"
+      ],
+      "targets": {
+        "backend": [
+          "App.main-content"
+        ],
+        "frontend": [
+          "App.main-content"
+        ]
+      },
+      "dependencies": [
+        "web-container"
+      ]
     }
   ]
 }
