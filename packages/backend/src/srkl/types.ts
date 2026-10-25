@@ -97,7 +97,7 @@ export interface AppServiceDeclaration {
 
 export interface AdaptedStorageConnection {
   id: string;
-  provider: 'backblaze_b2' | 'aws_s3' | 'local_fs';
+  provider: 'backblaze_b2' | 'aws_s3' | 'google_drive' | 'local_fs';
   label: string;
   role?: 'primary' | 'redundant_clone';
   enabled?: boolean;
@@ -112,6 +112,12 @@ export interface AdaptedStorageConnection {
   s3BucketName?: string;
   s3Region?: string;
   s3Endpoint?: string;
+  googleEmail?: string;
+  googleRootFolderId?: string;
+  googleRootFolderName?: string;
+  googleAccessToken?: string;
+  googleAccessTokenExpiresAt?: number;
+  googleRefreshToken?: string;
 }
 
 export interface KeyMaterial {
