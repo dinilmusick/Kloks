@@ -146,9 +146,10 @@ export class SrklClient {
     const creds = account.credentials || {};
     const sId = (account.serviceId || '').toLowerCase();
     const isB2 = sId.includes('backblaze') || sId === 'b2';
+    const isGoogle = sId.includes('google_drive') || sId.includes('googledrive') || sId === 'google';
     return {
       id: `conn-srkl-${account.id}`,
-      provider: isB2 ? 'backblaze_b2' : 'aws_s3',
+      provider: isB2 ? 'backblaze_b2' : isGoogle ? 'google_drive' : 'aws_s3',
       label: `SRKL: ${account.name || (isB2 ? 'Backblaze' : 'S3')}`,
       role: 'redundant_clone',
       enabled: true,
@@ -163,6 +164,12 @@ export class SrklClient {
       s3BucketName: creds.bucketName || creds.s3BucketName,
       s3Region: creds.region || creds.s3Region,
       s3Endpoint: creds.endpoint || creds.s3Endpoint,
+      googleEmail: creds.email || account.emailOrSlug,
+      googleRootFolderId: creds.rootFolderId,
+      googleRootFolderName: creds.rootFolderName,
+      googleAccessToken: creds.accessToken,
+      googleAccessTokenExpiresAt: creds.accessTokenExpiresAt,
+      googleRefreshToken: creds.refreshToken,
     };
   }
 }
