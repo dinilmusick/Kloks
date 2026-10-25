@@ -18,6 +18,21 @@ describe('CanonicalAuthClient', () => {
     expect(JSON.parse(String(calls[0].init?.body))).toEqual({ email: 'user@example.com', password: 'password123' });
   });
 
+  it('forwards a session cookie when resolving an existing session', async () => {
+    let requestInit: RequestInit | undefined;
+    const fetcher = async (_url: string, init?: RequestInit) => {
+      requestInit = init;
+      return new Response(JSON.stringify({
+        user: { id: 'u1', email: 'user@example.com', name: 'User' },
+        session: { token: 'session-token' },
+      }), { status: 200 });
+    };
+    const client = new CanonicalAuthClient({ baseUrl: 'https://auth.example.com', fetcher: fetcher as typeof fetch });
+    await client.getSession('better-auth.session_token=session-token');
+    expect(new Headers(requestInit?.headers).get('Cookie')).toBe('better-auth.session_token=session-token');
+    expect(requestInit?.credentials).toBe('include');
+  });
+
   it('requests Google Drive incrementally instead of during Google identity sign-in', async () => {
     const calls: string[] = [];
     const fetcher = async (url: string) => {

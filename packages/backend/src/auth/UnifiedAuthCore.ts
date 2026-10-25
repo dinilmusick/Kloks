@@ -62,9 +62,14 @@ export async function resolveUserFromToken(
   if (!tokenOrUserId) return null;
   try {
     const client = createCanonicalAuthClient(requireAuthBaseUrl(env));
-    const session = await client.getSession(
-      tokenOrUserId.startsWith('Bearer ') ? `better-auth.session_token=${tokenOrUserId.slice(7).trim()}` : undefined,
-    );
+    const credential = tokenOrUserId.trim();
+    if (!credential) return null;
+
+    // Accept a raw Better Auth session token or an explicit Bearer token. A user ID
+    // is not a credential and must never be treated as proof of authentication.
+    const token = credential.replace(/^Bearer[ \t]+/i, '').trim();
+    if (!token) return null;
+    const session = await client.getSession(`better-auth.session_token=${token}`);
     if (!session?.user) return null;
     return {
       ...session.user,
