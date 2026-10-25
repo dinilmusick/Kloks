@@ -5,4 +5,5 @@ export * from './RateLimiter.js';
 export * from './BaseAccountProvider.js';
 export * from './LocalAccountProvider.js';
 export * from './AdminGuard.js';
+export * from './CanonicalAuthClient.js';
 export * from './UnifiedAuthCore.js';
