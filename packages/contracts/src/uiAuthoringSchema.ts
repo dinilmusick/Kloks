@@ -76,7 +76,6 @@ export function buildServiceUISchema(session: UIAuthoringSession): ServiceUISche
     requirementMode: 'optional',
     pages: pages.map((page) => ({
       name: page.name,
-      description: page.props.description as string | undefined,
       sections: sections.filter((section) => section.parentId === page.id).map((section) => ({
         name: section.name,
         assetRef: section.assetRef!,
