@@ -124,8 +124,8 @@ export async function resumeVercelProject(
   if (!projectId?.trim()) throw new Error('Vercel project ID is required.');
   const { token, teamId } = await resolveVercelCredentials(payload, userId, env);
   const query = teamId ? `?teamId=${encodeURIComponent(teamId)}` : '';
-  const response = await fetch(`https://api.vercel.com/v1/projects/${encodeURIComponent(projectId)}/pause${query}`, {
-    method: 'DELETE',
+  const response = await fetch(`https://api.vercel.com/v1/projects/${encodeURIComponent(projectId)}/unpause${query}`, {
+    method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
   });
   await assertOk(response, 'Vercel');
