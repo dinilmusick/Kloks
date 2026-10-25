@@ -11,10 +11,6 @@ export class StorageAdapterFactory {
     switch (config.provider) {
       case 'local_fs':
         return new LocalFSAdapter(config);
-      case 's3':
-      case 'cloudflare_r2':
-      case 'r2':
-        return new S3Adapter(config);
       case 'backblaze_b2':
       case 'b2':
         return new BackblazeB2Adapter(config);
