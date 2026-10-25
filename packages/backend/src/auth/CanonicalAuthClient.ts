@@ -25,7 +25,7 @@ export interface AuthResult {
   status: number;
   user?: CanonicalAuthUser;
   session?: Record<string, unknown>;
-  error?: string;
+  error?: string;\n  redirectUrl?: string;
 }
 
 const cleanBaseUrl = (value: string) => value.trim().replace(/\\/+$/, '');
@@ -62,7 +62,7 @@ export class CanonicalAuthClient {
     if (result.status >= 400 || result.data?.error) {
       return { success: false, status: result.status, error: result.data?.error?.message ?? result.data?.message ?? 'Authentication failed.' };
     }
-    return { success: true, status: result.status, user: result.data?.user, session: result.data?.session };
+    return { success: true, status: result.status, user: result.data?.user, session: result.data?.session, redirectUrl: result.data?.url ?? result.data?.redirect };
   }
 
   async signUpEmail(email: string, password: string, name: string): Promise<AuthResult> {
