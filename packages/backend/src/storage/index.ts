@@ -10,3 +10,4 @@ export * from './SupabaseStorageAdapter.js';
 export * from './StorageAdapterFactory.js';
 export * from './B2DirectClient.js';
 
+export * from './GoogleDriveOAuth.js';
