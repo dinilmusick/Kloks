@@ -8,6 +8,8 @@ export * from './schemas.js';
 export * from './surface.js';
 export * from './snapshot.js';
 export * from './serviceUiSchema.js';
+export * from './monacoIdeSchema.js';
+export * from './uiAuthoringSchema.js';
 
 import { createKloksSnapshot } from './snapshot.js';
 import { KLOKS_PUBLIC_SURFACE, QWNSR_REQUIRED_SURFACE, validateConsumerSurfaceCompatibility } from './surface.js';
