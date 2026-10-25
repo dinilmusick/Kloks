@@ -83,7 +83,7 @@ export class WorkingWorkspaceService implements WorkspaceService {
 
   async deleteFile(_workspaceId: string, filePath: string): Promise<{ success: boolean }> {
     const cleanRel = filePath.replace(/^\/+/, '');
-    const fullPath = path.resolve(this.getWorkingDir(), cleanRel);
+    const fullPath = path.resolve(this.getWorkingDir(_workspaceId), cleanRel);
     try {
       await fs.promises.unlink(fullPath);
       return { success: true };

@@ -11,6 +11,7 @@ import path from 'path';
 import { formatCanonicalWorkspaceFolderName } from './workspaceCanonical';
 import { b2ListFileNames, b2DownloadFile, b2UploadFile, b2ListBuckets } from './b2DirectCore';
 import { queryUnifiedDb } from './unifiedDb';
+import { GoogleDriveAdapter } from '../storage/GoogleDriveAdapter.js';
 
 const ACCOUNTS_FILE = path.resolve('.skipo/accounts.json');
 const CONFIG_FILE = path.resolve('.skipo/workspace_config.json');
@@ -128,7 +129,7 @@ export interface WorkspaceSyncSummary {
   workspaceId: string;
   folderKey: string;
   workingDir: string;
-  persistenceType: 'backblaze_b2' | 'local_fs';
+  persistenceType: 'backblaze_b2' | 'local_fs' | 'google_drive';
   targetLocation: string;
   syncedFiles: SyncFileResult[];
   uploadedCount: number;
@@ -285,6 +286,93 @@ export async function syncWorkspace(workspaceId: string): Promise<WorkspaceSyncS
         downloadedCount,
         syncedAt: nowIso,
         error: err.message || 'Backblaze sync failed.',
+      };
+    }
+  }
+
+  const isGoogleDrive = workspace.storageProvider === 'google_drive' || workspace.storageConfig?.type === 'google_drive';
+  if (isGoogleDrive) {
+    const creds = workspace.storageConfig || connection?.credentials || connection || {};
+    const rootFolderId = creds.googleRootFolderId || creds.rootFolderId || workspace.googleRootFolderId;
+    const adapter = new GoogleDriveAdapter({
+      provider: 'google_drive',
+      googleAccessToken: creds.googleAccessToken || creds.accessToken,
+      googleAccessTokenExpiresAt: creds.googleAccessTokenExpiresAt,
+      googleRefreshToken: creds.googleRefreshToken || creds.refreshToken,
+      googleClientId: creds.googleClientId || process.env.GOOGLE_CLIENT_ID,
+      googleRootFolderId: rootFolderId,
+    });
+
+    try {
+      const remoteFiles = await adapter.list('');
+      const remoteMap = new Map<string, { size: number; timestamp: number }>();
+      for (const rf of remoteFiles) {
+        if (rf.path) remoteMap.set(rf.path, { size: rf.size, timestamp: rf.modifiedAt });
+      }
+
+      const localFiles = await collectLocalFiles(workingDir);
+      const localMap = new Map<string, { fullPath: string; mtimeMs: number; sizeBytes: number }>();
+      for (const lf of localFiles) {
+        localMap.set(lf.relPath, lf);
+      }
+
+      // 1. Download missing or newer remote files
+      for (const [relPath, rInfo] of remoteMap.entries()) {
+        const lFile = localMap.get(relPath);
+        const shouldDownload = !lFile || rInfo.timestamp > lFile.mtimeMs + 2000;
+        if (shouldDownload) {
+          const buf = await adapter.read(relPath);
+          const destPath = path.join(workingDir, relPath);
+          await fs.promises.mkdir(path.dirname(destPath), { recursive: true });
+          await fs.promises.writeFile(destPath, buf);
+          try {
+            const fileTime = new Date(rInfo.timestamp);
+            await fs.promises.utimes(destPath, fileTime, fileTime);
+          } catch {}
+          syncedFiles.push({ fileName: relPath, action: 'DOWNLOADED', sizeBytes: buf.byteLength });
+          downloadedCount++;
+        }
+      }
+
+      // 2. Upload missing or newer local files
+      for (const [relPath, lFile] of localMap.entries()) {
+        const rInfo = remoteMap.get(relPath);
+        const shouldUpload = !rInfo || lFile.mtimeMs > rInfo.timestamp + 2000;
+        if (shouldUpload) {
+          const content = await fs.promises.readFile(lFile.fullPath);
+          await adapter.write(relPath, new Uint8Array(content));
+          syncedFiles.push({ fileName: relPath, action: 'UPLOADED', sizeBytes: lFile.sizeBytes });
+          uploadedCount++;
+        } else if (!syncedFiles.some((f) => f.fileName === relPath)) {
+          syncedFiles.push({ fileName: relPath, action: 'UP_TO_DATE', sizeBytes: lFile.sizeBytes });
+        }
+      }
+
+      return {
+        success: true,
+        workspaceId,
+        folderKey,
+        workingDir,
+        persistenceType: 'google_drive',
+        targetLocation: `GoogleDrive://${rootFolderId || 'root'}`,
+        syncedFiles,
+        uploadedCount,
+        downloadedCount,
+        syncedAt: nowIso,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        workspaceId,
+        folderKey,
+        workingDir,
+        persistenceType: 'google_drive',
+        targetLocation: `GoogleDrive://${rootFolderId || 'root'}`,
+        syncedFiles,
+        uploadedCount,
+        downloadedCount,
+        syncedAt: nowIso,
+        error: err.message || 'Google Drive sync failed.',
       };
     }
   }

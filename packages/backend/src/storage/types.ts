@@ -27,6 +27,7 @@ export interface StorageConfig {
   googleClientId?: string;
   googleRedirectUri?: string;
   googleAccessToken?: string;
+  googleAccessTokenExpiresAt?: number;
   googleRefreshToken?: string;
   googleRootFolderId?: string;
 }
