@@ -31,10 +31,10 @@ import {
 export class WorkingWorkspaceService implements WorkspaceService {
   public readonly type = 'working' as const;
 
-  constructor(private workingDirResolver?: () => string) {}
+  constructor(private workingDirResolver?: (workspaceId?: string) => string) {}
 
-  getWorkingDir(): string {
-    return this.workingDirResolver ? this.workingDirResolver() : getWorkingWorkspaceDir();
+  getWorkingDir(workspaceId?: string): string {
+    return this.workingDirResolver ? this.workingDirResolver(workspaceId) : getWorkingWorkspaceDir(workspaceId);
   }
 
   async findWorkspace(workspaceId: string, env?: Record<string, unknown>): Promise<WorkspaceLookupResult> {
@@ -47,7 +47,7 @@ export class WorkingWorkspaceService implements WorkspaceService {
 
   async createWorkspace(userId: string, data: any, env?: Record<string, unknown>): Promise<WorkspaceMutationResult> {
     const res = await createWorkspace(userId, data, env);
-    const dir = this.getWorkingDir();
+    const dir = this.getWorkingDir(res.workspace?.id || data?.id || 'default');
     try {
       await fs.promises.mkdir(dir, { recursive: true });
     } catch {}
@@ -64,7 +64,7 @@ export class WorkingWorkspaceService implements WorkspaceService {
 
   async readFile(_workspaceId: string, filePath: string): Promise<Uint8Array | string> {
     const cleanRel = filePath.replace(/^\/+/, '');
-    const fullPath = path.resolve(this.getWorkingDir(), cleanRel);
+    const fullPath = path.resolve(this.getWorkingDir(_workspaceId), cleanRel);
     return await fs.promises.readFile(fullPath);
   }
 
@@ -93,7 +93,7 @@ export class WorkingWorkspaceService implements WorkspaceService {
   }
 
   async listFiles(_workspaceId: string, subfolder = ''): Promise<WorkspaceFileEntry[]> {
-    const baseDir = path.resolve(this.getWorkingDir(), subfolder.replace(/^\/+/, ''));
+    const baseDir = path.resolve(this.getWorkingDir(_workspaceId), subfolder.replace(/^\/+/, ''));
     if (!fs.existsSync(baseDir)) return [];
 
     const entries = await fs.promises.readdir(baseDir, { withFileTypes: true });
@@ -107,7 +107,7 @@ export class WorkingWorkspaceService implements WorkspaceService {
         updatedAt = s.mtimeMs;
       } catch {}
       return {
-        path: path.relative(this.getWorkingDir(), full),
+        path: path.relative(this.getWorkingDir(_workspaceId), full),
         name: e.name,
         isFolder: e.isDirectory(),
         sizeBytes,
