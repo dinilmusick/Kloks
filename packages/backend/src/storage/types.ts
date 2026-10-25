@@ -1,11 +1,8 @@
 export type StorageMode = 'local' | 'local_hosted' | 'remote';
 export type StorageProviderType =
   | 'local_fs'
-  | 's3'
   | 'backblaze_b2'
   | 'b2'
-  | 'cloudflare_r2'
-  | 'r2'
   | 'supabase'
   | 'firebase'
   | 'google_drive';
