@@ -14,6 +14,8 @@ import type {
 } from '@kloks/contracts';
 import { buildServiceUISchema, suggestUIComponent } from '@kloks/contracts';
 
+let activeUIAuthoringService: IService<UIAuthoringState>;
+
 interface UIAuthoringState extends Record<string, unknown> {
   sessions: Record<string, UIAuthoringSession>;
 }
@@ -37,7 +39,7 @@ export const UIAuthoringServiceDefinition: ServiceDefinition<UIAuthoringState> =
           operations: input.operations || [],
           metadata: input.metadata || {},
         };
-        ctx.service.setState({ sessions: { ...ctx.service.getState().sessions, [sessionId]: session } });
+        activeMonacoService.setState({ sessions: { ...activeMonacoService.getState().sessions, [sessionId]: session } });
         return session;
       },
     },
@@ -99,7 +101,7 @@ export const UIAuthoringServiceDefinition: ServiceDefinition<UIAuthoringState> =
     getSession: {
       id: 'UIAuthoringService.getSession',
       name: 'getSession',
-      handler: async (input: { sessionId: string }, ctx) => ctx.service.getState().sessions[input.sessionId] || null,
+      handler: async (input: { sessionId: string }, ctx) => activeMonacoService.getState().sessions[input.sessionId] || null,
     },
   },
 });
@@ -134,7 +136,8 @@ function validateSession(session: UIAuthoringSession): UIAuthoringValidation {
 }
 
 export function createUIAuthoringService(): IService<UIAuthoringState> {
-  return createService(UIAuthoringServiceDefinition);
+  activeUIAuthoringService = createService(UIAuthoringServiceDefinition);
+  return activeUIAuthoringService;
 }
 
 const defaultUIAuthoringService = createUIAuthoringService();
