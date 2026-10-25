@@ -1,5 +1,6 @@
 export interface GoogleDriveOAuthConfig {
   clientId: string;
+  clientSecret?: string;
   redirectUri: string;
   scopes?: string[];
 }
@@ -46,6 +47,7 @@ export async function exchangeGoogleDriveCode(
     code,
     grant_type: 'authorization_code',
   });
+  if (config.clientSecret) body.set('client_secret', config.clientSecret);
   if (codeVerifier) body.set('code_verifier', codeVerifier);
   const response = await fetch(TOKEN_URL, {
     method: 'POST',
