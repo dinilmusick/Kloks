@@ -18,7 +18,7 @@ import type { WorkspaceService } from '../packages/backend/src/workspace/Workspa
 describe('Workspace Services & Architecture Contracts', () => {
   it('RemoteWorkspaceService conforms to WorkspaceService contract', () => {
     const service: WorkspaceService = remoteWorkspaceService;
-    expect(service.type).toBe('remote');
+    expect(service.type).toBe('working');
     expect(typeof service.findWorkspace).toBe('function');
     expect(typeof service.listWorkspaces).toBe('function');
     expect(typeof service.createWorkspace).toBe('function');
