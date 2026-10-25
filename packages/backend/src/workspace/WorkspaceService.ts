@@ -35,7 +35,7 @@ export interface WorkspaceMutationResult {
 }
 
 export interface WorkspaceService {
-  readonly type: 'remote' | 'working';
+  readonly type: 'working';
 
   findWorkspace(workspaceId: string, env?: Record<string, unknown>): Promise<WorkspaceLookupResult>;
 
