@@ -1,10 +1,8 @@
 /**
  * @file RemoteWorkspaceService.ts
- * @description Remote-first WorkspaceService implementation for Kloks.
- * Directly mediates with authoritative remote storage (Backblaze B2/S3/DB) without requiring local working files.
- * Canonical choice for DEPM. Conforms to Skipo Governance (< 200 lines).
+ * @description Backward-compatible alias for the canonical active-working WorkspaceService.
+ * New Skipo apps must use WorkingWorkspaceService; direct remote file I/O is not an app architecture.
  */
-
 import {
   WorkspaceService,
   WorkspaceFileEntry,
@@ -12,82 +10,42 @@ import {
   WorkspaceListResult,
   WorkspaceMutationResult,
 } from './WorkspaceService.js';
-import {
-  findUserWorkspace,
-  getWorkspaces,
-  createWorkspace,
-  updateWorkspace,
-  deleteWorkspace,
-} from '../core/workspaceCore.js';
-import {
-  readWorkspaceFile,
-  writeWorkspaceFile,
-  deleteWorkspaceFile,
-  listWorkspaceFiles,
-} from '../core/workspaceFileCore.js';
+import { WorkspaceSyncSummary } from './types.js';
+import { workingWorkspaceService } from './WorkingWorkspaceService.js';
 
 export class RemoteWorkspaceService implements WorkspaceService {
-  public readonly type = 'remote' as const;
+  public readonly type = 'working' as const;
 
-  async findWorkspace(workspaceId: string, env?: Record<string, unknown>): Promise<WorkspaceLookupResult> {
-    return await findUserWorkspace(workspaceId, env);
+  findWorkspace(id: string, env?: Record<string, unknown>): Promise<WorkspaceLookupResult> {
+    return workingWorkspaceService.findWorkspace(id, env);
   }
-
-  async listWorkspaces(userId?: string, env?: Record<string, unknown>): Promise<WorkspaceListResult> {
-    return await getWorkspaces(userId, env);
+  listWorkspaces(userId?: string, env?: Record<string, unknown>): Promise<WorkspaceListResult> {
+    return workingWorkspaceService.listWorkspaces(userId, env);
   }
-
-  async createWorkspace(userId: string, data: any, env?: Record<string, unknown>): Promise<WorkspaceMutationResult> {
-    return await createWorkspace(userId, data, env);
+  createWorkspace(userId: string, data: any, env?: Record<string, unknown>): Promise<WorkspaceMutationResult> {
+    return workingWorkspaceService.createWorkspace(userId, data, env);
   }
-
-  async updateWorkspace(userId: string, params: any, env?: Record<string, unknown>): Promise<WorkspaceMutationResult> {
-    return await updateWorkspace(userId, params, env);
+  updateWorkspace(userId: string, params: any, env?: Record<string, unknown>): Promise<WorkspaceMutationResult> {
+    return workingWorkspaceService.updateWorkspace(userId, params, env);
   }
-
-  async deleteWorkspace(userId: string, workspaceId: string, env?: Record<string, unknown>): Promise<{ success: boolean; workspaces?: any[] }> {
-    return await deleteWorkspace(userId, workspaceId, env);
+  deleteWorkspace(userId: string, id: string, env?: Record<string, unknown>): Promise<{ success: boolean; workspaces?: any[] }> {
+    return workingWorkspaceService.deleteWorkspace(userId, id, env);
   }
-
-  async readFile(workspaceId: string, filePath: string, env?: Record<string, unknown>): Promise<Uint8Array | string> {
-    const { workspace, connection } = await this.findWorkspace(workspaceId, env);
-    if (!workspace) throw new Error(`Workspace "${workspaceId}" not found.`);
-    const data = await readWorkspaceFile(workspace, connection, filePath);
-    if (!data) throw new Error(`File "${filePath}" not found in workspace "${workspaceId}".`);
-    return data;
+  readFile(id: string, path: string, env?: Record<string, unknown>): Promise<Uint8Array | string> {
+    return workingWorkspaceService.readFile(id, path, env);
   }
-
-  async writeFile(
-    workspaceId: string,
-    filePath: string,
-    content: Uint8Array | string,
-    env?: Record<string, unknown>
-  ): Promise<{ success: boolean; path: string; sizeBytes?: number }> {
-    const { workspace, connection } = await this.findWorkspace(workspaceId, env);
-    if (!workspace) throw new Error(`Workspace "${workspaceId}" not found.`);
-    await writeWorkspaceFile(workspace, connection, filePath, content);
-    const size = typeof content === 'string' ? new TextEncoder().encode(content).length : content.byteLength;
-    return { success: true, path: filePath, sizeBytes: size };
+  writeFile(id: string, path: string, content: Uint8Array | string, env?: Record<string, unknown>) {
+    return workingWorkspaceService.writeFile(id, path, content, env);
   }
-
-  async deleteFile(workspaceId: string, filePath: string, env?: Record<string, unknown>): Promise<{ success: boolean }> {
-    const { workspace, connection } = await this.findWorkspace(workspaceId, env);
-    if (!workspace) throw new Error(`Workspace "${workspaceId}" not found.`);
-    const deleted = await deleteWorkspaceFile(workspace, connection, filePath);
-    return { success: deleted };
+  deleteFile(id: string, path: string, env?: Record<string, unknown>) {
+    return workingWorkspaceService.deleteFile(id, path, env);
   }
-
-  async listFiles(workspaceId: string, subfolder = '', env?: Record<string, unknown>): Promise<WorkspaceFileEntry[]> {
-    const { workspace, connection } = await this.findWorkspace(workspaceId, env);
-    if (!workspace) throw new Error(`Workspace "${workspaceId}" not found.`);
-    const files = await listWorkspaceFiles(workspace, connection, subfolder);
-    return files.map((f) => ({
-      path: f.fileName,
-      name: f.fileName.split('/').pop() || f.fileName,
-      sizeBytes: f.sizeBytes,
-      updatedAt: f.uploadTimestamp,
-    }));
+  listFiles(id: string, subfolder?: string, env?: Record<string, unknown>): Promise<WorkspaceFileEntry[]> {
+    return workingWorkspaceService.listFiles(id, subfolder, env);
+  }
+  sync(id: string, options?: any, env?: Record<string, unknown>): Promise<WorkspaceSyncSummary> {
+    return workingWorkspaceService.sync(id, options, env);
   }
 }
 
-export const remoteWorkspaceService = new RemoteWorkspaceService();
+export const remoteWorkspaceService = workingWorkspaceService;
