@@ -8,3 +8,5 @@
 
 export * from './queueContracts.js';
 export * from './browserExecutionClient.js';
+
+export * from './WorkspaceAutosaveController.js';
