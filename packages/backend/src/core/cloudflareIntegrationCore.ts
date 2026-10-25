@@ -132,7 +132,8 @@ export async function fetchCloudflareData(
       const url = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
       const domains = Array.isArray(p.domains) && p.domains.length > 0 ? p.domains : [pDomain];
       return {
-        id: p.name || p.id, name: p.name, type: 'PAGES_PROJECT',
+        id: p.name || p.id, name: p.name, type: 'PAGES_PROJECT', providerProjectId: p.id,
+        providerDeploymentId: p.latest_deployment?.id,
         status: p.latest_deployment?.status || 'READY', framework: 'Cloudflare Pages',
         domain: pDomain, domains, url, edgeRequestsFormatted: '0', fastDataTransferFormatted: '0 MB',
         updatedAt: p.latest_deployment?.created_on || p.created_on || new Date().toISOString(),

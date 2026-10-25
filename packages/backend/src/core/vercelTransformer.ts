@@ -78,6 +78,7 @@ export function buildProjectObservability(projects: any[], deployments: any[], u
       fastDataTransferFormatted: '100 MB',
       middlewareInvocations: 10,
       middlewareInvocationsFormatted: '10',
+      latestDeploymentId: latestDep?.id,
       latestDeploymentUrl: `https://${cleanDeploymentUrl}`,
       latestDeploymentStatus: displayStatus,
       latestDeploymentCreatedAt: new Date(createdAtTime).toISOString(),
@@ -97,5 +98,6 @@ export function buildProjectsList(observability: any[]) {
     domain: (po.domains && po.domains[0]) || `${po.projectName}.vercel.app`,
     domains: po.domains || [`${po.projectName}.vercel.app`],
     updatedAt: po.latestDeploymentCreatedAt,
+    deploymentId: po.latestDeploymentId,
   }));
 }
