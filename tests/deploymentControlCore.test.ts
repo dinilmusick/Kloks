@@ -22,8 +22,8 @@ describe('deployment control core', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 200 }));
     await resumeVercelProject('prj_123', { token: 'tok_123' });
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.vercel.com/v1/projects/prj_123/pause',
-      expect.objectContaining({ method: 'DELETE' })
+      'https://api.vercel.com/v1/projects/prj_123/unpause',
+      expect.objectContaining({ method: 'POST' })
     );
   });
 
