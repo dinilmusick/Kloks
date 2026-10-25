@@ -21,3 +21,4 @@ export const KLOKS_CANONICAL_CONTRACT = {
   validateCompatibility: (consumerSymbols?: string[]) =>
     validateConsumerSurfaceCompatibility(consumerSymbols ?? QWNSR_REQUIRED_SURFACE, KLOKS_PUBLIC_SURFACE),
 };
+export * from './uiAuthoringArtifactSchema.js';
