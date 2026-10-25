@@ -55,8 +55,8 @@ export async function getSrklAccounts(
         }
         for (const conn of pool) {
           if (service && !conn.provider?.toLowerCase().includes(service.toLowerCase())) continue;
-          const kId = (conn.b2KeyId || conn.keyId || conn.accessKeyId || '').trim();
-          const key = kId ? `key:${kId}` : `id:${conn.id}`;
+          const kId = (conn.b2KeyId || conn.keyId || conn.accessKeyId || conn.googleEmail || '').trim();
+          const key = kId ? `key:${kId}:${conn.googleRootFolderId || conn.b2BucketName || ''}` : `id:${conn.id}`;
           if (!seenKeys.has(key)) {
             seenKeys.add(key);
             accounts.push({
@@ -70,6 +70,12 @@ export async function getSrklAccounts(
                 bucketName: conn.b2BucketName || conn.bucketName,
                 region: conn.b2Region || conn.region,
                 endpoint: conn.b2Endpoint || conn.endpoint,
+                email: conn.googleEmail,
+                rootFolderId: conn.googleRootFolderId,
+                rootFolderName: conn.googleRootFolderName,
+                accessToken: conn.googleAccessToken,
+                accessTokenExpiresAt: conn.googleAccessTokenExpiresAt,
+                refreshToken: conn.googleRefreshToken,
               },
             });
           }
