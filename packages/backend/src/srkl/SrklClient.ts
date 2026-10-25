@@ -164,7 +164,7 @@ export class SrklClient {
       s3BucketName: creds.bucketName || creds.s3BucketName,
       s3Region: creds.region || creds.s3Region,
       s3Endpoint: creds.endpoint || creds.s3Endpoint,
-      googleEmail: creds.email || account.emailOrSlug,
+      googleEmail: creds.email || account.credentials?.email || account.name,
       googleRootFolderId: creds.rootFolderId,
       googleRootFolderName: creds.rootFolderName,
       googleAccessToken: creds.accessToken,
