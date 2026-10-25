@@ -12,6 +12,8 @@ import type {
   MonacoUpdateDocumentInput,
 } from '@kloks/contracts';
 
+let activeMonacoService: IService<MonacoState>;
+
 interface MonacoState extends Record<string, unknown> {
   sessions: Record<string, MonacoIdeSession>;
 }
@@ -35,7 +37,7 @@ export const MonacoIdeServiceDefinition: ServiceDefinition<MonacoState> = create
           createdAt: now,
           updatedAt: now,
         };
-        ctx.service.setState({ sessions: { ...ctx.service.getState().sessions, [sessionId]: session } });
+        activeMonacoService.setState({ sessions: { ...activeMonacoService.getState().sessions, [sessionId]: session } });
         return session;
       },
     },
@@ -43,7 +45,7 @@ export const MonacoIdeServiceDefinition: ServiceDefinition<MonacoState> = create
       id: 'MonacoIdeService.updateDocument',
       name: 'updateDocument',
       handler: async (input: MonacoUpdateDocumentInput, ctx) => {
-        const current = ctx.service.getState().sessions[input.sessionId];
+        const current = activeMonacoService.getState().sessions[input.sessionId];
         if (!current) throw new Error(`Unknown Monaco session: ${input.sessionId}`);
         const document = {
           ...current.document,
@@ -52,7 +54,7 @@ export const MonacoIdeServiceDefinition: ServiceDefinition<MonacoState> = create
           version: current.document.version + 1,
         };
         const session = { ...current, document, updatedAt: Date.now() };
-        ctx.service.setState({ sessions: { ...ctx.service.getState().sessions, [session.sessionId]: session } });
+        activeMonacoService.setState({ sessions: { ...activeMonacoService.getState().sessions, [session.sessionId]: session } });
         return session;
       },
     },
@@ -60,14 +62,14 @@ export const MonacoIdeServiceDefinition: ServiceDefinition<MonacoState> = create
       id: 'MonacoIdeService.setDiagnostics',
       name: 'setDiagnostics',
       handler: async (input: { sessionId: string; diagnostics: MonacoDiagnostic[] }, ctx) => {
-        const current = ctx.service.getState().sessions[input.sessionId];
+        const current = activeMonacoService.getState().sessions[input.sessionId];
         if (!current) throw new Error(`Unknown Monaco session: ${input.sessionId}`);
         const session = {
           ...current,
           document: { ...current.document, diagnostics: input.diagnostics },
           updatedAt: Date.now(),
         };
-        ctx.service.setState({ sessions: { ...ctx.service.getState().sessions, [session.sessionId]: session } });
+        activeMonacoService.setState({ sessions: { ...activeMonacoService.getState().sessions, [session.sessionId]: session } });
         return session;
       },
     },
@@ -75,25 +77,25 @@ export const MonacoIdeServiceDefinition: ServiceDefinition<MonacoState> = create
       id: 'MonacoIdeService.setOptions',
       name: 'setOptions',
       handler: async (input: { sessionId: string; options: MonacoEditorOptions }, ctx) => {
-        const current = ctx.service.getState().sessions[input.sessionId];
+        const current = activeMonacoService.getState().sessions[input.sessionId];
         if (!current) throw new Error(`Unknown Monaco session: ${input.sessionId}`);
         const session = { ...current, options: { ...current.options, ...input.options }, updatedAt: Date.now() };
-        ctx.service.setState({ sessions: { ...ctx.service.getState().sessions, [session.sessionId]: session } });
+        activeMonacoService.setState({ sessions: { ...activeMonacoService.getState().sessions, [session.sessionId]: session } });
         return session;
       },
     },
     getSession: {
       id: 'MonacoIdeService.getSession',
       name: 'getSession',
-      handler: async (input: { sessionId: string }, ctx) => ctx.service.getState().sessions[input.sessionId] || null,
+      handler: async (input: { sessionId: string }, ctx) => activeMonacoService.getState().sessions[input.sessionId] || null,
     },
     disposeSession: {
       id: 'MonacoIdeService.disposeSession',
       name: 'disposeSession',
       handler: async (input: { sessionId: string }, ctx) => {
-        const sessions = { ...ctx.service.getState().sessions };
+        const sessions = { ...activeMonacoService.getState().sessions };
         delete sessions[input.sessionId];
-        ctx.service.setState({ sessions });
+        activeMonacoService.setState({ sessions });
         return { disposed: true, sessionId: input.sessionId };
       },
     },
@@ -101,7 +103,8 @@ export const MonacoIdeServiceDefinition: ServiceDefinition<MonacoState> = create
 });
 
 export function createMonacoIdeService(): IService<MonacoState> {
-  return createService(MonacoIdeServiceDefinition);
+  activeMonacoService = createService(MonacoIdeServiceDefinition);
+  return activeMonacoService;
 }
 
 const defaultMonacoIdeService = createMonacoIdeService();
