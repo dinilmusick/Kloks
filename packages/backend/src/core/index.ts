@@ -23,3 +23,4 @@ export * from './cloudflareIntegrationCore.js';
 export * from './vercelIntegrationCore.js';
 export * from './vercelTransformer.js';
 
+export * from './deploymentControlCore.js';
