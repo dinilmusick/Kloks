@@ -48,13 +48,13 @@ export const AuthServiceDefinition: ServiceDefinition = createServiceDefinition(
       id: 'AuthService.login',
       name: 'login',
       handler: async (input: { email: string; password: string; isAdmin?: boolean; env?: Record<string, unknown> }) =>
-        loginSystemUser(input.email, input.password, Boolean(input.isAdmin), (sql, params) => queryUnifiedDb(sql, params, input.env)),
+        loginSystemUser(input.email, input.password, Boolean(input.isAdmin), (sql, params) => queryUnifiedDb(sql, params, input.env), input.env),
     },
     resolveUser: {
       id: 'AuthService.resolveUser',
       name: 'resolveUser',
       handler: async (input: { tokenOrUserId: string; env?: Record<string, unknown> }) =>
-        resolveUserFromToken(input.tokenOrUserId, (sql, params) => queryUnifiedDb(sql, params, input.env)),
+        resolveUserFromToken(input.tokenOrUserId, (sql, params) => queryUnifiedDb(sql, params, input.env), input.env),
     },
     checkRateLimit: {
       id: 'AuthService.checkRateLimit',
