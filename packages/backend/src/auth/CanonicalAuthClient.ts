@@ -25,10 +25,11 @@ export interface AuthResult {
   status: number;
   user?: CanonicalAuthUser;
   session?: Record<string, unknown>;
-  error?: string;\n  redirectUrl?: string;
+  error?: string;
+  redirectUrl?: string;
 }
 
-const cleanBaseUrl = (value: string) => value.trim().replace(/\\/+$/, '');
+const cleanBaseUrl = (value: string) => value.trim().replace(/\/+$/, '');
 
 export class CanonicalAuthClient {
   private readonly baseUrl: string;
@@ -84,7 +85,13 @@ export class CanonicalAuthClient {
     if (result.status >= 400 || result.data?.error) {
       return { success: false, status: result.status, error: result.data?.error?.message ?? result.data?.message ?? 'Google sign-in failed.' };
     }
-    return { success: true, status: result.status, user: result.data?.user, session: result.data?.session, redirectUrl: result.data?.url ?? result.data?.redirect };
+    return {
+      success: true,
+      status: result.status,
+      user: result.data?.user,
+      session: result.data?.session,
+      redirectUrl: result.data?.url ?? result.data?.redirect,
+    };
   }
 
   async requestGoogleDriveAccess(callbackURL?: string): Promise<AuthResult> {
