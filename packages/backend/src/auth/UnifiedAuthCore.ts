@@ -13,7 +13,7 @@ export interface AuthEnvironment {
 }
 
 function requireAuthBaseUrl(env?: AuthEnvironment): string {
-  const baseUrl = String(env?.SRKL_AUTH_BASE_URL ?? '').trim();
+  const baseUrl = String(env?.SRKL_AUTH_BASE_URL ?? (typeof process !== 'undefined' ? process.env.SRKL_AUTH_BASE_URL : '') ?? '').trim();
   if (!baseUrl) {
     throw new Error('SRKL_AUTH_BASE_URL is required. Local application auth is not supported.');
   }
