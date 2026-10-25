@@ -21,11 +21,11 @@ describe('shared IDE and UI authoring services', () => {
   it('builds a context-aware artifact and rejects broken hierarchy', async () => {
     const service = createUIAuthoringService();
     await service.start();
-    const session = await service.call('createSession', {
+    const session = await service.call<unknown, import('@kloks/contracts').UIAuthoringSession>('createSession', {
       context: 'general-component',
       metadata: { origin: 'theta', name: 'ExampleButton' },
     });
-    const valid = await service.call('validate', { sessionId: session.sessionId });
+    const valid = await service.call<unknown, import('@kloks/contracts').UIAuthoringValidation>('validate', { sessionId: session.sessionId });
     expect(valid.valid).toBe(false);
     await service.call('addNode', { sessionId: session.sessionId, node: {
       id: 'page', kind: 'page', name: 'Page', props: {},
@@ -33,9 +33,9 @@ describe('shared IDE and UI authoring services', () => {
     await service.call('addNode', { sessionId: session.sessionId, node: {
       id: 'section', kind: 'section', name: 'Section', parentId: 'page', props: {},
     }});
-    const validAfterHierarchy = await service.call('validate', { sessionId: session.sessionId });
+    const validAfterHierarchy = await service.call<unknown, import('@kloks/contracts').UIAuthoringValidation>('validate', { sessionId: session.sessionId });
     expect(validAfterHierarchy.valid).toBe(true);
-    const artifact = await service.call('generateArtifact', { sessionId: session.sessionId });
+    const artifact = await service.call<unknown, import('@kloks/contracts').UIComponentArtifact>('generateArtifact', { sessionId: session.sessionId });
     expect(artifact.purpose).toBe('general-purpose');
     expect(artifact.promotion).toBe('always');
   });
