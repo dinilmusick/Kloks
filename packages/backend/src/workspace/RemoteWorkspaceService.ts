@@ -32,19 +32,19 @@ export class RemoteWorkspaceService implements WorkspaceService {
     return workingWorkspaceService.deleteWorkspace(userId, id, env);
   }
   readFile(id: string, path: string, env?: Record<string, unknown>): Promise<Uint8Array | string> {
-    return workingWorkspaceService.readFile(id, path, env);
+    return workingWorkspaceService.readFile(id, path);
   }
   writeFile(id: string, path: string, content: Uint8Array | string, env?: Record<string, unknown>) {
-    return workingWorkspaceService.writeFile(id, path, content, env);
+    return workingWorkspaceService.writeFile(id, path, content);
   }
   deleteFile(id: string, path: string, env?: Record<string, unknown>) {
-    return workingWorkspaceService.deleteFile(id, path, env);
+    return workingWorkspaceService.deleteFile(id, path);
   }
   listFiles(id: string, subfolder?: string, env?: Record<string, unknown>): Promise<WorkspaceFileEntry[]> {
-    return workingWorkspaceService.listFiles(id, subfolder, env);
+    return workingWorkspaceService.listFiles(id, subfolder);
   }
   sync(id: string, options?: any, env?: Record<string, unknown>): Promise<WorkspaceSyncSummary> {
-    return workingWorkspaceService.sync(id, options, env);
+    return workingWorkspaceService.sync(id, options);
   }
 }
 
