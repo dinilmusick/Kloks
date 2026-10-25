@@ -24,6 +24,11 @@ export interface StorageConfig {
   keyId?: string;
   applicationKey?: string;
   accountId?: string;
+  googleClientId?: string;
+  googleRedirectUri?: string;
+  googleAccessToken?: string;
+  googleRefreshToken?: string;
+  googleRootFolderId?: string;
 }
 
 export interface FileInfo {
