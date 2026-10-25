@@ -11,7 +11,7 @@ describe('shared IDE and UI authoring services', () => {
 
   it('exposes context-neutral UI authoring operations', () => {
     expect(Object.keys(UIAuthoringServiceDefinition.operations)).toEqual([
-      'createSession', 'addNode', 'updateNode', 'removeNode', 'setBinding',
+      'createSession', 'replaceSession', 'addNode', 'updateNode', 'removeNode', 'setBinding',
       'setOperations', 'validate', 'serialize', 'generateServiceUI', 'suggestComponent', 'getSession',
     ]);
   });

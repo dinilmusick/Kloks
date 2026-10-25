@@ -43,6 +43,14 @@ export const UIAuthoringServiceDefinition: ServiceDefinition<UIAuthoringState> =
         return session;
       },
     },
+    replaceSession: {
+      id: 'UIAuthoringService.replaceSession',
+      name: 'replaceSession',
+      handler: async (input: { sessionId: string; session: UIAuthoringSession }, ctx) => {
+        if (input.sessionId !== input.session.sessionId) throw new Error('Session id mismatch.');
+        return updateSession(activeUIAuthoringService, input.sessionId, () => input.session);
+      },
+    },
     addNode: {
       id: 'UIAuthoringService.addNode',
       name: 'addNode',
