@@ -74,7 +74,7 @@ export class WorkingWorkspaceService implements WorkspaceService {
     content: Uint8Array | string
   ): Promise<{ success: boolean; path: string; sizeBytes?: number }> {
     const cleanRel = filePath.replace(/^\/+/, '');
-    const fullPath = path.resolve(this.getWorkingDir(), cleanRel);
+    const fullPath = path.resolve(this.getWorkingDir(_workspaceId), cleanRel);
     await fs.promises.mkdir(path.dirname(fullPath), { recursive: true });
     const buffer = typeof content === 'string' ? Buffer.from(content) : Buffer.from(content.buffer, content.byteOffset, content.byteLength);
     await fs.promises.writeFile(fullPath, buffer);
