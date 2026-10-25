@@ -62,8 +62,10 @@ export function setWorkingWorkspaceConfig(cfg: Partial<WorkingWorkspaceConfig>):
   return updated;
 }
 
-export function getWorkingWorkspaceDir(): string {
-  const dir = getWorkingWorkspaceConfig().workingDirectory;
+export function getWorkingWorkspaceDir(workspaceId = 'default'): string {
+  const root = getWorkingWorkspaceConfig().workingDirectory;
+  const safeId = workspaceId.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const dir = path.join(root, safeId);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -177,7 +179,7 @@ export async function syncWorkspace(workspaceId: string): Promise<WorkspaceSyncS
 
   const { workspace, user, connection } = match;
   const folderKey = getWorkspaceFolderKey(workspace, user);
-  const workingDir = getWorkingWorkspaceDir();
+  const workingDir = getWorkingWorkspaceDir(workspaceId);
   const isB2 = workspace.storageProvider === 'backblaze_b2' || workspace.storageConfig?.type === 'b2';
 
   const syncedFiles: SyncFileResult[] = [];
