@@ -7,7 +7,7 @@ describe('CanonicalAuthClient', () => {
     const fetcher = async (url: string, init?: RequestInit) => {
       calls.push({ url, init });
       return new Response(JSON.stringify({
-        user: { id: 'u1', email: 'user@example.com', name: 'User', role: 'user' },
+        user: { id: 'u1', email: 'user@example.com', name: 'User', role: 'user' },\n        url: 'https://auth.example.com/api/auth/callback/google',
         session: { token: 'session-token' },
       }), { status: 200, headers: { 'content-type': 'application/json' } });
     };
@@ -29,3 +29,4 @@ describe('CanonicalAuthClient', () => {
     expect(calls[0]).toBe('https://auth.example.com/api/auth/link-social');
   });
 });
+\n
