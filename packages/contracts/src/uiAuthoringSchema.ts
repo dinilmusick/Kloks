@@ -71,7 +71,24 @@ export function buildServiceUISchema(session: UIAuthoringSession): ServiceUISche
   const pages = session.nodes.filter((node) => node.kind === 'page');
   const sections = session.nodes.filter((node) => node.kind === 'section');
   const components = session.nodes.filter((node) => node.kind === 'component');
-  const assetRefs = components.map((node) => node.assetRef).filter(Boolean) as AssetRef[];
+  const assetRefs = [
+    ...sections.map((node) => node.assetRef),
+    ...components.map((node) => node.assetRef),
+  ].filter(Boolean) as AssetRef[];
+  const componentDescriptor = (component: (typeof components)[number]) => {
+    if (!component.assetRef) throw new Error(`Component '${component.id}' requires a FLOKS asset reference before ServiceUISchema generation.`);
+    return {
+      name: component.name,
+      assetRef: component.assetRef,
+      description: component.props.description as string | undefined,
+    };
+  };
+  const sectionDescriptor = (section: (typeof sections)[number]) => ({
+    name: section.name,
+    ...(section.assetRef ? { assetRef: section.assetRef } : {}),
+    components: components.filter((component) => component.parentId === section.id).map(componentDescriptor),
+    description: section.props.description as string | undefined,
+  });
   return {
     schemaId: `kloks.authored-ui.${session.sessionId}`,
     schemaVersion: UI_AUTHORING_SCHEMA_VERSION,
@@ -79,32 +96,11 @@ export function buildServiceUISchema(session: UIAuthoringSession): ServiceUISche
     requirementMode: 'optional',
     pages: pages.map((page) => ({
       name: page.name,
-      sections: sections.filter((section) => section.parentId === page.id).map((section) => ({
-        name: section.name,
-        assetRef: section.assetRef!,
-        components: components.filter((component) => component.parentId === section.id).map((component) => ({
-          name: component.name,
-          assetRef: component.assetRef!,
-          description: component.props.description as string | undefined,
-        })),
-        description: section.props.description as string | undefined,
-      })),
+      sections: sections.filter((section) => section.parentId === page.id).map(sectionDescriptor),
       description: page.props.description as string | undefined,
     })),
-    sections: sections.map((section) => ({
-      name: section.name,
-      assetRef: section.assetRef!,
-      components: components.filter((component) => component.parentId === section.id).map((component) => ({
-        name: component.name,
-        assetRef: component.assetRef!,
-      })),
-      description: section.props.description as string | undefined,
-    })),
-    components: components.map((component) => ({
-      name: component.name,
-      assetRef: component.assetRef!,
-      description: component.props.description as string | undefined,
-    })),
+    sections: sections.map(sectionDescriptor),
+    components: components.map(componentDescriptor),
     assetRefs,
     operationBindings: session.bindings.map((binding) => ({
       operationId: binding.target.apiId,
