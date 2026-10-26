@@ -17,7 +17,6 @@ describe('shared IDE and UI authoring services', () => {
       'setOperations', 'validate', 'serialize', 'generateArtifact', 'generateServiceUI', 'suggestComponent', 'getSession',
     ]);
   });
-});
 
 
   it('builds a context-aware artifact and rejects broken hierarchy', async () => {
@@ -110,7 +109,7 @@ it('rejects bindings to structural nodes and unknown operation fields', async ()
   expect(validation.errors).toContain('Slot content references missing child: missing-child');
   expect(validation.errors).toContain('Event onClick references missing operation: missing-operation');
 });
-
+});
 
 describe('shared service instance isolation', () => {
   it('keeps Monaco sessions isolated between service instances', async () => {
@@ -149,8 +148,8 @@ describe('shared service instance isolation', () => {
   });
 });
 
-
-it('generates ServiceUISchema without inventing assets for structural sections', async () => {
+describe('extended authoring and Monaco operations', () => {
+  it('generates ServiceUISchema without inventing assets for structural sections', async () => {
   const service = createUIAuthoringService();
   await service.start();
   const session = await service.call<unknown, import('@kloks/contracts').UIAuthoringSession>('createSession', {
@@ -242,3 +241,5 @@ it('supports Monaco workspace context, language intelligence, import analysis, a
   expect(restored.validation).toEqual(validation);
   expect(restored.importAnalysis).toEqual(imports);
 });
+});
+
