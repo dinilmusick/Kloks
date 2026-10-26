@@ -146,3 +146,29 @@ describe('shared service instance isolation', () => {
     expect(await second.call('getSession', { sessionId: 'first-authoring' })).toBeNull();
   });
 });
+
+
+it('generates ServiceUISchema without inventing assets for structural sections', async () => {
+  const service = createUIAuthoringService();
+  await service.start();
+  const session = await service.call<unknown, import('@kloks/contracts').UIAuthoringSession>('createSession', {
+    context: 'service',
+    metadata: { serviceId: 'service.example' },
+    operations: [{ operationId: 'submit', name: 'submit', inputFields: [{ name: 'email', type: 'email' }] }],
+  });
+  const assetRef = {
+    packageId: '@ultrst-armada/floks',
+    packageVersion: '^1.5.0',
+    exportPath: 'ui',
+    assetId: 'floks.input.text',
+    assetVersion: '1.0.0',
+  };
+  await service.call('addNode', { sessionId: session.sessionId, node: { id: 'page', kind: 'page', name: 'Page', props: {} } });
+  await service.call('addNode', { sessionId: session.sessionId, node: { id: 'section', kind: 'section', name: 'Form', parentId: 'page', props: {} } });
+  await service.call('addNode', { sessionId: session.sessionId, node: { id: 'email', kind: 'component', name: 'Email', parentId: 'section', assetRef, props: {} } });
+  const schema = await service.call<unknown, import('@kloks/contracts').ServiceUISchema>('generateServiceUI', { sessionId: session.sessionId });
+  expect(schema.serviceId).toBe('service.example');
+  expect(schema.pages[0].sections[0].assetRef).toBeUndefined();
+  expect(schema.pages[0].sections[0].components[0].assetRef).toEqual(assetRef);
+  expect(schema.assetRefs).toEqual([assetRef]);
+});
