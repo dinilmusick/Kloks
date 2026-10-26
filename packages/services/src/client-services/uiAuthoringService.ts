@@ -12,7 +12,7 @@ import type {
   UIAuthoringSession,
   UIAuthoringValidation,
 } from '@kloks/contracts';
-import { buildServiceUISchema, suggestUIComponent } from '@kloks/contracts';
+import { buildServiceUISchema, buildUIComponentArtifact, suggestUIComponent } from '@kloks/contracts';
 
 let activeUIAuthoringService: IService<UIAuthoringState>;
 
@@ -96,6 +96,11 @@ export const UIAuthoringServiceDefinition: ServiceDefinition<UIAuthoringState> =
       name: 'serialize',
       handler: async (input: { sessionId: string }, ctx) => JSON.stringify(getSession(activeUIAuthoringService, input.sessionId), null, 2),
     },
+    generateArtifact: {
+      id: 'UIAuthoringService.generateArtifact',
+      name: 'generateArtifact',
+      handler: async (input: { sessionId: string }, ctx) => buildUIComponentArtifact(getSession(activeUIAuthoringService, input.sessionId)),
+    },
     generateServiceUI: {
       id: 'UIAuthoringService.generateServiceUI',
       name: 'generateServiceUI',
@@ -134,6 +139,15 @@ function validateSession(session: UIAuthoringSession): UIAuthoringValidation {
   const errors: string[] = [];
   const warnings: string[] = [];
   if (!session.nodes.some((node) => node.kind === 'page')) errors.push('At least one page is required.');
+  const ids = new Set<string>();
+  for (const node of session.nodes) {
+    if (ids.has(node.id)) errors.push(`Duplicate authoring node id: ${node.id}`);
+    ids.add(node.id);
+    if (node.parentId && !session.nodes.some((parent) => parent.id === node.parentId)) errors.push(`Missing parent for node: ${node.id}`);
+    if (node.kind === 'page' && node.parentId) errors.push(`Page cannot have a parent: ${node.id}`);
+    if (node.kind === 'section' && node.parentId && !session.nodes.some((parent) => parent.id === node.parentId && parent.kind === 'page')) errors.push(`Section parent must be a page: ${node.id}`);
+    if (node.kind === 'component' && node.parentId && !session.nodes.some((parent) => parent.id === node.parentId && parent.kind === 'section')) errors.push(`Component parent must be a section: ${node.id}`);
+  }
   if (session.nodes.some((node) => node.kind === 'component' && !node.assetRef)) errors.push('Every component node requires a FLOKS asset reference.');
   if (session.context === 'service' && !session.metadata.serviceId) errors.push('Service authoring requires metadata.serviceId.');
   for (const binding of session.bindings) {
