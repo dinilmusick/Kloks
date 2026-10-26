@@ -10,7 +10,6 @@ import type {
   MonacoEditorOptions,
   MonacoIdeSession,
   MonacoUpdateDocumentInput,
-  MonacoCompletionItem,
   MonacoImportAnalysis,
   MonacoLanguageConfiguration,
   MonacoSerializedSession,
@@ -18,7 +17,6 @@ import type {
   MonacoSetImportAnalysisInput,
   MonacoSetValidationResultInput,
   MonacoSetWorkspaceContextInput,
-  MonacoValidationResult,
 } from '@kloks/contracts';
 
 let activeMonacoService: IService<MonacoState>;
@@ -195,8 +193,9 @@ function buildMonacoIdeServiceDefinition(getService: () => IService<MonacoState>
           const specifier = match[1] || match[2] || match[3];
           if (!specifier) continue;
           const lineNumber = source.slice(0, match.index || 0).split('\\n').length;
+          const normalizedSpecifier = specifier.replace(/^\.\//, '');
           const resolvedUri = workspace?.files.find((file) =>
-            file.uri === specifier || file.uri.endsWith('/' + specifier) || file.uri.endsWith(specifier),
+            file.uri === specifier || file.uri.endsWith('/' + normalizedSpecifier) || file.uri.endsWith(normalizedSpecifier),
           )?.uri;
           imports.push({
             specifier,
