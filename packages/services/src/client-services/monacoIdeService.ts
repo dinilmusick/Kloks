@@ -81,7 +81,7 @@ function buildMonacoIdeServiceDefinition(getService: () => IService<MonacoState>
           document: { ...current.document, diagnostics: input.diagnostics },
           updatedAt: Date.now(),
         };
-        getService().setState({ sessions: { ...getService().getState().sessions, [session.sessionId]: session } });
+        getService().setState({ ...getService().getState(), sessions: { ...getService().getState().sessions, [session.sessionId]: session } });
         return session;
       },
     },
@@ -92,7 +92,7 @@ function buildMonacoIdeServiceDefinition(getService: () => IService<MonacoState>
         const current = getService().getState().sessions[input.sessionId];
         if (!current) throw new Error(`Unknown Monaco session: ${input.sessionId}`);
         const session = { ...current, options: { ...current.options, ...input.options }, updatedAt: Date.now() };
-        getService().setState({ sessions: { ...getService().getState().sessions, [session.sessionId]: session } });
+        getService().setState({ ...getService().getState(), sessions: { ...getService().getState().sessions, [session.sessionId]: session } });
         return session;
       },
     },
@@ -110,7 +110,7 @@ function buildMonacoIdeServiceDefinition(getService: () => IService<MonacoState>
         getService().setState({ ...getService().getState(), sessions });
         return { disposed: true, sessionId: input.sessionId };
       },
-    ,
+    },
     setWorkspaceContext: {
       id: 'MonacoIdeService.setWorkspaceContext',
       name: 'setWorkspaceContext',
@@ -237,7 +237,6 @@ function buildMonacoIdeServiceDefinition(getService: () => IService<MonacoState>
       name: 'getLanguageConfiguration',
       handler: async (input: { language: string }, ctx) => getService().getState().languageConfigurations[input.language] || null,
     },
-  },
   },
   });
 }
