@@ -108,3 +108,41 @@ it('rejects bindings to structural nodes and unknown operation fields', async ()
   expect(validation.errors).toContain('Slot content references missing child: missing-child');
   expect(validation.errors).toContain('Event onClick references missing operation: missing-operation');
 });
+
+
+describe('shared service instance isolation', () => {
+  it('keeps Monaco sessions isolated between service instances', async () => {
+    const { createMonacoIdeService } = await import('./client-services/monacoIdeService.js');
+    const first = createMonacoIdeService();
+    const second = createMonacoIdeService();
+    await first.start();
+    await second.start();
+    const firstSession = await first.call<unknown, import('@kloks/contracts').MonacoIdeSession>('createSession', {
+      sessionId: 'first-session', uri: 'inmemory://first.ts', language: 'typescript', value: 'first',
+    });
+    const secondSession = await second.call<unknown, import('@kloks/contracts').MonacoIdeSession>('createSession', {
+      sessionId: 'second-session', uri: 'inmemory://second.ts', language: 'typescript', value: 'second',
+    });
+    expect(firstSession.document.value).toBe('first');
+    expect(secondSession.document.value).toBe('second');
+    expect(await first.call('getSession', { sessionId: 'second-session' })).toBeNull();
+    expect(await second.call('getSession', { sessionId: 'first-session' })).toBeNull();
+  });
+
+  it('keeps UI authoring sessions isolated between service instances', async () => {
+    const first = createUIAuthoringService();
+    const second = createUIAuthoringService();
+    await first.start();
+    await second.start();
+    const firstSession = await first.call<unknown, import('@kloks/contracts').UIAuthoringSession>('createSession', {
+      sessionId: 'first-authoring', context: 'general-component',
+    });
+    const secondSession = await second.call<unknown, import('@kloks/contracts').UIAuthoringSession>('createSession', {
+      sessionId: 'second-authoring', context: 'application',
+    });
+    expect(firstSession.context).toBe('general-component');
+    expect(secondSession.context).toBe('application');
+    expect(await first.call('getSession', { sessionId: 'second-authoring' })).toBeNull();
+    expect(await second.call('getSession', { sessionId: 'first-authoring' })).toBeNull();
+  });
+});
