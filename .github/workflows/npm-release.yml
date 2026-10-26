@@ -221,7 +221,7 @@ jobs:
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          const consumers = ['Kult-Engine', 'Theta-Engine', 'Kelt-Engine', 'Skipo'];
+          const consumers = ['Floks', 'Kult-Engine', 'Theta-Engine', 'Kelt-Engine', 'Skipo'];
           for (const consumer of consumers) {
             const response = await fetch(`https://api.github.com/repos/dinilmusick/${consumer}/dispatches`, {
               method: 'POST',
