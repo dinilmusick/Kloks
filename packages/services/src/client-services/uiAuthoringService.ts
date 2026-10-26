@@ -181,7 +181,7 @@ function validateSession(session: UIAuthoringSession): UIAuthoringValidation {
     if (node.kind === 'section' && !node.parentId) errors.push(`Section requires a page parent: ${node.id}`);
     if (node.kind === 'section' && node.parentId && !session.nodes.some((parent) => parent.id === node.parentId && parent.kind === 'page')) errors.push(`Section parent must be a page: ${node.id}`);
     if (node.kind === 'component' && !node.parentId) errors.push(`Component requires a section parent: ${node.id}`);
-    if (node.kind === 'component' && node.parentId && !session.nodes.some((parent) => parent.id === node.parentId && parent.kind === 'section')) errors.push(`Component parent must be a section: ${node.id}`);
+    if (node.kind === 'component' && node.parentId && !session.nodes.some((parent) => parent.id === node.parentId && (parent.kind === 'section' || parent.kind === 'component'))) errors.push(`Component parent must be a section or component: ${node.id}`);
   }
   if (session.nodes.some((node) => node.kind === 'component' && !node.assetRef)) errors.push('Every component node requires a FLOKS asset reference.');
   if (session.context === 'service' && !session.metadata.serviceId) errors.push('Service authoring requires metadata.serviceId.');
