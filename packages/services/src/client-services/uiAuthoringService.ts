@@ -145,13 +145,28 @@ function validateSession(session: UIAuthoringSession): UIAuthoringValidation {
     ids.add(node.id);
     if (node.parentId && !session.nodes.some((parent) => parent.id === node.parentId)) errors.push(`Missing parent for node: ${node.id}`);
     if (node.kind === 'page' && node.parentId) errors.push(`Page cannot have a parent: ${node.id}`);
+    if (node.kind === 'section' && !node.parentId) errors.push(`Section requires a page parent: ${node.id}`);
     if (node.kind === 'section' && node.parentId && !session.nodes.some((parent) => parent.id === node.parentId && parent.kind === 'page')) errors.push(`Section parent must be a page: ${node.id}`);
+    if (node.kind === 'component' && !node.parentId) errors.push(`Component requires a section parent: ${node.id}`);
     if (node.kind === 'component' && node.parentId && !session.nodes.some((parent) => parent.id === node.parentId && parent.kind === 'section')) errors.push(`Component parent must be a section: ${node.id}`);
   }
   if (session.nodes.some((node) => node.kind === 'component' && !node.assetRef)) errors.push('Every component node requires a FLOKS asset reference.');
   if (session.context === 'service' && !session.metadata.serviceId) errors.push('Service authoring requires metadata.serviceId.');
   for (const binding of session.bindings) {
-    if (!session.nodes.some((node) => node.id === binding.componentId)) errors.push(`Binding references missing component: ${binding.componentId}`);
+    const component = session.nodes.find((node) => node.id === binding.componentId);
+    if (!component) errors.push(`Binding references missing component: ${binding.componentId}`);
+    else if (component.kind !== 'component') errors.push(`Binding target must be a component node: ${binding.componentId}`);
+    const operation = session.operations.find((item) => item.operationId === binding.target.apiId);
+    if (!operation) {
+      errors.push(`Binding references missing operation: ${binding.target.apiId}`);
+      continue;
+    }
+    const fields = binding.target.kind === 'api-input' ? operation.inputFields : operation.outputFields;
+    const field = fields?.find((item) => item.name === binding.target.field);
+    if (!field) errors.push(`Binding references missing ${binding.target.kind === 'api-input' ? 'input' : 'output'} field: ${binding.target.apiId}.${binding.target.field}`);
+    else if (field.type.toLowerCase() !== binding.target.fieldType.toLowerCase()) {
+      errors.push(`Binding field type mismatch for ${binding.target.apiId}.${binding.target.field}: expected ${field.type}, received ${binding.target.fieldType}`);
+    }
   }
   if (!session.operations.length) warnings.push('No service operations have been attached to this authoring session.');
   return { valid: errors.length === 0, errors, warnings };
