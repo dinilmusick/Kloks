@@ -69,6 +69,9 @@ it('validates typed operation bindings and resolves nested component roots', asy
   }});
   await service.call('addNode', { sessionId: session.sessionId, node: {
     id: 'form', kind: 'component', name: 'EmailInput', parentId: 'section', props: {}, assetRef,
+    slots: { content: [] },
+    states: { idle: { background: 'black' } },
+    events: { onSubmit: 'submit' },
   }});
   await service.call('setBinding', { sessionId: session.sessionId, binding: {
     componentId: 'form',
@@ -90,6 +93,8 @@ it('rejects bindings to structural nodes and unknown operation fields', async ()
   });
   await service.call('addNode', { sessionId: session.sessionId, node: {
     id: 'page', kind: 'page', name: 'Page', props: {},
+    slots: { content: ['missing-child'] },
+    events: { onClick: 'missing-operation' },
   }});
   await service.call('setBinding', { sessionId: session.sessionId, binding: {
     componentId: 'page',
@@ -100,4 +105,6 @@ it('rejects bindings to structural nodes and unknown operation fields', async ()
   expect(validation.valid).toBe(false);
   expect(validation.errors).toContain('Binding target must be a component node: page');
   expect(validation.errors).toContain('Binding references missing input field: submit.missing');
+  expect(validation.errors).toContain('Slot content references missing child: missing-child');
+  expect(validation.errors).toContain('Event onClick references missing operation: missing-operation');
 });
