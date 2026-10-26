@@ -128,7 +128,14 @@ function buildUIAuthoringServiceDefinition(getService: () => IService<UIAuthorin
     generateServiceUI: {
       id: 'UIAuthoringService.generateServiceUI',
       name: 'generateServiceUI',
-      handler: async (input: { sessionId: string }, ctx) => buildServiceUISchema(getSession(getService(), input.sessionId)),
+      handler: async (input: { sessionId: string }, ctx) => {
+        const session = getSession(getService(), input.sessionId);
+        const validation = validateSession(session);
+        if (!validation.valid) {
+          throw new Error(`Cannot generate ServiceUISchema: ${validation.errors.join('; ')}`);
+        }
+        return buildServiceUISchema(session);
+      },
     },
     suggestComponent: {
       id: 'UIAuthoringService.suggestComponent',
