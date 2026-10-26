@@ -27,7 +27,8 @@ export interface ComponentDescriptor {
 
 export interface SectionDescriptor {
   name: string;
-  assetRef: AssetRef;
+  /** Optional for structural authoring sections that are not reusable components. */
+  assetRef?: AssetRef;
   components: ComponentDescriptor[];
   description?: string;
 }
