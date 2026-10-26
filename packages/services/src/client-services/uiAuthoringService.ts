@@ -20,7 +20,8 @@ interface UIAuthoringState extends Record<string, unknown> {
   sessions: Record<string, UIAuthoringSession>;
 }
 
-export const UIAuthoringServiceDefinition: ServiceDefinition<UIAuthoringState> = createServiceDefinition({
+function buildUIAuthoringServiceDefinition(getService: () => IService<UIAuthoringState>): ServiceDefinition<UIAuthoringState> {
+  return createServiceDefinition<UIAuthoringState>({
   id: 'kloks.service.uiAuthoring',
   name: 'UIAuthoringService',
   version: '1.0.0',
@@ -39,7 +40,7 @@ export const UIAuthoringServiceDefinition: ServiceDefinition<UIAuthoringState> =
           operations: input.operations || [],
           metadata: input.metadata || {},
         };
-        activeUIAuthoringService.setState({ sessions: { ...activeUIAuthoringService.getState().sessions, [sessionId]: session } });
+        getService().setState({ sessions: { ...getService().getState().sessions, [sessionId]: session } });
         return session;
       },
     },
@@ -114,11 +115,13 @@ export const UIAuthoringServiceDefinition: ServiceDefinition<UIAuthoringState> =
     getSession: {
       id: 'UIAuthoringService.getSession',
       name: 'getSession',
-      handler: async (input: { sessionId: string }, ctx) => activeUIAuthoringService.getState().sessions[input.sessionId] || null,
+      handler: async (input: { sessionId: string }, ctx) => getService().getState().sessions[input.sessionId] || null,
     },
   },
-});
+  });
+}
 
+export const UIAuthoringServiceDefinition = buildUIAuthoringServiceDefinition(() => activeUIAuthoringService);
 function getSession(service: IService<UIAuthoringState>, sessionId: string): UIAuthoringSession {
   const session = service.getState().sessions[sessionId];
   if (!session) throw new Error(`Unknown UI authoring session: ${sessionId}`);
@@ -189,11 +192,13 @@ function validateSession(session: UIAuthoringSession): UIAuthoringValidation {
 }
 
 export function createUIAuthoringService(): IService<UIAuthoringState> {
-  activeUIAuthoringService = createService(UIAuthoringServiceDefinition);
-  return activeUIAuthoringService;
+  let instance!: IService<UIAuthoringState>;
+  instance = createService(buildUIAuthoringServiceDefinition(() => instance));
+  return instance;
 }
 
-const defaultUIAuthoringService = createUIAuthoringService();
+const defaultUIAuthoringService = createService(UIAuthoringServiceDefinition);
+activeUIAuthoringService = defaultUIAuthoringService;
 export const UIAuthoringServiceFacade = {
   id: UIAuthoringServiceDefinition.id,
   name: UIAuthoringServiceDefinition.name,
