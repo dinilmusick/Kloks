@@ -17,7 +17,8 @@ export interface BackendProviderProps {
   children: React.ReactNode;
 }
 
-const BackendContext = createContext<BackendClientInstance | null>(null);
+const BackendContext: React.Context<BackendClientInstance | null> =
+  typeof createContext === 'function' ? createContext<BackendClientInstance | null>(null) : (null as any);
 
 export function BackendProvider({ client, resolver, session, children }: BackendProviderProps) {
   const activeClient = useMemo(() => {
