@@ -207,7 +207,7 @@ jobs:
             sed -i '/_authToken/d' ~/.npmrc 2>/dev/null || true
             npm publish --access public
           fi
-      - name: Notify Skipo after successful upstream publication
+      - name: Notify downstream consumers after successful upstream publication
         if: success() && steps.registry.outputs.exists == 'false' && (github.event_name == 'workflow_run' || github.event_name == 'release' || (github.event_name == 'schedule' && steps.updates.outputs.changed == 'true') || (github.event_name == 'workflow_dispatch' && inputs.publish))
         env:
           SYNC_TOKEN: ${{ secrets.ECOSYSTEM_SYNC_TOKEN }}
@@ -215,31 +215,36 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${SYNC_TOKEN:-}" ]; then
-            echo "ECOSYSTEM_SYNC_TOKEN is not configured; the scheduled dependency-sync fallback remains active."
+            echo "ECOSYSTEM_SYNC_TOKEN is not configured; scheduled dependency-sync fallbacks remain active."
             exit 0
           fi
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          const response = await fetch('https://api.github.com/repos/dinilmusick/Skipo/dispatches', {
-            method: 'POST',
-            headers: {
-              Authorization: 'Bearer ' + process.env.SYNC_TOKEN,
-              Accept: 'application/vnd.github+json',
-              'X-GitHub-Api-Version': '2022-11-28',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              event_type: 'upstream-package-published',
-              client_payload: {
-                package: pkg.name,
-                version: pkg.version,
-                repository: process.env.GITHUB_REPOSITORY,
-                commit: process.env.GITHUB_SHA,
+          const consumers = ['Kult-Engine', 'Theta-Engine', 'Kelt-Engine', 'Skipo'];
+          for (const consumer of consumers) {
+            const response = await fetch(`https://api.github.com/repos/dinilmusick/${consumer}/dispatches`, {
+              method: 'POST',
+              headers: {
+                Authorization: 'Bearer ' + process.env.SYNC_TOKEN,
+                Accept: 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28',
+                'Content-Type': 'application/json',
               },
-            }),
-          });
-          if (!response.ok) throw new Error('Skipo dispatch failed [' + response.status + ']: ' + await response.text());
-          console.log('Notified Skipo about ' + pkg.name + '@' + pkg.version);
+              body: JSON.stringify({
+                event_type: 'upstream-package-published',
+                client_payload: {
+                  package: pkg.name,
+                  version: pkg.version,
+                  repository: process.env.GITHUB_REPOSITORY,
+                  commit: process.env.GITHUB_SHA,
+                },
+              }),
+            });
+            if (!response.ok) {
+              console.warn('Consumer dispatch warning for ' + consumer + ' [' + response.status + ']: ' + await response.text());
+            } else {
+              console.log('Notified ' + consumer + ' about ' + pkg.name + '@' + pkg.version);
+            }
+          }
           NODE
-
