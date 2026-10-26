@@ -172,3 +172,22 @@ it('generates ServiceUISchema without inventing assets for structural sections',
   expect(schema.pages[0].sections[0].components[0].assetRef).toEqual(assetRef);
   expect(schema.assetRefs).toEqual([assetRef]);
 });
+
+
+it('removes complete subtrees and cleans dependent bindings and slot references', async () => {
+  const service = createUIAuthoringService();
+  await service.start();
+  const session = await service.call<unknown, import('@kloks/contracts').UIAuthoringSession>('createSession', {
+    context: 'general-component',
+    operations: [{ operationId: 'submit', name: 'submit' }],
+  });
+  const assetRef = { packageId: '@ultrst-armada/floks', packageVersion: '^1.5.0', exportPath: 'ui', assetId: 'floks.button', assetVersion: '1.0.0' };
+  await service.call('addNode', { sessionId: session.sessionId, node: { id: 'page', kind: 'page', name: 'Page', props: {}, slots: { sections: ['section'] } } });
+  await service.call('addNode', { sessionId: session.sessionId, node: { id: 'section', kind: 'section', name: 'Section', parentId: 'page', props: {}, slots: { children: ['button'] } } });
+  await service.call('addNode', { sessionId: session.sessionId, node: { id: 'button', kind: 'component', name: 'Button', parentId: 'section', props: {}, assetRef } });
+  await service.call('setBinding', { sessionId: session.sessionId, binding: { componentId: 'button', property: 'onClick', target: { kind: 'api-input', apiId: 'submit', field: 'unused', fieldType: 'string' } } });
+  await service.call('removeNode', { sessionId: session.sessionId, nodeId: 'page' });
+  const after = await service.call<unknown, import('@kloks/contracts').UIAuthoringSession>('getSession', { sessionId: session.sessionId });
+  expect(after.nodes).toEqual([]);
+  expect(after.bindings).toEqual([]);
+});
