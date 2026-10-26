@@ -46,3 +46,45 @@ export interface MonacoUpdateDocumentInput {
   value: string;
   language?: string;
 }
+
+
+export interface MonacoCompletionItem {
+  label: string;
+  insertText?: string;
+  detail?: string;
+  documentation?: string;
+  kind?: string;
+  sortText?: string;
+}
+
+export interface MonacoCompletionRequest {
+  sessionId: string;
+  uri: string;
+  language: string;
+  value: string;
+  position: { lineNumber: number; column: number; offset: number };
+}
+
+export interface MonacoWorkspaceContext {
+  workspaceId: string;
+  rootUri: string;
+  files: Array<{ uri: string; language?: string }>;
+  dependencies?: Record<string, string>;
+  metadata?: Record<string, string>;
+}
+
+export interface MonacoImportAnalysis {
+  specifier: string;
+  importedSymbols: string[];
+  lineNumber: number;
+  resolvedUri?: string;
+  resolved: boolean;
+}
+
+export interface MonacoValidationResult {
+  valid: boolean;
+  diagnostics: MonacoDiagnostic[];
+  checkedAt: number;
+}
+
+export type MonacoCompletionProvider = (request: MonacoCompletionRequest) => Promise<MonacoCompletionItem[]>;
