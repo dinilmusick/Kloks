@@ -32,7 +32,10 @@ export function buildUIComponentArtifact(session: UIAuthoringSession): UICompone
   const purpose = getUIComponentPurpose(session.context);
   const origin = (session.metadata.origin === 'kult' || session.metadata.origin === 'theta' || session.metadata.origin === 'kelt')
     ? session.metadata.origin : 'other';
-  const root = session.nodes.find((node) => node.kind === 'component' && !node.parentId)?.assetRef;
+  const requestedRootId = session.metadata.rootComponentId;
+  const root = session.nodes.find((node) => node.kind === 'component' && node.id === requestedRootId)
+    || session.nodes.find((node) => node.kind === 'component');
+  const rootAsset = root?.assetRef;
   return {
     artifactId: 'kloks.ui-artifact.' + session.sessionId,
     schemaVersion: '1.0.0',
@@ -42,7 +45,7 @@ export function buildUIComponentArtifact(session: UIAuthoringSession): UICompone
     context: session.context,
     name: session.metadata.name || session.sessionId,
     description: session.metadata.description || '',
-    rootAsset: root,
+    rootAsset,
     session,
   };
 }
