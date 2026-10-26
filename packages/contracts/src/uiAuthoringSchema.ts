@@ -54,7 +54,7 @@ export interface UIAuthoringValidation {
   warnings: string[];
 }
 
-export const UI_AUTHORING_SCHEMA_VERSION = '1.0.0';
+export const UI_AUTHORING_SCHEMA_VERSION = '1.1.0';
 
 export function suggestUIComponent(fieldType: string): string {
   const normalized = fieldType.toLowerCase();
