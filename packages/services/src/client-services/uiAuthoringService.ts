@@ -49,27 +49,27 @@ function buildUIAuthoringServiceDefinition(getService: () => IService<UIAuthorin
       name: 'replaceSession',
       handler: async (input: { sessionId: string; session: UIAuthoringSession }, ctx) => {
         if (input.sessionId !== input.session.sessionId) throw new Error('Session id mismatch.');
-        return updateSession(activeUIAuthoringService, input.sessionId, () => input.session);
+        return updateSession(getService(), input.sessionId, () => input.session);
       },
     },
     addNode: {
       id: 'UIAuthoringService.addNode',
       name: 'addNode',
-      handler: async (input: { sessionId: string; node: UIAuthoringNode }, ctx) => updateSession(activeUIAuthoringService, input.sessionId, (session) => ({
+      handler: async (input: { sessionId: string; node: UIAuthoringNode }, ctx) => updateSession(getService(), input.sessionId, (session) => ({
         ...session, nodes: [...session.nodes.filter((node) => node.id !== input.node.id), input.node],
       })),
     },
     updateNode: {
       id: 'UIAuthoringService.updateNode',
       name: 'updateNode',
-      handler: async (input: { sessionId: string; nodeId: string; patch: Partial<UIAuthoringNode> }, ctx) => updateSession(activeUIAuthoringService, input.sessionId, (session) => ({
+      handler: async (input: { sessionId: string; nodeId: string; patch: Partial<UIAuthoringNode> }, ctx) => updateSession(getService(), input.sessionId, (session) => ({
         ...session, nodes: session.nodes.map((node) => node.id === input.nodeId ? { ...node, ...input.patch } : node),
       })),
     },
     removeNode: {
       id: 'UIAuthoringService.removeNode',
       name: 'removeNode',
-      handler: async (input: { sessionId: string; nodeId: string }, ctx) => updateSession(activeUIAuthoringService, input.sessionId, (session) => ({
+      handler: async (input: { sessionId: string; nodeId: string }, ctx) => updateSession(getService(), input.sessionId, (session) => ({
         ...session,
         nodes: session.nodes.filter((node) => node.id !== input.nodeId && node.parentId !== input.nodeId),
       })),
@@ -77,7 +77,7 @@ function buildUIAuthoringServiceDefinition(getService: () => IService<UIAuthorin
     setBinding: {
       id: 'UIAuthoringService.setBinding',
       name: 'setBinding',
-      handler: async (input: { sessionId: string; binding: UIAuthoringBinding }, ctx) => updateSession(activeUIAuthoringService, input.sessionId, (session) => ({
+      handler: async (input: { sessionId: string; binding: UIAuthoringBinding }, ctx) => updateSession(getService(), input.sessionId, (session) => ({
         ...session,
         bindings: [...session.bindings.filter((binding) => binding.componentId !== input.binding.componentId || binding.property !== input.binding.property), input.binding],
       })),
@@ -85,27 +85,27 @@ function buildUIAuthoringServiceDefinition(getService: () => IService<UIAuthorin
     setOperations: {
       id: 'UIAuthoringService.setOperations',
       name: 'setOperations',
-      handler: async (input: { sessionId: string; operations: UIAuthoringOperation[] }, ctx) => updateSession(activeUIAuthoringService, input.sessionId, (session) => ({ ...session, operations: input.operations })),
+      handler: async (input: { sessionId: string; operations: UIAuthoringOperation[] }, ctx) => updateSession(getService(), input.sessionId, (session) => ({ ...session, operations: input.operations })),
     },
     validate: {
       id: 'UIAuthoringService.validate',
       name: 'validate',
-      handler: async (input: { sessionId: string }, ctx) => validateSession(getSession(activeUIAuthoringService, input.sessionId)),
+      handler: async (input: { sessionId: string }, ctx) => validateSession(getSession(getService(), input.sessionId)),
     },
     serialize: {
       id: 'UIAuthoringService.serialize',
       name: 'serialize',
-      handler: async (input: { sessionId: string }, ctx) => JSON.stringify(getSession(activeUIAuthoringService, input.sessionId), null, 2),
+      handler: async (input: { sessionId: string }, ctx) => JSON.stringify(getSession(getService(), input.sessionId), null, 2),
     },
     generateArtifact: {
       id: 'UIAuthoringService.generateArtifact',
       name: 'generateArtifact',
-      handler: async (input: { sessionId: string }, ctx) => buildUIComponentArtifact(getSession(activeUIAuthoringService, input.sessionId)),
+      handler: async (input: { sessionId: string }, ctx) => buildUIComponentArtifact(getSession(getService(), input.sessionId)),
     },
     generateServiceUI: {
       id: 'UIAuthoringService.generateServiceUI',
       name: 'generateServiceUI',
-      handler: async (input: { sessionId: string }, ctx) => buildServiceUISchema(getSession(activeUIAuthoringService, input.sessionId)),
+      handler: async (input: { sessionId: string }, ctx) => buildServiceUISchema(getSession(getService(), input.sessionId)),
     },
     suggestComponent: {
       id: 'UIAuthoringService.suggestComponent',
