@@ -10,12 +10,23 @@ import type {
   MonacoEditorOptions,
   MonacoIdeSession,
   MonacoUpdateDocumentInput,
+  MonacoCompletionItem,
+  MonacoImportAnalysis,
+  MonacoLanguageConfiguration,
+  MonacoSerializedSession,
+  MonacoSetCompletionsInput,
+  MonacoSetImportAnalysisInput,
+  MonacoSetValidationResultInput,
+  MonacoSetWorkspaceContextInput,
+  MonacoValidationResult,
 } from '@kloks/contracts';
 
 let activeMonacoService: IService<MonacoState>;
 
 interface MonacoState extends Record<string, unknown> {
   sessions: Record<string, MonacoIdeSession>;
+  workspaces: Record<string, import('@kloks/contracts').MonacoWorkspaceContext>;
+  languageConfigurations: Record<string, MonacoLanguageConfiguration>;
 }
 
 function buildMonacoIdeServiceDefinition(getService: () => IService<MonacoState>): ServiceDefinition<MonacoState> {
@@ -23,7 +34,7 @@ function buildMonacoIdeServiceDefinition(getService: () => IService<MonacoState>
   id: 'kloks.service.monacoIde',
   name: 'MonacoIdeService',
   version: '1.0.0',
-  state: { initial: { sessions: {} } },
+  state: { initial: { sessions: {}, workspaces: {}, languageConfigurations: {} } },
   operations: {
     createSession: {
       id: 'MonacoIdeService.createSession',
@@ -38,7 +49,7 @@ function buildMonacoIdeServiceDefinition(getService: () => IService<MonacoState>
           createdAt: now,
           updatedAt: now,
         };
-        getService().setState({ sessions: { ...getService().getState().sessions, [sessionId]: session } });
+        getService().setState({ ...getService().getState(), sessions: { ...getService().getState().sessions, [sessionId]: session } });
         return session;
       },
     },
@@ -55,7 +66,7 @@ function buildMonacoIdeServiceDefinition(getService: () => IService<MonacoState>
           version: current.document.version + 1,
         };
         const session = { ...current, document, updatedAt: Date.now() };
-        getService().setState({ sessions: { ...getService().getState().sessions, [session.sessionId]: session } });
+        getService().setState({ ...getService().getState(), sessions: { ...getService().getState().sessions, [session.sessionId]: session } });
         return session;
       },
     },
@@ -96,10 +107,137 @@ function buildMonacoIdeServiceDefinition(getService: () => IService<MonacoState>
       handler: async (input: { sessionId: string }, ctx) => {
         const sessions = { ...getService().getState().sessions };
         delete sessions[input.sessionId];
-        getService().setState({ sessions });
+        getService().setState({ ...getService().getState(), sessions });
         return { disposed: true, sessionId: input.sessionId };
       },
+    ,
+    setWorkspaceContext: {
+      id: 'MonacoIdeService.setWorkspaceContext',
+      name: 'setWorkspaceContext',
+      handler: async (input: MonacoSetWorkspaceContextInput, ctx) => {
+        const current = getService().getState().sessions[input.sessionId];
+        if (!current) throw new Error(`Unknown Monaco session: ${input.sessionId}`);
+        const session = { ...current, workspaceContext: input.workspaceContext, updatedAt: Date.now() };
+        const state = getService().getState();
+        getService().setState({
+          ...state,
+          sessions: { ...state.sessions, [input.sessionId]: session },
+          workspaces: { ...state.workspaces, [input.workspaceContext.workspaceId]: input.workspaceContext },
+        });
+        return session;
+      },
     },
+    setLanguageConfiguration: {
+      id: 'MonacoIdeService.setLanguageConfiguration',
+      name: 'setLanguageConfiguration',
+      handler: async (input: { sessionId: string; configuration: MonacoLanguageConfiguration }, ctx) => {
+        const current = getService().getState().sessions[input.sessionId];
+        if (!current) throw new Error(`Unknown Monaco session: ${input.sessionId}`);
+        const state = getService().getState();
+        const session = { ...current, languageConfiguration: input.configuration, updatedAt: Date.now() };
+        getService().setState({
+          ...state,
+          sessions: { ...state.sessions, [input.sessionId]: session },
+          languageConfigurations: { ...state.languageConfigurations, [input.configuration.language]: input.configuration },
+        });
+        return session;
+      },
+    },
+    setCompletions: {
+      id: 'MonacoIdeService.setCompletions',
+      name: 'setCompletions',
+      handler: async (input: MonacoSetCompletionsInput, ctx) => {
+        const current = getService().getState().sessions[input.sessionId];
+        if (!current) throw new Error(`Unknown Monaco session: ${input.sessionId}`);
+        const session = { ...current, completions: input.completions, updatedAt: Date.now() };
+        getService().setState({ ...getService().getState(), sessions: { ...getService().getState().sessions, [input.sessionId]: session } });
+        return session;
+      },
+    },
+    setValidationResult: {
+      id: 'MonacoIdeService.setValidationResult',
+      name: 'setValidationResult',
+      handler: async (input: MonacoSetValidationResultInput, ctx) => {
+        const current = getService().getState().sessions[input.sessionId];
+        if (!current) throw new Error(`Unknown Monaco session: ${input.sessionId}`);
+        const session = {
+          ...current,
+          validation: input.validation,
+          document: { ...current.document, diagnostics: input.validation.diagnostics },
+          updatedAt: Date.now(),
+        };
+        getService().setState({ ...getService().getState(), sessions: { ...getService().getState().sessions, [input.sessionId]: session } });
+        return session;
+      },
+    },
+    setImportAnalysis: {
+      id: 'MonacoIdeService.setImportAnalysis',
+      name: 'setImportAnalysis',
+      handler: async (input: MonacoSetImportAnalysisInput, ctx) => {
+        const current = getService().getState().sessions[input.sessionId];
+        if (!current) throw new Error(`Unknown Monaco session: ${input.sessionId}`);
+        const session = { ...current, importAnalysis: input.imports, updatedAt: Date.now() };
+        getService().setState({ ...getService().getState(), sessions: { ...getService().getState().sessions, [input.sessionId]: session } });
+        return session;
+      },
+    },
+    analyzeImports: {
+      id: 'MonacoIdeService.analyzeImports',
+      name: 'analyzeImports',
+      handler: async (input: { sessionId: string }, ctx) => {
+        const current = getService().getState().sessions[input.sessionId];
+        if (!current) throw new Error(`Unknown Monaco session: ${input.sessionId}`);
+        const workspace = current.workspaceContext;
+        const source = current.document.value;
+        const pattern = /\\bimport\\s+(?:[^'"]*?\\s+from\\s*)?['"]([^'"]+)['"]|\\bexport\\s+[^'"]*?\\s+from\\s*['"]([^'"]+)['"]|\\bimport\\s*\\(\\s*['"]([^'"]+)['"]\\s*\\)/g;
+        const imports: MonacoImportAnalysis[] = [];
+        for (const match of source.matchAll(pattern)) {
+          const specifier = match[1] || match[2] || match[3];
+          if (!specifier) continue;
+          const lineNumber = source.slice(0, match.index || 0).split('\\n').length;
+          const resolvedUri = workspace?.files.find((file) =>
+            file.uri === specifier || file.uri.endsWith('/' + specifier) || file.uri.endsWith(specifier),
+          )?.uri;
+          imports.push({
+            specifier,
+            importedSymbols: [],
+            lineNumber,
+            resolvedUri,
+            resolved: Boolean(resolvedUri || workspace?.dependencies?.[specifier]),
+          });
+        }
+        const session = { ...current, importAnalysis: imports, updatedAt: Date.now() };
+        getService().setState({ ...getService().getState(), sessions: { ...getService().getState().sessions, [input.sessionId]: session } });
+        return imports;
+      },
+    },
+    serializeSession: {
+      id: 'MonacoIdeService.serializeSession',
+      name: 'serializeSession',
+      handler: async (input: { sessionId: string }, ctx): Promise<MonacoSerializedSession> => {
+        const session = getService().getState().sessions[input.sessionId];
+        if (!session) throw new Error(`Unknown Monaco session: ${input.sessionId}`);
+        return { schemaVersion: '1.0.0', serializedAt: Date.now(), session: structuredClone(session) };
+      },
+    },
+    restoreSession: {
+      id: 'MonacoIdeService.restoreSession',
+      name: 'restoreSession',
+      handler: async (input: { serialized: MonacoSerializedSession }, ctx) => {
+        if (input.serialized.schemaVersion !== '1.0.0') throw new Error('Unsupported Monaco session schema version.');
+        const session = input.serialized.session;
+        if (!session?.sessionId || !session.document?.uri) throw new Error('Invalid serialized Monaco session.');
+        const state = getService().getState();
+        getService().setState({ ...state, sessions: { ...state.sessions, [session.sessionId]: session } });
+        return session;
+      },
+    },
+    getLanguageConfiguration: {
+      id: 'MonacoIdeService.getLanguageConfiguration',
+      name: 'getLanguageConfiguration',
+      handler: async (input: { language: string }, ctx) => getService().getState().languageConfigurations[input.language] || null,
+    },
+  },
   },
   });
 }
