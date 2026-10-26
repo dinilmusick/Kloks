@@ -152,6 +152,22 @@ function validateSession(session: UIAuthoringSession): UIAuthoringValidation {
   }
   if (session.nodes.some((node) => node.kind === 'component' && !node.assetRef)) errors.push('Every component node requires a FLOKS asset reference.');
   if (session.context === 'service' && !session.metadata.serviceId) errors.push('Service authoring requires metadata.serviceId.');
+  for (const node of session.nodes) {
+    for (const [slotId, childIds] of Object.entries(node.slots || {})) {
+      if (!slotId.trim()) errors.push(`Slot id cannot be blank on node: ${node.id}`);
+      for (const childId of childIds) {
+        const child = session.nodes.find((candidate) => candidate.id === childId);
+        if (!child) errors.push(`Slot ${slotId} references missing child: ${childId}`);
+        else if (child.parentId !== node.id) errors.push(`Slot child ${childId} must be a direct child of node: ${node.id}`);
+      }
+    }
+    for (const [eventName, operationId] of Object.entries(node.events || {})) {
+      if (!eventName.trim()) errors.push(`Event name cannot be blank on node: ${node.id}`);
+      if (!operationId.trim() || !session.operations.some((operation) => operation.operationId === operationId)) {
+        errors.push(`Event ${eventName} references missing operation: ${operationId}`);
+      }
+    }
+  }
   for (const binding of session.bindings) {
     const component = session.nodes.find((node) => node.id === binding.componentId);
     if (!component) errors.push(`Binding references missing component: ${binding.componentId}`);
