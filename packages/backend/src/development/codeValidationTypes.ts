@@ -1,4 +1,4 @@
-export type ValidationLayer = 'syntax' | 'lint' | 'test' | 'build' | 'krnl' | 'frnl' | 'law-l9';
+export type ValidationLayer = 'syntax' | 'lint' | 'test' | 'build' | 'krnl' | 'frnl' | 'lockfile-check' | 'law-l9';
 export interface CodeValidationInput {
   layers?: ValidationLayer[];
   cwd?: string;

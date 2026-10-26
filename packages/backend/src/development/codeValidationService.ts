@@ -9,8 +9,9 @@ const COMMANDS: Record<Exclude<ValidationLayer, 'law-l9'>, { command: string; ar
   build: { command: 'pnpm', args: ['run', 'build', '--if-present'] },
   krnl: { command: 'pnpm', args: ['exec', 'krnl', 'validate'] },
   frnl: { command: 'pnpm', args: ['exec', 'frnl', 'validate'] },
+  'lockfile-check': { command: 'pnpm', args: ['install', '--frozen-lockfile', '--ignore-scripts'] },
 };
-const DEFAULT_LAYERS: ValidationLayer[] = ['syntax', 'lint', 'krnl', 'frnl'];
+const DEFAULT_LAYERS: ValidationLayer[] = ['lockfile-check', 'syntax', 'lint', 'krnl', 'frnl'];
 const commandText = (command: string, args: string[]) => [command, ...args].join(' ');
 
 export class CodeValidationRuntime {
@@ -19,9 +20,9 @@ export class CodeValidationRuntime {
     if (input.files) await this.runtime.mount(input.files);
     const diagnostics: ValidationDiagnostic[] = [];
     if (input.install) {
-      const installed = await this.runtime.runCommand('pnpm', ['install', '--no-frozen-lockfile'], input.cwd, input.env);
-      diagnostics.push({ layer: 'lint', ok: installed.exitCode === 0, exitCode: installed.exitCode, output: installed.output, command: 'pnpm install --no-frozen-lockfile' });
-      if (installed.exitCode !== 0) return { ok: false, diagnostics, failedLayers: ['lint'] };
+      const installed = await this.runtime.runCommand('pnpm', ['install', '--frozen-lockfile', '--ignore-scripts'], input.cwd, input.env);
+      diagnostics.push({ layer: 'lockfile-check', ok: installed.exitCode === 0, exitCode: installed.exitCode, output: installed.output, command: 'pnpm install --frozen-lockfile --ignore-scripts' });
+      if (installed.exitCode !== 0) return { ok: false, diagnostics, failedLayers: ['lockfile-check'] };
     }
     const layers = input.layers?.length ? input.layers : DEFAULT_LAYERS;
     for (const layer of layers) {
@@ -44,7 +45,7 @@ export class CodeValidationRuntime {
 }
 const runtime = new CodeValidationRuntime();
 export const CodeValidationServiceDefinition: ServiceDefinition = createServiceDefinition({
-  id: 'kloks.backend.codeValidation', name: 'CodeValidationService', version: '1.0.0',
+  id: 'kloks.backend.codeValidation', name: 'CodeValidationService', version: '1.1.0',
   operations: { validate: { id: 'CodeValidationService.validate', name: 'validate', handler: async (input: CodeValidationInput) => runtime.validate(input) } },
 });
 export const CodeValidationServiceFacade = {
