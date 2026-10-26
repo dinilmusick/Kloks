@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import packageJson from "../package.json";
 
 describe("ecosystem promotion release metadata", () => {
@@ -7,4 +8,10 @@ describe("ecosystem promotion release metadata", () => {
     expect(packageJson.version).toMatch(/^\d+\.\d+\.\d+$/);
     expect(packageJson.private).toBe(false);
   });
+});
+
+
+it("notifies FLOKS when a new KLOKS package version is published", () => {
+  const workflow = readFileSync(".github/workflows/npm-release.yml", "utf8");
+  expect(workflow).toContain("const consumers = ['Floks', 'Kult-Engine', 'Theta-Engine', 'Kelt-Engine', 'Skipo'];");
 });
