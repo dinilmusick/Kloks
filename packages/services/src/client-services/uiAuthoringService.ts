@@ -69,10 +69,33 @@ function buildUIAuthoringServiceDefinition(getService: () => IService<UIAuthorin
     removeNode: {
       id: 'UIAuthoringService.removeNode',
       name: 'removeNode',
-      handler: async (input: { sessionId: string; nodeId: string }, ctx) => updateSession(getService(), input.sessionId, (session) => ({
-        ...session,
-        nodes: session.nodes.filter((node) => node.id !== input.nodeId && node.parentId !== input.nodeId),
-      })),
+      handler: async (input: { sessionId: string; nodeId: string }, ctx) => updateSession(getService(), input.sessionId, (session) => {
+        const removedIds = new Set<string>([input.nodeId]);
+        let expanded = true;
+        while (expanded) {
+          expanded = false;
+          for (const node of session.nodes) {
+            if (node.parentId && removedIds.has(node.parentId) && !removedIds.has(node.id)) {
+              removedIds.add(node.id);
+              expanded = true;
+            }
+          }
+        }
+        return {
+          ...session,
+          nodes: session.nodes
+            .filter((node) => !removedIds.has(node.id))
+            .map((node) => ({
+              ...node,
+              slots: node.slots
+                ? Object.fromEntries(Object.entries(node.slots).map(([slot, children]) => [
+                    slot, children.filter((childId) => !removedIds.has(childId)),
+                  ]))
+                : undefined,
+            })),
+          bindings: session.bindings.filter((binding) => !removedIds.has(binding.componentId)),
+        };
+      }),
     },
     setBinding: {
       id: 'UIAuthoringService.setBinding',
