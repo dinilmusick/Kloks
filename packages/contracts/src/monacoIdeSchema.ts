@@ -29,6 +29,11 @@ export interface MonacoIdeSession {
   sessionId: string;
   document: MonacoDocument;
   options: MonacoEditorOptions;
+  workspaceContext?: MonacoWorkspaceContext;
+  languageConfiguration?: MonacoLanguageConfiguration;
+  completions?: MonacoCompletionItem[];
+  validation?: MonacoValidationResult;
+  importAnalysis?: MonacoImportAnalysis[];
   createdAt: number;
   updatedAt: number;
 }
@@ -88,3 +93,37 @@ export interface MonacoValidationResult {
 }
 
 export type MonacoCompletionProvider = (request: MonacoCompletionRequest) => Promise<MonacoCompletionItem[]>;
+
+
+export interface MonacoLanguageConfiguration {
+  language: string;
+  extensions?: string[];
+  aliases?: string[];
+  configuration: Record<string, unknown>;
+}
+
+export interface MonacoSerializedSession {
+  schemaVersion: '1.0.0';
+  serializedAt: number;
+  session: MonacoIdeSession;
+}
+
+export interface MonacoSetWorkspaceContextInput {
+  sessionId: string;
+  workspaceContext: MonacoWorkspaceContext;
+}
+
+export interface MonacoSetCompletionsInput {
+  sessionId: string;
+  completions: MonacoCompletionItem[];
+}
+
+export interface MonacoSetValidationResultInput {
+  sessionId: string;
+  validation: MonacoValidationResult;
+}
+
+export interface MonacoSetImportAnalysisInput {
+  sessionId: string;
+  imports: MonacoImportAnalysis[];
+}
