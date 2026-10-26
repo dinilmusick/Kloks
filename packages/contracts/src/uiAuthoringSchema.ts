@@ -11,6 +11,9 @@ export interface UIAuthoringNode {
   assetRef?: AssetRef;
   parentId?: string;
   props: Record<string, string | number | boolean>;
+  slots?: Record<string, string[]>;
+  states?: Record<string, Record<string, string | number | boolean>>;
+  events?: Record<string, string>;
 }
 
 export interface UIAuthoringBinding {
