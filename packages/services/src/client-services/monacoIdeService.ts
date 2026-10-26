@@ -187,12 +187,12 @@ function buildMonacoIdeServiceDefinition(getService: () => IService<MonacoState>
         if (!current) throw new Error(`Unknown Monaco session: ${input.sessionId}`);
         const workspace = current.workspaceContext;
         const source = current.document.value;
-        const pattern = /\\bimport\\s+(?:[^'"]*?\\s+from\\s*)?['"]([^'"]+)['"]|\\bexport\\s+[^'"]*?\\s+from\\s*['"]([^'"]+)['"]|\\bimport\\s*\\(\\s*['"]([^'"]+)['"]\\s*\\)/g;
+        const pattern = /\bimport\s+(?:[^'"]*?\s+from\s*)?['"]([^'"]+)['"]|\bexport\s+[^'"]*?\s+from\s*['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
         const imports: MonacoImportAnalysis[] = [];
         for (const match of source.matchAll(pattern)) {
           const specifier = match[1] || match[2] || match[3];
           if (!specifier) continue;
-          const lineNumber = source.slice(0, match.index || 0).split('\\n').length;
+          const lineNumber = source.slice(0, match.index || 0).split('\n').length;
           const normalizedSpecifier = specifier.replace(/^\.\//, '');
           const resolvedUri = workspace?.files.find((file) =>
             file.uri === specifier || file.uri.endsWith('/' + normalizedSpecifier) || file.uri.endsWith(normalizedSpecifier),
