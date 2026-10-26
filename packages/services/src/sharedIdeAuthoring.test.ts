@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { MonacoIdeServiceDefinition } from './client-services/monacoIdeService.js';
+import { MonacoIdeServiceDefinition, createMonacoIdeService } from './client-services/monacoIdeService.js';
 import { UIAuthoringServiceDefinition, createUIAuthoringService } from './client-services/uiAuthoringService.js';
 
 describe('shared IDE and UI authoring services', () => {
   it('exposes the Monaco session lifecycle', () => {
     expect(Object.keys(MonacoIdeServiceDefinition.operations)).toEqual([
       'createSession', 'updateDocument', 'setDiagnostics', 'setOptions', 'getSession', 'disposeSession',
+      'setWorkspaceContext', 'setLanguageConfiguration', 'setCompletions', 'setValidationResult',
+      'setImportAnalysis', 'analyzeImports', 'serializeSession', 'restoreSession', 'getLanguageConfiguration',
     ]);
   });
 
@@ -190,4 +192,53 @@ it('removes complete subtrees and cleans dependent bindings and slot references'
   const after = await service.call<unknown, import('@kloks/contracts').UIAuthoringSession>('getSession', { sessionId: session.sessionId });
   expect(after.nodes).toEqual([]);
   expect(after.bindings).toEqual([]);
+});
+
+
+it('supports Monaco workspace context, language intelligence, import analysis, and session round-tripping', async () => {
+  const service = createMonacoIdeService();
+  await service.start();
+  const session = await service.call<unknown, import('@kloks/contracts').MonacoIdeSession>('createSession', {
+    sessionId: 'intelligence-session',
+    uri: 'inmemory://workspace/main.ts',
+    language: 'typescript',
+    value: "import local from './local.ts';\nimport remote from 'remote-pkg';",
+  });
+  await service.call('setWorkspaceContext', {
+    sessionId: session.sessionId,
+    workspaceContext: {
+      workspaceId: 'workspace',
+      rootUri: 'inmemory://workspace/',
+      files: [{ uri: 'inmemory://workspace/local.ts', language: 'typescript' }],
+      dependencies: { 'remote-pkg': '^1.0.0' },
+    },
+  });
+  const imports = await service.call<unknown, import('@kloks/contracts').MonacoImportAnalysis[]>('analyzeImports', {
+    sessionId: session.sessionId,
+  });
+  expect(imports).toEqual(expect.arrayContaining([
+    expect.objectContaining({ specifier: './local.ts', resolved: true, resolvedUri: 'inmemory://workspace/local.ts' }),
+    expect.objectContaining({ specifier: 'remote-pkg', resolved: true }),
+  ]));
+
+  const completions = [{ label: 'workspaceItem', insertText: 'workspaceItem', kind: 'Variable' }];
+  await service.call('setCompletions', { sessionId: session.sessionId, completions });
+  const validation = { valid: true, diagnostics: [], checkedAt: 123 };
+  await service.call('setValidationResult', { sessionId: session.sessionId, validation });
+  const languageConfiguration = {
+    language: 'typescript', extensions: ['.ts', '.tsx'], configuration: { comments: { lineComment: '//' } },
+  };
+  await service.call('setLanguageConfiguration', { sessionId: session.sessionId, configuration: languageConfiguration });
+  expect(await service.call('getLanguageConfiguration', { language: 'typescript' })).toEqual(languageConfiguration);
+
+  const serialized = await service.call<unknown, import('@kloks/contracts').MonacoSerializedSession>('serializeSession', {
+    sessionId: session.sessionId,
+  });
+  expect(serialized.schemaVersion).toBe('1.0.0');
+  await service.call('disposeSession', { sessionId: session.sessionId });
+  expect(await service.call('getSession', { sessionId: session.sessionId })).toBeNull();
+  const restored = await service.call<unknown, import('@kloks/contracts').MonacoIdeSession>('restoreSession', { serialized });
+  expect(restored.completions).toEqual(completions);
+  expect(restored.validation).toEqual(validation);
+  expect(restored.importAnalysis).toEqual(imports);
 });
