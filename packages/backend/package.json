@@ -72,10 +72,45 @@
       "import": "./dist/development/index.js",
       "types": "./dist/development/index.d.ts",
       "default": "./dist/development/index.js"
+    },
+    "./ai-provider": {
+      "import": "./dist/ai-provider/index.js",
+      "types": "./dist/ai-provider/index.d.ts",
+      "default": "./dist/ai-provider/index.js"
+    },
+    "./ai-inference": {
+      "import": "./dist/ai-inference/index.js",
+      "types": "./dist/ai-inference/index.d.ts",
+      "default": "./dist/ai-inference/index.js"
+    },
+    "./ai-models": {
+      "import": "./dist/ai-models/index.js",
+      "types": "./dist/ai-models/index.d.ts",
+      "default": "./dist/ai-models/index.js"
+    },
+    "./ai-routing": {
+      "import": "./dist/ai-routing/index.js",
+      "types": "./dist/ai-routing/index.d.ts",
+      "default": "./dist/ai-routing/index.js"
+    },
+    "./ai-keys": {
+      "import": "./dist/ai-keys/index.js",
+      "types": "./dist/ai-keys/index.d.ts",
+      "default": "./dist/ai-keys/index.js"
+    },
+    "./ai-tools": {
+      "import": "./dist/ai-tools/index.js",
+      "types": "./dist/ai-tools/index.d.ts",
+      "default": "./dist/ai-tools/index.js"
+    },
+    "./krnl-ai-services": {
+      "import": "./dist/krnl-ai-services.js",
+      "types": "./dist/krnl-ai-services.d.ts",
+      "default": "./dist/krnl-ai-services.js"
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts src/krnl-services.ts src/services/index.ts src/auth/index.ts src/storage/index.ts src/workspace/index.ts src/control-plane/index.ts src/api/index.ts src/connectivity/index.ts src/client/index.ts src/srkl/index.ts src/development/index.ts --format esm --dts --clean --external @kloks/functions --external react --external @kloks/state-graph --external @neondatabase/serverless --external @supabase/supabase-js --external @aws-sdk/client-s3 --external @aws-sdk/lib-storage --external bcryptjs --external better-sqlite3 --external zod --external ws --external @webcontainer/api",
+    "build": "tsup src/index.ts src/krnl-services.ts src/krnl-ai-services.ts src/services/index.ts src/auth/index.ts src/storage/index.ts src/workspace/index.ts src/control-plane/index.ts src/api/index.ts src/connectivity/index.ts src/client/index.ts src/srkl/index.ts src/development/index.ts src/ai-provider/index.ts src/ai-inference/index.ts src/ai-models/index.ts src/ai-routing/index.ts src/ai-keys/index.ts src/ai-tools/index.ts --format esm --dts --clean --external @kloks/functions --external react --external @kloks/state-graph --external @neondatabase/serverless --external @supabase/supabase-js --external @aws-sdk/client-s3 --external @aws-sdk/lib-storage --external bcryptjs --external better-sqlite3 --external zod --external ws --external @webcontainer/api",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },

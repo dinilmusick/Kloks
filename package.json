@@ -109,6 +109,41 @@
       "types": "./packages/backend/dist/development/index.d.ts",
       "import": "./packages/backend/dist/development/index.js",
       "default": "./packages/backend/dist/development/index.js"
+    },
+    "./ai-provider": {
+      "types": "./packages/backend/dist/ai-provider/index.d.ts",
+      "import": "./packages/backend/dist/ai-provider/index.js",
+      "default": "./packages/backend/dist/ai-provider/index.js"
+    },
+    "./ai-inference": {
+      "types": "./packages/backend/dist/ai-inference/index.d.ts",
+      "import": "./packages/backend/dist/ai-inference/index.js",
+      "default": "./packages/backend/dist/ai-inference/index.js"
+    },
+    "./ai-models": {
+      "types": "./packages/backend/dist/ai-models/index.d.ts",
+      "import": "./packages/backend/dist/ai-models/index.js",
+      "default": "./packages/backend/dist/ai-models/index.js"
+    },
+    "./ai-routing": {
+      "types": "./packages/backend/dist/ai-routing/index.d.ts",
+      "import": "./packages/backend/dist/ai-routing/index.js",
+      "default": "./packages/backend/dist/ai-routing/index.js"
+    },
+    "./ai-keys": {
+      "types": "./packages/backend/dist/ai-keys/index.d.ts",
+      "import": "./packages/backend/dist/ai-keys/index.js",
+      "default": "./packages/backend/dist/ai-keys/index.js"
+    },
+    "./ai-tools": {
+      "types": "./packages/backend/dist/ai-tools/index.d.ts",
+      "import": "./packages/backend/dist/ai-tools/index.js",
+      "default": "./packages/backend/dist/ai-tools/index.js"
+    },
+    "./krnl-ai-services": {
+      "types": "./packages/backend/dist/krnl-ai-services.d.ts",
+      "import": "./packages/backend/dist/krnl-ai-services.js",
+      "default": "./packages/backend/dist/krnl-ai-services.js"
     }
   },
   "scripts": {

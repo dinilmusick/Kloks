@@ -1,0 +1,41 @@
+/**
+ * @file modelCatalog.ts
+ * @description Master Model Catalog Service for AI model registration and retrieval
+ */
+
+import type { ProviderId } from '../ai-provider/types.js';
+import type { ModelCatalogEntry } from './types.js';
+import { STATIC_MODELS_CATALOG } from './catalogData.js';
+import { modelHealthService } from './modelHealthService.js';
+
+export class ModelCatalogService {
+  private customModels: Map<string, ModelCatalogEntry> = new Map();
+
+  getAllModels(): ModelCatalogEntry[] {
+    const list = [...STATIC_MODELS_CATALOG, ...Array.from(this.customModels.values())];
+    return list;
+  }
+
+  getModelsByProvider(providerId: ProviderId): ModelCatalogEntry[] {
+    return this.getAllModels().filter((m) => m.providerId === providerId);
+  }
+
+  getModel(id: string): ModelCatalogEntry | undefined {
+    return (
+      this.customModels.get(id) ??
+      this.getAllModels().find((m) => m.id === id || m.id.endsWith(id))
+    );
+  }
+
+  registerModel(model: ModelCatalogEntry): void {
+    this.customModels.set(model.id, model);
+  }
+
+  getAvailableModels(): ModelCatalogEntry[] {
+    return this.getAllModels().filter((m) =>
+      modelHealthService.isModelAvailable(m.providerId, m.id)
+    );
+  }
+}
+
+export const modelCatalog = new ModelCatalogService();

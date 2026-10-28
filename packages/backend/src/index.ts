@@ -33,3 +33,13 @@ export {
   b2UploadFile,
 } from './storage/index.js';
 export type { WorkspaceSyncSummary } from './workspace/index.js';
+
+export * from './ai-provider/index.js';
+export * from './ai-inference/index.js';
+export * from './ai-models/index.js';
+export * from './ai-routing/index.js';
+export * from './ai-keys/index.js';
+export * from './ai-tools/index.js';
+export * from './krnl-ai-services.js';
+
+
