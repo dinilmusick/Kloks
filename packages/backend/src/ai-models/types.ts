@@ -19,7 +19,8 @@ export interface ModelCatalogEntry {
   latencyRatingMs?: number;
   qualityRating?: number;
   maxOutputTokens?: number;
-  status?: 'active' | 'deprecated' | 'offline';
+  status?: 'active' | 'deprecated' | 'offline' | 'online' | 'currently_unavailable';
+  runtimeStats?: Record<string, any>;
   description?: string;
 }
 
