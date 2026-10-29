@@ -21,6 +21,33 @@ export class MetricsLogger {
   private records: AIMetricRecord[] = [];
   private readonly maxRecords: number = 2000;
 
+  logRequest(record: {
+    providerId: ProviderId;
+    modelId: string;
+    latencyMs: number;
+    status?: string;
+    clientIp?: string;
+    profileRequested?: unknown;
+    selectedModel?: string;
+    selectedProvider?: ProviderId;
+    selectedKeyId?: string;
+    tokensUsed?: number;
+    statusCode?: number;
+    failoverOccurred?: boolean;
+    failoverChain?: string[];
+    promptSnippet?: string;
+    responseSnippet?: string;
+    toolCalls?: unknown;
+    toolsProvided?: unknown;
+  }): void {
+    this.log({
+      providerId: record.providerId,
+      modelId: record.modelId,
+      durationMs: record.latencyMs,
+      success: record.status !== 'failure',
+    });
+  }
+
   log(record: Omit<AIMetricRecord, 'id' | 'timestamp'>): void {
     const full: AIMetricRecord = {
       id: `met_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
