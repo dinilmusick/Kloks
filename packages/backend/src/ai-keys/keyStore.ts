@@ -4,7 +4,7 @@
  */
 
 import type { ProviderId } from '../ai-provider/types.js';
-import type { ApiKeyEntry, RotationStrategy } from './types.js';
+import type { ApiKeyEntry, KeyModelUsageStats, RotationStrategy } from './types.js';
 import { keysStorage } from './keysStorage.js';
 import { validateApiKey } from './keyValidator.js';
 
