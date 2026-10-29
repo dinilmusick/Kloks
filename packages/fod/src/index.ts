@@ -21,3 +21,18 @@ export function createFodServiceFacade(runtime:FodRuntime){
   const service:IService=createService(definition);
   return {id:definition.id,name:definition.name,version:definition.version,runtime:'server' as const,deployment:'local' as const,definition,createInstance:()=>createService(definition),execute:async<TIn=unknown,TOut=unknown>(op:string,input?:TIn)=>{await service.start();return service.call<TIn,TOut>(op,input)}};
 }
+
+export function createFodServiceFacadeForWorkspace(buildRuntime:(workspaceId:string)=>FodRuntime){
+  const definition:ServiceDefinition={
+    id:'kloks.fod',name:'FodService',version:'1.0.0',
+    operations:{
+      listFlows:{id:'FodService.listFlows',name:'listFlows',inputSchema:{type:'object',properties:{workspaceId:{type:'string'}},required:['workspaceId']},outputSchema:{type:'array'},handler:async(input:any)=>buildRuntime(String(input.workspaceId)).listFlows()},
+      getFlow:{id:'FodService.getFlow',name:'getFlow',inputSchema:{type:'object',properties:{workspaceId:{type:'string'},flowId:{type:'string'}},required:['workspaceId','flowId']},outputSchema:{type:'object'},handler:async(input:any)=>buildRuntime(String(input.workspaceId)).getFlow(String(input.flowId))},
+      saveFlow:{id:'FodService.saveFlow',name:'saveFlow',inputSchema:{type:'object',properties:{workspaceId:{type:'string'},flow:{type:'object'}},required:['workspaceId','flow']},outputSchema:{type:'object'},handler:async(input:any)=>buildRuntime(String(input.workspaceId)).saveFlow(input.flow)},
+      deleteFlow:{id:'FodService.deleteFlow',name:'deleteFlow',inputSchema:{type:'object',properties:{workspaceId:{type:'string'},flowId:{type:'string'}},required:['workspaceId','flowId']},outputSchema:{type:'object'},handler:async(input:any)=>({success:await buildRuntime(String(input.workspaceId)).deleteFlow(String(input.flowId))})},
+      executeFlow:{id:'FodService.executeFlow',name:'executeFlow',inputSchema:{type:'object',properties:{workspaceId:{type:'string'},flowId:{type:'string'}},required:['workspaceId','flowId']},outputSchema:{type:'object'},handler:async(input:any)=>buildRuntime(String(input.workspaceId)).executeFlow(String(input.flowId))}
+    }
+  };
+  const service:IService=createService(definition);
+  return {id:definition.id,name:definition.name,version:definition.version,runtime:'server' as const,deployment:'local' as const,definition,createInstance:()=>createService(definition),execute:async<TIn=unknown,TOut=unknown>(op:string,input?:TIn)=>{await service.start();return service.call<TIn,TOut>(op,input)}};
+}
