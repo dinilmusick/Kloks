@@ -188,7 +188,7 @@ export const AIKeyServiceFacade = {
   version: AIKeyServiceDefinition.version,
   runtime: 'server' as const,
   deployment: 'local' as const,
-  getKeys: (providerId?: string) => keyStore.getKeys(providerId as any),
+  getKeys: (providerId?: string, modelId?: string) => keyStore.getKeys(providerId as any, modelId),
   getStrategy: () => keyStore.getStrategy(),
   getUsageStats: (keyId?: string, modelId?: string) => keyStore.getUsageStats(keyId, modelId),
   addKey: (input: any) => keyStore.addKey(input),
