@@ -10,6 +10,30 @@ export class MCPEngine {
   private registeredTools: Map<string, MCPTool> = new Map();
   private toolHandlers: Map<string, (args: any) => Promise<any>> = new Map();
 
+  getSystemTools(): MCPTool[] {
+    return this.listTools();
+  }
+
+  async handleJsonRpc(payload: any): Promise<any> {
+    const { id, method, params } = payload ?? {};
+    if (method === 'tools/list') {
+      return { jsonrpc: '2.0', id, result: { tools: this.listTools() } };
+    }
+    if (method === 'tools/call') {
+      const toolName = params?.name;
+      if (!toolName) return { jsonrpc: '2.0', id, error: { code: -32602, message: 'Tool name is required.' } };
+      const result = await this.executeTool(toolName, params?.arguments ?? {});
+      return {
+        jsonrpc: '2.0',
+        id,
+        result: result.success
+          ? { content: [{ type: 'text', text: JSON.stringify(result.output ?? '') }] }
+          : { content: [{ type: 'text', text: result.error ?? 'Tool execution failed' }], isError: true },
+      };
+    }
+    return { jsonrpc: '2.0', id, error: { code: -32601, message: `Method "${method}" not found.` } };
+  }
+
   registerServer(config: MCPServerConfig): void {
     this.servers.set(config.id, config);
   }
