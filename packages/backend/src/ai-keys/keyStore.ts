@@ -54,7 +54,7 @@ export class KeyStoreService {
     return this.strategy;
   }
 
-  addKey(entry: Omit<ApiKeyEntry, 'id' | 'createdAt' | 'totalCalls' | 'successfulCalls' | 'failedCalls' | 'lastLatencyMs' | 'errorCount'>): ApiKeyEntry {
+  addKey(entry: Partial<ApiKeyEntry> & Pick<ApiKeyEntry, 'providerId' | 'label' | 'key'>): ApiKeyEntry {
     const full: ApiKeyEntry = {
       id: `key_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       createdAt: new Date().toISOString(),
@@ -63,14 +63,80 @@ export class KeyStoreService {
       failedCalls: 0,
       lastLatencyMs: 0,
       errorCount: 0,
+      status: 'active',
+      isActive: true,
+      remainingCreditsUsd: null,
+      weight: 5,
       ...entry,
     };
     keysStorage.saveKey(full);
     return full;
   }
 
+  getPermanentKey(providerId: ProviderId): string | null {
+    return null;
+  }
+
+  getPermanentKeysMap(): Record<string, string> {
+    return {};
+  }
+
+  setPermanentKey(_providerId: ProviderId, _keyId: string | null): void {}
+
+  setForcedNextKey(providerId: ProviderId, keyId: string): void {
+    this.roundRobinIndices.set(providerId, -1);
+    const key = this.getKey(keyId);
+    if (key) key.lastLatencyMs = -1;
+  }
+
+  peekNextKey(providerId: ProviderId, modelId?: string): ApiKeyEntry | null {
+    return this.selectNextKey(providerId, modelId) ?? null;
+  }
+
+  getNextKey(providerId: ProviderId, modelId?: string): ApiKeyEntry | null {
+    return this.peekNextKey(providerId, modelId);
+  }
+
   selectNextKey(providerId: ProviderId, _modelId?: string): ApiKeyEntry | undefined {
     return this.getActiveKey(providerId);
+  }
+
+  updateKeyLabel(id: string, label: string): ApiKeyEntry | undefined {
+    const key = this.getKey(id);
+    if (!key) return undefined;
+    key.label = label;
+    keysStorage.saveKey(key);
+    return key;
+  }
+
+  deleteKey(id: string): boolean {
+    const existed = Boolean(this.getKey(id));
+    keysStorage.deleteKey(id);
+    return existed;
+  }
+
+  resetKeyProbabilities(id: string): ApiKeyEntry | undefined {
+    const key = this.getKey(id);
+    if (!key) return undefined;
+    key.weight = 5;
+    key.errorCount = 0;
+    key.status = 'active';
+    key.isActive = true;
+    keysStorage.saveKey(key);
+    return key;
+  }
+
+  resetAllFailures(): void {
+    for (const key of this.getKeys()) {
+      key.errorCount = 0;
+      key.status = 'active';
+      key.isActive = true;
+      keysStorage.saveKey(key);
+    }
+  }
+
+  getUsageStats(_keyId?: string, _modelId?: string): KeyModelUsageStats[] {
+    return [];
   }
 
   updateKeyStatus(id: string, status: ApiKeyEntry['status']): void {
