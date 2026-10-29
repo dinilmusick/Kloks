@@ -48,6 +48,29 @@ export class MetricsLogger {
     });
   }
 
+  getLogs(limit = 50): AIMetricRecord[] {
+    return this.records.slice(-limit);
+  }
+
+  getMetricsSummary(): {
+    totalRequests: number;
+    successRatePercent: number;
+    averageLatencyMs: number;
+    totalFailovers: number;
+  } {
+    const totalRequests = this.records.length;
+    const successes = this.records.filter((record) => record.success).length;
+    const averageLatencyMs = totalRequests
+      ? Math.round(this.records.reduce((sum, record) => sum + record.durationMs, 0) / totalRequests)
+      : 0;
+    return {
+      totalRequests,
+      successRatePercent: totalRequests ? Math.round((successes / totalRequests) * 100) : 100,
+      averageLatencyMs,
+      totalFailovers: 0,
+    };
+  }
+
   log(record: Omit<AIMetricRecord, 'id' | 'timestamp'>): void {
     const full: AIMetricRecord = {
       id: `met_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
