@@ -6,6 +6,8 @@
 import type { ProviderId } from '../ai-provider/types.js';
 import type { ModelCatalogEntry } from './types.js';
 import { STATIC_MODELS_CATALOG } from './catalogData.js';
+import { endpointRefresher } from './endpointRefresher.js';
+import { keyStore } from '../ai-keys/keyStore.js';
 import { modelHealthService } from './modelHealthService.js';
 
 export class ModelCatalogService {
@@ -27,7 +29,20 @@ export class ModelCatalogService {
   }
 
   async refreshCatalogFromEndpoints(): Promise<{ updated: number; errors: string[] }> {
-    return { updated: 0, errors: [] };
+    const errors: string[] = [];
+    let updated = 0;
+    for (const providerId of Array.from(new Set(this.getAllModels().map((model) => model.providerId)))) {
+      const key = keyStore.getActiveKey(providerId);
+      if (!key) continue;
+      try {
+        const models = await endpointRefresher.fetchRemoteModels(providerId, key.key);
+        for (const model of models) this.registerModel(model);
+        updated += models.length;
+      } catch (error) {
+        errors.push(error instanceof Error ? error.message : String(error));
+      }
+    }
+    return { updated, errors };
   }
 
   getAllModels(): ModelCatalogEntry[] {
