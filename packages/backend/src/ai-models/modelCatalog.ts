@@ -20,6 +20,31 @@ export class ModelCatalogService {
     return this.getAllModels().filter((m) => m.providerId === providerId);
   }
 
+  getModelById(id: string): ModelCatalogEntry | undefined {
+    return this.getModel(id);
+  }
+
+  recordModelSuccess(id: string): void {
+    const model = this.getModel(id);
+    if (model) model.status = 'active';
+  }
+
+  recordModelFailure(id: string): void {
+    const model = this.getModel(id);
+    if (model) model.status = 'offline';
+  }
+
+  createExecutionContract(
+    modelId: string,
+    providerId: ProviderId,
+    keyId: string,
+    intelligenceSpec?: unknown
+  ): { contractId: string } {
+    return {
+      contractId: `contract-${Date.now()}-${providerId}-${modelId}-${keyId}`,
+    };
+  }
+
   getModel(id: string): ModelCatalogEntry | undefined {
     return (
       this.customModels.get(id) ??
