@@ -14,7 +14,7 @@ export class KeyStoreService {
   private forcedNextKeys: Map<ProviderId, string> = new Map();
   private permanentKeys: Map<ProviderId, string> = new Map();
 
-  getKeys(providerId?: ProviderId): ApiKeyEntry[] {
+  getKeys(providerId?: ProviderId, _modelId?: string): ApiKeyEntry[] {
     const all = keysStorage.loadKeys();
     if (!providerId) return all;
     return all.filter((k) => k.providerId === providerId);
