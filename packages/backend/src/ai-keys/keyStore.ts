@@ -127,22 +127,6 @@ export class KeyStoreService {
     keysStorage.saveKey(entry);
     return res.valid;
   }
-
-  recordUsage(keyId: string, success: boolean, latencyMs: number): void {
-    const key = this.getKey(keyId);
-    if (!key) return;
-
-    key.totalCalls++;
-    key.lastLatencyMs = latencyMs;
-    key.lastUsedAt = new Date().toISOString();
-    if (success) {
-      key.successfulCalls++;
-    } else {
-      key.failedCalls++;
-      key.errorCount++;
-    }
-    keysStorage.saveKey(key);
-  }
 }
 
 export const keyStore = new KeyStoreService();
