@@ -82,14 +82,16 @@ export class KeyStoreService {
 
   recordUsage(
     keyId: string,
-    latencyMs: number,
-    success: boolean,
+    successOrLatency: boolean | number,
+    latencyOrSuccess: boolean | number,
     _costUsd = 0,
     _modelId?: string,
     error?: string
   ): void {
     const key = this.getKey(keyId);
     if (!key) return;
+    const success = typeof successOrLatency === 'boolean' ? successOrLatency : Boolean(latencyOrSuccess);
+    const latencyMs = typeof successOrLatency === 'number' ? successOrLatency : Number(latencyOrSuccess);
     key.totalCalls++;
     key.lastLatencyMs = latencyMs;
     key.lastUsedAt = new Date().toISOString();
