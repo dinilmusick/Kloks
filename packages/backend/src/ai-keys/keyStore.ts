@@ -11,6 +11,8 @@ import { validateApiKey } from './keyValidator.js';
 export class KeyStoreService {
   private strategy: RotationStrategy = 'lowest-latency';
   private roundRobinIndices: Map<string, number> = new Map();
+  private forcedNextKeys: Map<ProviderId, string> = new Map();
+  private permanentKeys: Map<ProviderId, string> = new Map();
 
   getKeys(providerId?: ProviderId): ApiKeyEntry[] {
     const all = keysStorage.loadKeys();
@@ -74,27 +76,33 @@ export class KeyStoreService {
   }
 
   getPermanentKey(providerId: ProviderId): string | null {
-    return null;
+    return this.permanentKeys.get(providerId) ?? null;
   }
 
   getPermanentKeysMap(): Record<string, string> {
-    return {};
+    return Object.fromEntries(this.permanentKeys.entries());
   }
 
-  setPermanentKey(_providerId: ProviderId, _keyId: string | null): void {}
+  setPermanentKey(providerId: ProviderId, keyId: string | null): void {
+    if (keyId) this.permanentKeys.set(providerId, keyId);
+    else this.permanentKeys.delete(providerId);
+  }
 
   setForcedNextKey(providerId: ProviderId, keyId: string): void {
-    this.roundRobinIndices.set(providerId, -1);
-    const key = this.getKey(keyId);
-    if (key) key.lastLatencyMs = -1;
+    this.forcedNextKeys.set(providerId, keyId);
   }
 
-  peekNextKey(providerId: ProviderId, modelId?: string): ApiKeyEntry | null {
-    return this.selectNextKey(providerId, modelId) ?? null;
+  peekNextKey(providerId: ProviderId, _modelId?: string): ApiKeyEntry | null {
+    const keys = this.getKeys(providerId).filter((key) => key.status !== 'invalid' && key.isActive);
+    const forced = this.forcedNextKeys.get(providerId);
+    const permanent = this.permanentKeys.get(providerId);
+    return (forced && this.getKey(forced)) || (permanent && this.getKey(permanent)) || keys[0] || null;
   }
 
   getNextKey(providerId: ProviderId, modelId?: string): ApiKeyEntry | null {
-    return this.peekNextKey(providerId, modelId);
+    const key = this.peekNextKey(providerId, modelId);
+    this.forcedNextKeys.delete(providerId);
+    return key;
   }
 
   selectNextKey(providerId: ProviderId, _modelId?: string): ApiKeyEntry | undefined {
