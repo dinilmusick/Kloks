@@ -69,6 +69,53 @@ export class KeyStoreService {
     return full;
   }
 
+  selectNextKey(providerId: ProviderId, _modelId?: string): ApiKeyEntry | undefined {
+    return this.getActiveKey(providerId);
+  }
+
+  updateKeyStatus(id: string, status: ApiKeyEntry['status']): void {
+    const key = this.getKey(id);
+    if (!key) return;
+    key.status = status;
+    keysStorage.saveKey(key);
+  }
+
+  recordUsage(
+    keyId: string,
+    latencyMs: number,
+    success: boolean,
+    _costUsd = 0,
+    _modelId?: string,
+    error?: string
+  ): void {
+    const key = this.getKey(keyId);
+    if (!key) return;
+    key.totalCalls++;
+    key.lastLatencyMs = latencyMs;
+    key.lastUsedAt = new Date().toISOString();
+    if (success) key.successfulCalls++;
+    else {
+      key.failedCalls++;
+      key.errorCount++;
+      key.validationError = error ?? key.validationError;
+    }
+    keysStorage.saveKey(key);
+  }
+
+  exportKeysStructured(): { version: 1; exportedAt: string; keys: ApiKeyEntry[] } {
+    return { version: 1, exportedAt: new Date().toISOString(), keys: this.getKeys() };
+  }
+
+  async importKeys(payload: unknown): Promise<{ importedCount: number; keys: ApiKeyEntry[] }> {
+    const raw = (payload as any)?.keys ?? payload;
+    if (!Array.isArray(raw)) throw new Error('Invalid key backup payload.');
+    const keys = raw.filter((entry): entry is ApiKeyEntry =>
+      Boolean(entry && typeof entry.id === 'string' && typeof entry.providerId === 'string' && typeof entry.key === 'string')
+    );
+    keysStorage.saveKeys(keys);
+    return { importedCount: keys.length, keys };
+  }
+
   async verifyKey(id: string): Promise<boolean> {
     const entry = this.getKey(id);
     if (!entry) return false;
