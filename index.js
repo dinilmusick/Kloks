@@ -5,3 +5,4 @@ export * from './packages/services/dist/index.js';
 export * from './packages/backend/dist/index.js';
 export * from './packages/orchestrations/dist/index.js';
 export * from './packages/contracts/dist/index.js';
+export * from './packages/fod/dist/index';
