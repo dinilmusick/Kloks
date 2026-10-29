@@ -192,3 +192,39 @@ export const AIKeyServiceFacade = {
     return aiKeyInstance.call<TIn, TOut>(op, input);
   },
 };
+
+// 6. AIToolService
+export const AIToolServiceDefinition: ServiceDefinition = createServiceDefinition({
+  id: 'kloks.backend.aiTools',
+  name: 'AIToolService',
+  version: '1.0.0',
+  operations: {
+    listTools: {
+      id: 'AIToolService.listTools',
+      name: 'listTools',
+      handler: async () => toolManagerService.listTools(),
+    },
+    execute: {
+      id: 'AIToolService.execute',
+      name: 'execute',
+      handler: async (input: { toolName: string; args: Record<string, unknown> }) =>
+        toolManagerService.execute(input.toolName, input.args),
+    },
+  },
+});
+
+const aiToolInstance: IService = createService(AIToolServiceDefinition);
+export const AIToolServiceFacade = {
+  id: AIToolServiceDefinition.id,
+  name: AIToolServiceDefinition.name,
+  version: AIToolServiceDefinition.version,
+  runtime: 'server' as const,
+  deployment: 'local' as const,
+  definition: AIToolServiceDefinition,
+  createInstance: () => createService(AIToolServiceDefinition),
+  execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => {
+    await aiToolInstance.start();
+    return aiToolInstance.call<TIn, TOut>(op, input);
+  },
+};
+
