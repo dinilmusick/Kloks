@@ -5,3 +5,4 @@ export * from './packages/services/dist/index.d.ts';
 export * from './packages/backend/dist/index.d.ts';
 export * from './packages/orchestrations/dist/index.d.ts';
 export * from './packages/contracts/dist/index.d.ts';
+export * from './packages/fod/dist/index.d.ts';

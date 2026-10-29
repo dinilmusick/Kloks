@@ -144,6 +144,11 @@
       "types": "./packages/backend/dist/krnl-ai-services.d.ts",
       "import": "./packages/backend/dist/krnl-ai-services.js",
       "default": "./packages/backend/dist/krnl-ai-services.js"
+    },
+    "./fod": {
+      "types": "./packages/fod/dist/index.d.ts",
+      "import": "./packages/fod/dist/index.js",
+      "default": "./packages/fod/dist/index.js"
     }
   },
   "scripts": {
