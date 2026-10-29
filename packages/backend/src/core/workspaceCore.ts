@@ -6,6 +6,16 @@
  */
 
 import { queryUnifiedDb } from './unifiedDb';
+
+function workspaceAppId(env?: Record<string, unknown>): string {
+  const value = String(env?.WORKSPACE_APP_ID ?? 'depm').trim().toLowerCase();
+  return value || 'depm';
+}
+
+function appProfile(profiles: Record<string, any>, appId: string): Record<string, any> {
+  if (!profiles[appId] || typeof profiles[appId] !== 'object') profiles[appId] = {};
+  return profiles[appId];
+}
 import { resolveWorkspaceConnection, syncWorkspaceCreateToBucket, syncWorkspaceDeleteToBucket } from './workspaceBucketSyncCore';
 export { loadWorkspaceData, saveWorkspaceData, renameAppInWorkspaceData } from './workspaceDataCore';
 export { getWorkspaceStorageDetails } from './workspaceStorageDetailsCore';
@@ -14,11 +24,11 @@ export async function findUserWorkspace(workspaceId: string, env?: Record<string
   const res = await queryUnifiedDb(`SELECT id, email, username, app_profiles FROM "ultrst-users"`, [], env);
   for (const user of res.rows) {
     const profiles = typeof user.app_profiles === 'string' ? JSON.parse(user.app_profiles) : (user.app_profiles || {});
-    const depm = profiles.depm || {};
-    const workspaces = Array.isArray(depm.workspaces) ? depm.workspaces : [];
+    const app = appProfile(profiles, workspaceAppId(env));
+    const workspaces = Array.isArray(app.workspaces) ? app.workspaces : [];
     const ws = workspaces.find((w: any) => w.id === workspaceId);
     if (ws) {
-      const conns = depm.storage_connections || profiles.srkl?.storage_connections || profiles.docustack?.storage_connections || [];
+      const conns = app.storage_connections || profiles.srkl?.storage_connections || profiles.docustack?.storage_connections || [];
       const conn = conns.find((c: any) => c.id === ws.storageConnectionId) || conns.find((c: any) => c.role === 'primary') || conns[0] || null;
       return { user, workspace: ws, connection: conn };
     }
@@ -37,10 +47,10 @@ export async function getWorkspaces(userId?: string, env?: Record<string, unknow
   }
 
   const profiles = typeof userRow.app_profiles === 'string' ? JSON.parse(userRow.app_profiles) : (userRow.app_profiles || {});
-  const depm = profiles.depm || {};
-  const workspaces = Array.isArray(depm.workspaces) ? depm.workspaces : [];
-  const activeWorkspaceId = depm.activeWorkspaceId || null;
-  const conns = depm.storage_connections?.length ? depm.storage_connections : (profiles.srkl?.storage_connections || []);
+  const app = appProfile(profiles, workspaceAppId(env));
+  const workspaces = Array.isArray(app.workspaces) ? app.workspaces : [];
+  const activeWorkspaceId = app.activeWorkspaceId || null;
+  const conns = app.storage_connections?.length ? app.storage_connections : (profiles.srkl?.storage_connections || []);
 
   return { success: true, workspaces, activeWorkspaceId, storage_connections: conns };
 }
@@ -51,8 +61,8 @@ export async function createWorkspace(userId: string, wsData: any, env?: Record<
   if (!user) throw new Error('User account not found.');
 
   const profiles = typeof user.app_profiles === 'string' ? JSON.parse(user.app_profiles) : (user.app_profiles || {});
-  if (!profiles.depm) profiles.depm = {};
-  const workspaces = Array.isArray(profiles.depm.workspaces) ? profiles.depm.workspaces : [];
+  const app = appProfile(profiles, workspaceAppId(env));
+  const workspaces = Array.isArray(app.workspaces) ? app.workspaces : [];
 
   const wsName = (wsData.name || 'New Workspace').trim();
   const wsId = wsData.id || `ws-depm-${Date.now()}`;
@@ -73,8 +83,8 @@ export async function createWorkspace(userId: string, wsData: any, env?: Record<
   };
 
   workspaces.push(newWs);
-  profiles.depm.workspaces = workspaces;
-  profiles.depm.activeWorkspaceId = wsId;
+  app.workspaces = workspaces;
+  app.activeWorkspaceId = wsId;
 
   await queryUnifiedDb(`UPDATE "ultrst-users" SET app_profiles = $1, updated_at = NOW() WHERE id = $2`, [JSON.stringify(profiles), user.id], env);
   const conn = resolveWorkspaceConnection(profiles, newWs);
@@ -88,8 +98,8 @@ export async function updateWorkspace(userId: string, params: any, env?: Record<
   if (!user) throw new Error('User not found.');
 
   const profiles = typeof user.app_profiles === 'string' ? JSON.parse(user.app_profiles) : (user.app_profiles || {});
-  if (!profiles.depm) profiles.depm = {};
-  const workspaces = Array.isArray(profiles.depm.workspaces) ? profiles.depm.workspaces : [];
+  const app = appProfile(profiles, workspaceAppId(env));
+  const workspaces = Array.isArray(app.workspaces) ? app.workspaces : [];
 
   const { action, workspaceId, updates } = params;
   const targetId = workspaceId || updates?.id;
@@ -97,7 +107,7 @@ export async function updateWorkspace(userId: string, params: any, env?: Record<
   if (!match) throw new Error('Workspace not found.');
 
   if (action === 'switch') {
-    profiles.depm.activeWorkspaceId = targetId;
+    app.activeWorkspaceId = targetId;
   } else {
     // ENFORCE IMMUTABILITY: storage fields cannot be altered post-creation
     const safeUpdates = { ...(updates || params) };
@@ -126,22 +136,23 @@ export async function deleteWorkspace(userId: string, wsId: string, env?: Record
   if (!user) throw new Error('User not found.');
 
   const profiles = typeof user.app_profiles === 'string' ? JSON.parse(user.app_profiles) : (user.app_profiles || {});
-  if (!profiles.depm?.workspaces) return { success: true, workspaces: [] };
+  const app = appProfile(profiles, workspaceAppId(env));
+  if (!app.workspaces) return { success: true, workspaces: [] };
 
-  const targetWs = profiles.depm.workspaces.find((w: any) => w.id === wsId);
+  const targetWs = app.workspaces.find((w: any) => w.id === wsId);
   const conn = targetWs ? resolveWorkspaceConnection(profiles, targetWs) : null;
 
-  profiles.depm.workspaces = profiles.depm.workspaces.filter((w: any) => w.id !== wsId);
-  if (profiles.depm.activeWorkspaceId === wsId) {
-    profiles.depm.activeWorkspaceId = profiles.depm.workspaces[0]?.id || null;
+  app.workspaces = app.workspaces.filter((w: any) => w.id !== wsId);
+  if (app.activeWorkspaceId === wsId) {
+    app.activeWorkspaceId = app.workspaces[0]?.id || null;
   }
-  if (profiles.depm.workspace_data?.[wsId]) {
-    delete profiles.depm.workspace_data[wsId];
+  if (app.workspace_data?.[wsId]) {
+    delete app.workspace_data[wsId];
   }
 
   await queryUnifiedDb(`UPDATE "ultrst-users" SET app_profiles = $1, updated_at = NOW() WHERE id = $2`, [JSON.stringify(profiles), user.id], env);
   if (targetWs && conn) {
     await syncWorkspaceDeleteToBucket(targetWs, conn, env);
   }
-  return { success: true, workspaces: profiles.depm.workspaces };
+  return { success: true, workspaces: app.workspaces };
 }
