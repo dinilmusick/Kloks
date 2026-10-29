@@ -9,7 +9,26 @@ import { STATIC_MODELS_CATALOG } from './catalogData.js';
 import { modelHealthService } from './modelHealthService.js';
 
 export class ModelCatalogService {
+  private providerStatuses: Record<string, { providerId: ProviderId; status: string; modelsCount: number; error?: string }> = {};
   private customModels: Map<string, ModelCatalogEntry> = new Map();
+
+  getCatalog(providerId?: ProviderId): ModelCatalogEntry[] {
+    return providerId ? this.getAllModels().filter((model) => model.providerId === providerId) : this.getAllModels();
+  }
+
+  getProviderStatuses(): Array<{ providerId: ProviderId; status: string; modelsCount: number; error?: string }> {
+    const providers = new Set(this.getAllModels().map((model) => model.providerId));
+    for (const providerId of providers) {
+      const modelsCount = this.getModelsByProvider(providerId).length;
+      this.providerStatuses[providerId] ??= { providerId, status: 'online', modelsCount };
+      this.providerStatuses[providerId].modelsCount = modelsCount;
+    }
+    return Object.values(this.providerStatuses);
+  }
+
+  async refreshCatalogFromEndpoints(): Promise<{ updated: number; errors: string[] }> {
+    return { updated: 0, errors: [] };
+  }
 
   getAllModels(): ModelCatalogEntry[] {
     const list = [...STATIC_MODELS_CATALOG, ...Array.from(this.customModels.values())];
