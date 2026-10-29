@@ -6,6 +6,7 @@
  */
 
 import { queryUnifiedDb } from './unifiedDb';
+import { resolveWorkspaceConnection, syncWorkspaceCreateToBucket, syncWorkspaceDeleteToBucket } from './workspaceBucketSyncCore';
 
 function workspaceAppId(env?: Record<string, unknown>): string {
   const value = String(env?.WORKSPACE_APP_ID ?? 'depm').trim().toLowerCase();
@@ -16,7 +17,6 @@ function appProfile(profiles: Record<string, any>, appId: string): Record<string
   if (!profiles[appId] || typeof profiles[appId] !== 'object') profiles[appId] = {};
   return profiles[appId];
 }
-import { resolveWorkspaceConnection, syncWorkspaceCreateToBucket, syncWorkspaceDeleteToBucket } from './workspaceBucketSyncCore';
 export { loadWorkspaceData, saveWorkspaceData, renameAppInWorkspaceData } from './workspaceDataCore';
 export { getWorkspaceStorageDetails } from './workspaceStorageDetailsCore';
 
@@ -64,10 +64,11 @@ export async function createWorkspace(userId: string, wsData: any, env?: Record<
   const app = appProfile(profiles, workspaceAppId(env));
   const workspaces = Array.isArray(app.workspaces) ? app.workspaces : [];
 
+  const appId = workspaceAppId(env);
   const wsName = (wsData.name || 'New Workspace').trim();
-  const wsId = wsData.id || `ws-depm-${Date.now()}`;
+  const wsId = wsData.id || `ws-${appId}-${Date.now()}`;
   const userName = user.username || user.name || 'user';
-  const folderKey = `ultrst_depm_${userName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${wsName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+  const folderKey = `ultrst_${appId}_${userName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${wsName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
 
   const newWs = {
     ...wsData,
@@ -77,7 +78,7 @@ export async function createWorkspace(userId: string, wsData: any, env?: Record<
     localFolderKey: folderKey,
     workspacePath: `./${folderKey}`,
     storageProvider: wsData.storageProvider || 'backblaze_b2',
-    b2BucketName: wsData.b2BucketName || 'ultrst-apps',
+    b2BucketName: wsData.b2BucketName || undefined,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
