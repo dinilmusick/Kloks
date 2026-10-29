@@ -116,6 +116,9 @@ export const AIModelCatalogServiceFacade = {
   version: AIModelCatalogServiceDefinition.version,
   runtime: 'server' as const,
   deployment: 'local' as const,
+  getCatalog: (providerId?: string) => modelCatalog.getCatalog(providerId as any),
+  getProviderStatuses: () => modelCatalog.getProviderStatuses(),
+  refreshCatalogFromEndpoints: () => modelCatalog.refreshCatalogFromEndpoints(),
   definition: AIModelCatalogServiceDefinition,
   createInstance: () => createService(AIModelCatalogServiceDefinition),
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => {
@@ -185,6 +188,10 @@ export const AIKeyServiceFacade = {
   version: AIKeyServiceDefinition.version,
   runtime: 'server' as const,
   deployment: 'local' as const,
+  getKeys: (providerId?: string) => keyStore.getKeys(providerId as any),
+  getStrategy: () => keyStore.getStrategy(),
+  getUsageStats: (keyId?: string, modelId?: string) => keyStore.getUsageStats(keyId, modelId),
+  addKey: (input: any) => keyStore.addKey(input),
   definition: AIKeyServiceDefinition,
   createInstance: () => createService(AIKeyServiceDefinition),
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => {
