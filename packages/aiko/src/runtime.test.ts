@@ -28,3 +28,15 @@ it('creates a custom agent with an explicit capability allow-list',async()=>{
  expect(agent.allowedToolIds).toEqual(['a']);
  await expect(runtime.executeAgent(agent.id,{toolId:'b',input:{}})).rejects.toThrow('not permitted');
 });
+
+it('resolves natural-language input before executing the agent tool',async()=>{
+ let received:any=null;
+ const runtime=new AikoRuntime({
+  capabilities:[{id:'api',name:'API',sourceKind:'endpoint',sourceId:'api',execute:async(input)=>{received=input;return input}}],
+  resolver:{resolve:()=>({spec:{reasoning:9}})},
+  resolveNaturalLanguage:async()=>({value:42}),
+  keys:{listKeys:async()=>[],getActiveKey:async()=>null,rotateKey:async()=>null,syncFromAikoEngine:async()=>({synced:0})}
+ });
+ await runtime.executeAgent('aiko-endpoint-api','do it');
+ expect(received).toEqual({value:42});
+});
