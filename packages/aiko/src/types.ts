@@ -10,8 +10,6 @@ export interface AikoTool {
   execute:(input:unknown)=>Promise<unknown>;
   sourceKind:AikoSourceKind;
   sourceId:string;
-  allowedToolIds?:string[];
-  custom?:boolean;
 }
 
 export interface AikoAgentDefinition {
@@ -25,6 +23,8 @@ export interface AikoAgentDefinition {
   intelligenceSpecId?:string;
   sourceKind:AikoSourceKind;
   sourceId:string;
+  allowedToolIds?:string[];
+  custom?:boolean;
 }
 
 export interface AikoCapability {
