@@ -97,7 +97,7 @@ export function mergeSrklAccounts<T extends { srklAccountId?: string; id?: strin
     srklAccountId: account.id,
     syncedAt: new Date().toISOString(),
     source: 'SRKL' as const,
-  })) as T[];
+  })) as unknown as T[];
 
   // Preserve unrelated local records; synchronized SRKL records are replaced above.
   for (const item of local) {
