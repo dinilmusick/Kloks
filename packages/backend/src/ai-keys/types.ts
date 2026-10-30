@@ -15,6 +15,7 @@ export interface ApiKeyEntry {
   id: string;
   providerId: ProviderId;
   label: string;
+  emailGroup?: string;
   key: string;
   keyValue?: string;
   status: 'active' | 'valid' | 'invalid' | 'rate-limited' | 'checking';
