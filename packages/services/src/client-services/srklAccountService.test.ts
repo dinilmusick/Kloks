@@ -313,5 +313,29 @@ describe('SrklAccountClient & mergeSrklAccounts', () => {
     await client.getByService('aiko', { forceSync: true });
     expect(fetchCount).toBe(2);
   });
+
+  it('✓ token and sessionToken header propagation', async () => {
+    let capturedHeaders: Record<string, string> = {};
+    const client = new SrklAccountClient({
+      baseUrl: 'https://srkl.example',
+      userId: 'usr-secure',
+      appId: 'aiko',
+      token: 'jwt-access-token-xyz',
+      sessionToken: 'sess-token-abc',
+      fetchImpl: async (_input, init) => {
+        capturedHeaders = init?.headers as Record<string, string>;
+        return new Response(
+          JSON.stringify({ success: true, count: 0, workspaceId: 'ws-1', accounts: [] }),
+          { status: 200 }
+        );
+      },
+    });
+
+    await client.sync();
+    expect(capturedHeaders.authorization).toBe('Bearer jwt-access-token-xyz');
+    expect(capturedHeaders['x-session-token']).toBe('sess-token-abc');
+    expect(capturedHeaders['x-user-id']).toBe('usr-secure');
+    expect(capturedHeaders['x-app-id']).toBe('aiko');
+  });
 });
 

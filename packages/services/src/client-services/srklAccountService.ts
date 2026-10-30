@@ -32,6 +32,8 @@ export interface SrklAccountClientOptions {
   baseUrl: string;
   userId: string;
   appId: string;
+  token?: string;
+  sessionToken?: string;
   fetchImpl?: typeof fetch;
 }
 
@@ -47,6 +49,8 @@ export class SrklAccountClient {
   private readonly baseUrl: string;
   private readonly userId: string;
   private readonly appId: string;
+  private readonly token?: string;
+  private readonly sessionToken?: string;
   private cachedAccounts: SrklAccount[] = [];
 
   constructor(options: SrklAccountClientOptions) {
@@ -54,6 +58,8 @@ export class SrklAccountClient {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '');
     this.userId = options.userId;
     this.appId = options.appId;
+    this.token = options.token;
+    this.sessionToken = options.sessionToken;
   }
 
   async sync(manifest: SrklAccountManifest = {}): Promise<SrklAccountSyncResult> {
@@ -62,13 +68,20 @@ export class SrklAccountClient {
       appId: manifest.appId || this.appId,
       includeCredentials: manifest.includeCredentials ?? true,
     };
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+      'x-user-id': this.userId,
+      'x-app-id': this.appId,
+    };
+    if (this.token) {
+      headers.authorization = this.token.startsWith('Bearer ') ? this.token : `Bearer ${this.token}`;
+    }
+    if (this.sessionToken) {
+      headers['x-session-token'] = this.sessionToken;
+    }
     const response = await this.fetchImpl(`${this.baseUrl}/api/ecosystem/accounts`, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-user-id': this.userId,
-        'x-app-id': this.appId,
-      },
+      headers,
       body: JSON.stringify(payload),
     });
     if (!response.ok) throw new Error(`SRKL account sync failed: ${response.status}`);
