@@ -77,6 +77,7 @@ export const AuthServiceFacade = {
   runtime: 'server' as const,
   deployment: 'local' as const,
   definition: AuthServiceDefinition,
+  get telemetry() { return authServiceInstance.telemetry; },
   createInstance: () => createService(AuthServiceDefinition),
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await authServiceInstance.start(); return authServiceInstance.call<TIn, TOut>(op, input); },
 };
@@ -119,6 +120,7 @@ export const StorageServiceFacade = {
   runtime: 'server' as const,
   deployment: 'local' as const,
   definition: StorageServiceDefinition,
+  get telemetry() { return storageServiceInstance.telemetry; },
   createInstance: () => createService(StorageServiceDefinition),
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await storageServiceInstance.start(); return storageServiceInstance.call<TIn, TOut>(op, input); },
 };
@@ -185,6 +187,7 @@ export const WorkspaceServiceFacade = {
   runtime: 'server' as const,
   deployment: 'local' as const,
   definition: WorkspaceServiceDefinition,
+  get telemetry() { return workspaceServiceInstance.telemetry; },
   createInstance: () => createService(WorkspaceServiceDefinition),
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await workspaceServiceInstance.start(); return workspaceServiceInstance.call<TIn, TOut>(op, input); },
 };
@@ -215,6 +218,7 @@ export const ControlPlaneServiceFacade = {
   runtime: 'server' as const,
   deployment: 'local' as const,
   definition: ControlPlaneServiceDefinition,
+  get telemetry() { return controlPlaneServiceInstance.telemetry; },
   createInstance: () => createService(ControlPlaneServiceDefinition),
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await controlPlaneServiceInstance.start(); return controlPlaneServiceInstance.call<TIn, TOut>(op, input); },
 };

@@ -8,12 +8,14 @@ import {
   type IService,
   type ServiceDefinition,
   type OperationContext,
+  TelemetryController,
 } from '@ultrst-armada/krnl';
 
 export class CompositeBackend implements IService {
   public readonly id: string;
   public readonly name: string;
   public readonly version: string;
+  public readonly telemetry: TelemetryController;
 
   private services: Map<string, IService> = new Map();
   private capabilitiesList: string[] = [];
@@ -22,6 +24,7 @@ export class CompositeBackend implements IService {
     this.name = name;
     this.id = `backend-${name}`;
     this.version = version;
+    this.telemetry = new TelemetryController(this.id);
   }
 
   registerService(service: IService): this {
@@ -101,21 +104,6 @@ export class CompositeBackend implements IService {
   }
 
   setState(_mutation: Partial<Record<string, unknown>>): void {}
-
-  on(event: string, handler: (payload: any) => void): () => void {
-    const [serviceName, eventName] = event.split('.');
-    const service = this.services.get(serviceName);
-    if (!service) return () => {};
-    return service.on(eventName, handler);
-  }
-
-  emit(event: string, payload: any): void {
-    const [serviceName, eventName] = event.split('.');
-    const service = this.services.get(serviceName);
-    if (service) {
-      service.emit(eventName, payload);
-    }
-  }
 
   getDefinition(): ServiceDefinition {
     const ops: Record<string, any> = {};

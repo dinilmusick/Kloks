@@ -77,18 +77,11 @@ export function createAudioHardwareService(
         ...manager.getState(),
       },
     },
-    events: {
-      stateChange: {
-        name: 'stateChange',
-        description: 'Emitted when audio hardware devices or context state change',
-      },
-    },
     lifecycle: {
       onInit: () => {
         manager.subscribe((nextState) => {
           if (svcRef) {
             svcRef.setState({ ...nextState });
-            svcRef.emit('stateChange', nextState);
           }
         });
       },
@@ -196,25 +189,11 @@ export function createMidiService(
         ...manager.getState(),
       },
     },
-    events: {
-      midiEvent: {
-        name: 'midiEvent',
-        description: 'Hardware or virtual MIDI event stream',
-      },
-      stateChange: {
-        name: 'stateChange',
-        description: 'MIDI port connection state change',
-      },
-    },
     lifecycle: {
       onInit: () => {
-        manager.subscribeEvents((ev) => {
-          if (svcRef) svcRef.emit('midiEvent', ev);
-        });
         manager.subscribeState((st) => {
           if (svcRef) {
             svcRef.setState({ ...st });
-            svcRef.emit('stateChange', st);
           }
         });
       },
@@ -244,9 +223,6 @@ export function createMidiService(
           const cmd = payload.command || payload.midiCommand || 'NOTE_ON';
           manager.emitVirtualMidi({ ...payload, command: cmd });
           unsub();
-          if (captured && svcRef) {
-            svcRef.emit('midiEvent', captured);
-          }
           return { midiEvent: captured, success: true };
         },
       },
