@@ -149,6 +149,11 @@
       "types": "./packages/fod/dist/index.d.ts",
       "import": "./packages/fod/dist/index.js",
       "default": "./packages/fod/dist/index.js"
+    },
+    "./aiko": {
+      "types": "./packages/aiko/dist/index.d.ts",
+      "import": "./packages/aiko/dist/index.js",
+      "default": "./packages/aiko/dist/index.js"
     }
   },
   "scripts": {
