@@ -14,3 +14,17 @@ describe('AikoRuntime',()=>{
   expect(agents[0].intelligenceSpec.reasoning).toBe(9);
  });
 });
+
+it('creates a custom agent with an explicit capability allow-list',async()=>{
+ const runtime=new AikoRuntime({
+  capabilities:[
+   {id:'a',name:'A',sourceKind:'endpoint',sourceId:'a',execute:async(input)=>input},
+   {id:'b',name:'B',sourceKind:'endpoint',sourceId:'b',execute:async(input)=>input}
+  ],
+  resolver:{resolve:()=>({spec:{reasoning:8}})},
+  keys:{listKeys:async()=>[],getActiveKey:async()=>null,rotateKey:async()=>null,syncFromAikoEngine:async()=>({synced:0})}
+ });
+ const agent=await runtime.createCustomAgent('Custom',['a']);
+ expect(agent.allowedToolIds).toEqual(['a']);
+ await expect(runtime.executeAgent(agent.id,{toolId:'b',input:{}})).rejects.toThrow('not permitted');
+});
