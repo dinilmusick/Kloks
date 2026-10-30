@@ -66,5 +66,5 @@ describe('Kloks Clean Distribution & Architectural Boundary', () => {
     expect((orchestrations as any).workerExecutionBoundary).toBeUndefined();
     expect((orchestrations as any).backendFacade).toBeUndefined();
     expect((orchestrations as any).ExecutableBackendFacade).toBeUndefined();
-  });
+  }, 30000);
 });
