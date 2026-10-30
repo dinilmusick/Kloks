@@ -10,6 +10,8 @@ export interface AikoTool {
   execute:(input:unknown)=>Promise<unknown>;
   sourceKind:AikoSourceKind;
   sourceId:string;
+  allowedToolIds?:string[];
+  custom?:boolean;
 }
 
 export interface AikoAgentDefinition {
@@ -53,10 +55,12 @@ export interface AikoKeyRuntime {
   listKeys():Promise<AikoKey[]>;
   getActiveKey(providerId:string):Promise<AikoKey|null>;
   rotateKey(providerId:string):Promise<AikoKey|null>;
+  addKey?(input:{providerId:string;label:string;key:string;emailGroup?:string}):Promise<AikoKey>;
   syncFromAikoEngine():Promise<{synced:number;message?:string}>;
 }
 
 export interface AikoRuntimeOptions {
+  customAgents?: AikoAgentDefinition[];
   capabilities:()=>Promise<AikoCapability[]>|AikoCapability[];
   resolver:AikoIntelligenceResolver;
   keys:AikoKeyRuntime;
