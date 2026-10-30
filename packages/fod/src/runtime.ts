@@ -23,9 +23,9 @@ export class FodRuntime {
   async getFlow(flowId:string):Promise<FodFlow|null> { return this.flowStore.get(this.options.workspaceId,flowId); }
   async saveFlow(flow:FodFlow):Promise<FodFlow> { return this.flowStore.save(this.options.workspaceId,flow); }
   async deleteFlow(flowId:string):Promise<boolean> { return this.flowStore.delete(this.options.workspaceId,flowId); }
-  async executeFlow(flowId:string):Promise<FodExecutionResult> {
+  async executeFlow(flowId:string,input?:unknown):Promise<FodExecutionResult> {
     const flow=await this.getFlow(flowId);
     if(!flow) throw new Error(`FOD flow '${flowId}' not found.`);
-    return executeFodFlow(flow,this.endpoints,this.options.onEvent);
+    return executeFodFlow(flow,this.endpoints,this.options.onEvent,input);
   }
 }

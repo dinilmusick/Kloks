@@ -6,11 +6,17 @@ export class AikoRuntime {
 
   constructor(options:AikoRuntimeOptions){this.options=options;for(const agent of options.customAgents??[])this.agents.set(agent.id,agent);}
 
-  async listCapabilities():Promise<AikoCapability[]>{return await this.options.capabilities();}
+  async listCapabilities():Promise<AikoCapability[]>{
+    const caps=this.options.capabilities;
+    return typeof caps==='function'?await caps():caps;
+  }
 
   async refreshAgents():Promise<AikoAgentDefinition[]>{
     const capabilities=await this.listCapabilities();
     const next=new Map<string,AikoAgentDefinition>();
+    for(const agent of this.agents.values()){
+      if(agent.custom||agent.sourceKind==='custom')next.set(agent.id,agent);
+    }
     for(const capability of capabilities){
       const tool={id:capability.id,name:capability.name,description:capability.description,inputSchema:capability.inputSchema,execute:capability.execute,sourceKind:capability.sourceKind,sourceId:capability.sourceId};
       const resolved=await this.options.resolver.resolve(undefined,{tool});
@@ -54,7 +60,7 @@ export class AikoRuntime {
       if(!capability)throw new Error('Capability not found.');
       return capability.execute(request.input);
     },sourceKind:'custom' as const,sourceId:name};
-    const agent:AikoAgentDefinition={schemaVersion:'1.0.0',id:'aiko-custom-'+name.toLowerCase().replace(/\\s+/g,'-'),name,description:'Custom Aiko agent',agentType:'AIKO',tool,intelligenceSpec:resolved.spec,intelligenceSpecId:resolved.specId,sourceKind:'custom',sourceId:name,allowedToolIds:capabilityIds,custom:true};
+    const agent:AikoAgentDefinition={schemaVersion:'1.0.0',id:'aiko-custom-'+name.toLowerCase().replace(/\s+/g,'-'),name,description:'Custom Aiko agent',agentType:'AIKO',tool,intelligenceSpec:resolved.spec,intelligenceSpecId:resolved.specId,sourceKind:'custom',sourceId:name,allowedToolIds:capabilityIds,custom:true};
     this.agents.set(agent.id,agent);return agent;
   }
 

@@ -1,6 +1,6 @@
 import type {FodEndpointDescriptor,FodExecutionEvent,FodExecutionResult,FodFlow} from './types.js';
 
-export async function executeFodFlow(flow:FodFlow,endpoints:Map<string,FodEndpointDescriptor>,onEvent?:(event:FodExecutionEvent)=>void):Promise<FodExecutionResult> {
+export async function executeFodFlow(flow:FodFlow,endpoints:Map<string,FodEndpointDescriptor>,onEvent?:(event:FodExecutionEvent)=>void,initialInput?:unknown):Promise<FodExecutionResult> {
   const events:FodExecutionEvent[]=[];
   const errors:Array<{nodeId?:string;message:string}>=[];
   const emit=(event:FodExecutionEvent)=>{events.push(event);onEvent?.(event);};
@@ -30,6 +30,13 @@ export async function executeFodFlow(flow:FodFlow,endpoints:Map<string,FodEndpoi
         if (!endpoint) throw new Error(`No executable endpoint registered for node '${node.type}'.`);
 
         const input:Record<string,unknown>={};
+        if(incoming(node.id).length===0 && initialInput!==undefined) {
+          if(typeof initialInput==='object' && initialInput!==null) {
+            Object.assign(input,initialInput);
+          } else {
+            input.input=initialInput;
+          }
+        }
         for(const edge of incoming(node.id)) {
           input[String(edge.targetHandle ?? 'input')]=values.get(`${edge.source}:${edge.sourceHandle ?? 'result'}`);
         }
