@@ -17,6 +17,7 @@ export * from './storageService/storage.ui.js';
 export * from './systemDb.ui.js';
 export * from './monacoIdeService.js';
 export * from './uiAuthoringService.js';
+export * from './srklAccountService.js';
 
 import { authService } from './authService.js';
 import { storageService } from './storageService.js';
