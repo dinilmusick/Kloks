@@ -69,6 +69,7 @@ export const FunctionsServiceFacade = {
   runtime: 'server' as const,
   deployment: 'local' as const,
   definition: FunctionsServiceDefinition,
+  get telemetry() { return defaultFunctionsService.telemetry; },
   createInstance: () => createService(FunctionsServiceDefinition),
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await defaultFunctionsService.start(); return defaultFunctionsService.call<TIn, TOut>(op, input); },
 };

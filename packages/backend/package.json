@@ -120,14 +120,14 @@
     "@webcontainer/api": "^1.6.4"
   },
   "peerDependencies": {
-    "better-sqlite3": "^11.0.0",
     "@aws-sdk/client-s3": "^3.600.0",
     "@aws-sdk/lib-storage": "^3.600.0",
-    "@supabase/supabase-js": "^2.45.0",
     "@neondatabase/serverless": "^0.10.0",
+    "@supabase/supabase-js": "^2.45.0",
     "bcryptjs": "^2.4.3",
-    "zod": "^3.22.0",
-    "react": "^18.0.0 || ^19.0.0"
+    "better-sqlite3": "^11.0.0",
+    "react": "^18.0.0 || ^19.0.0",
+    "zod": "^3.22.0"
   },
   "peerDependenciesMeta": {
     "better-sqlite3": {
@@ -156,6 +156,6 @@
     }
   },
   "devDependencies": {
-    "@ultrst-armada/krnl": "^1.0.3"
+    "@ultrst-armada/krnl": "^1.0.9"
   }
 }

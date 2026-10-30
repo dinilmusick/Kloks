@@ -28,6 +28,6 @@
     "@kloks/state-graph": "workspace:*"
   },
   "devDependencies": {
-    "@ultrst-armada/krnl": "^1.0.3"
+    "@ultrst-armada/krnl": "^1.0.9"
   }
 }

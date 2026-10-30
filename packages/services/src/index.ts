@@ -30,6 +30,7 @@ export interface ServiceFacade<
   readonly runtime: 'client' | 'server';
   readonly deployment: 'local' | 'remote';
   readonly definition: ServiceDefinition<TState, TEvents>;
+  readonly telemetry: import('@ultrst-armada/krnl').TelemetryController;
   createInstance(): IService<TState, TEvents>;
   execute<TIn = unknown, TOut = unknown>(operation: string, input?: TIn): Promise<TOut>;
 }
@@ -85,6 +86,7 @@ export const ServiceAFacade: ServiceFacade = {
   runtime: 'server',
   deployment: 'local',
   definition: ServiceADefinition,
+  telemetry: serviceAInstance.telemetry,
   createInstance: () => createService(ServiceADefinition),
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await serviceAInstance.start(); return serviceAInstance.call<TIn, TOut>(op, input); },
 };
@@ -144,6 +146,7 @@ export const ServiceBFacade: ServiceFacade<CounterState> = {
   runtime: 'server',
   deployment: 'local',
   definition: ServiceBDefinition,
+  get telemetry() { return defaultServiceB.telemetry; },
   createInstance: createServiceB,
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await defaultServiceB.start(); return defaultServiceB.call<TIn, TOut>(op, input); },
 };
@@ -153,17 +156,10 @@ export const ServiceBFacade: ServiceFacade<CounterState> = {
 // ══════════════════════════════════════════════════════════════════════════════
 
 export function createServiceC(): IService<Record<string, unknown>, TelemetryEvents> {
-  let instanceRef: IService<Record<string, unknown>, TelemetryEvents>;
   const def = createServiceDefinition<Record<string, unknown>, TelemetryEvents>({
     id: 'kloks.service.c',
     name: 'ServiceC',
     version: '1.0.0',
-    events: {
-      reading: {
-        name: 'reading',
-        description: 'Emitted when a new metric reading is recorded',
-      },
-    },
     operations: {
       publishReading: {
         id: 'ServiceC.publishReading',
@@ -174,14 +170,12 @@ export function createServiceC(): IService<Record<string, unknown>, TelemetryEve
             value: input.value,
             timestamp: Date.now(),
           };
-          instanceRef.emit('reading', payload);
           return payload;
         },
       },
     },
   });
-  instanceRef = createService<Record<string, unknown>, TelemetryEvents>(def);
-  return instanceRef;
+  return createService<Record<string, unknown>, TelemetryEvents>(def);
 }
 
 const defaultServiceC = createServiceC();
@@ -194,6 +188,7 @@ export const ServiceCFacade: ServiceFacade<Record<string, unknown>, TelemetryEve
   runtime: 'server',
   deployment: 'local',
   definition: ServiceCDefinition,
+  get telemetry() { return defaultServiceC.telemetry; },
   createInstance: createServiceC,
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await defaultServiceC.start(); return defaultServiceC.call<TIn, TOut>(op, input); },
 };
@@ -278,6 +273,7 @@ export const ServiceDFacade: ServiceFacade = {
   runtime: 'server',
   deployment: 'remote',
   definition: ServiceDDefinition,
+  get telemetry() { return defaultServiceD.telemetry; },
   createInstance: () => createService(ServiceDDefinition),
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await defaultServiceD.start(); return defaultServiceD.call<TIn, TOut>(op, input); },
 };
