@@ -38,7 +38,8 @@ export class AikoRuntime {
   async executeAgent(agentId:string,input:unknown):Promise<unknown>{
     const agent=this.agents.get(agentId)??(await this.refreshAgents()).find(item=>item.id===agentId);
     if(!agent)throw new Error('Aiko agent not found: '+agentId);
-    return agent.tool.execute(input);
+    const resolvedInput=typeof input==='string'&&this.options.resolveNaturalLanguage?await this.options.resolveNaturalLanguage(agent,input):input;
+    return agent.tool.execute(resolvedInput);
   }
 
   async createCustomAgent(name:string,capabilityIds:string[],specId?:string):Promise<AikoAgentDefinition>{
