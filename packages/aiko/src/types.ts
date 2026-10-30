@@ -63,5 +63,6 @@ export interface AikoRuntimeOptions {
   customAgents?: AikoAgentDefinition[];
   capabilities:()=>Promise<AikoCapability[]>|AikoCapability[];
   resolver:AikoIntelligenceResolver;
+  resolveNaturalLanguage?: (agent:AikoAgentDefinition,input:string)=>Promise<unknown>;
   keys:AikoKeyRuntime;
 }
