@@ -109,6 +109,10 @@ export class KeyStoreService {
     return this.getActiveKey(providerId);
   }
 
+  rotateKey(providerId: ProviderId): ApiKeyEntry | null {
+    return this.getNextKey(providerId);
+  }
+
   updateKeyLabel(id: string, label: string): ApiKeyEntry | undefined {
     const key = this.getKey(id);
     if (!key) return undefined;

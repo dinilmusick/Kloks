@@ -190,8 +190,11 @@ export const AIKeyServiceFacade = {
   deployment: 'local' as const,
   getKeys: (providerId?: string, modelId?: string) => keyStore.getKeys(providerId as any, modelId),
   getStrategy: () => keyStore.getStrategy(),
-  getUsageStats: (keyId?: string, modelId?: string) => keyStore.getUsageStats(keyId, modelId),
   addKey: (input: any) => keyStore.addKey(input),
+  getActiveKey: (providerId: string) => keyStore.getActiveKey(providerId),
+  rotateKey: (providerId: string) => keyStore.rotateKey(providerId),
+  importKeys: (payload: unknown) => keyStore.importKeys(payload),
+  exportKeysStructured: () => keyStore.exportKeysStructured(),
   definition: AIKeyServiceDefinition,
   createInstance: () => createService(AIKeyServiceDefinition),
   execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => {

@@ -25,7 +25,7 @@ export async function executeFodFlow(flow:FodFlow,endpoints:Map<string,FodEndpoi
       remaining.delete(node.id);
       emit({type:'node-started',timestamp:Date.now(),flowId:flow.id,nodeId:node.id});
       try {
-        const endpointId=String(node.data.endpointId ?? node.data.apiId ?? node.type.replace(/^(host|gutts)\//,''));
+        const endpointId=String(node.data?.endpointId ?? node.data?.apiId ?? node.type.replace(/^(host|gutts)\//,''));
         const endpoint=endpoints.get(endpointId);
         if (!endpoint) throw new Error(`No executable endpoint registered for node '${node.type}'.`);
 
@@ -40,7 +40,7 @@ export async function executeFodFlow(flow:FodFlow,endpoints:Map<string,FodEndpoi
         for(const edge of incoming(node.id)) {
           input[String(edge.targetHandle ?? 'input')]=values.get(`${edge.source}:${edge.sourceHandle ?? 'result'}`);
         }
-        const configured=(node.data.inputs ?? {}) as Record<string,unknown>;
+        const configured=(node.data?.inputs ?? {}) as Record<string,unknown>;
         Object.assign(input,configured);
         const result=await endpoint.invoke(input);
         outputs[node.id]=result;
