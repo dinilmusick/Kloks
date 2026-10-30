@@ -237,4 +237,81 @@ describe('SrklAccountClient & mergeSrklAccounts', () => {
     expect(unrelated?.name).toBe('Unsynced Local Item');
     expect(unrelated?.customLocalProperty).toBe('preserve-always');
   });
+
+  it('✓ includeCredentials flag propagation & presentation list vs privileged sync', async () => {
+    const bodies: any[] = [];
+    const client = new SrklAccountClient({
+      baseUrl: 'https://srkl.example',
+      userId: 'usr-1',
+      appId: 'aiko',
+      fetchImpl: async (_input, init) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return new Response(
+          JSON.stringify({ success: true, count: 0, workspaceId: 'ws-1', accounts: [] }),
+          { status: 200 }
+        );
+      },
+    });
+
+    await client.sync();
+    expect(bodies[0].includeCredentials).toBe(true);
+
+    await client.list();
+    expect(bodies[1].includeCredentials).toBe(false);
+  });
+
+  it('✓ local client-side caching & offline getCachedByService avoids network calls', async () => {
+    let fetchCount = 0;
+    const client = new SrklAccountClient({
+      baseUrl: 'https://srkl.example',
+      userId: 'usr-1',
+      appId: 'aiko',
+      fetchImpl: async () => {
+        fetchCount++;
+        return new Response(
+          JSON.stringify({
+            success: true,
+            count: 1,
+            workspaceId: 'ws-1',
+            accounts: [
+              {
+                id: 'acc-aiko',
+                serviceId: 'aiko',
+                provider: 'AIKO',
+                category: 'ai',
+                name: 'Aiko Gateway',
+                status: 'CONNECTED',
+                credentials: { apiKey: 'cached-sk-123' },
+              },
+            ],
+          }),
+          { status: 200 }
+        );
+      },
+    });
+
+    // Before sync: cache is empty
+    expect(client.getCachedAccounts()).toHaveLength(0);
+    expect(client.getCachedByService('aiko')).toBeUndefined();
+
+    // Perform explicit sync: updates cache
+    await client.sync();
+    expect(fetchCount).toBe(1);
+    expect(client.getCachedAccounts()).toHaveLength(1);
+
+    // getCachedByService reads from cache with 0 network calls
+    const cached = client.getCachedByService('aiko');
+    expect(cached?.credentials?.apiKey).toBe('cached-sk-123');
+    expect(fetchCount).toBe(1);
+
+    // getByService without forceSync uses cache with 0 network calls
+    const resolved = await client.getByService('aiko');
+    expect(resolved?.id).toBe('acc-aiko');
+    expect(fetchCount).toBe(1);
+
+    // getByService with forceSync: true triggers network call
+    await client.getByService('aiko', { forceSync: true });
+    expect(fetchCount).toBe(2);
+  });
 });
+

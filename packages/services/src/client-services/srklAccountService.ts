@@ -25,6 +25,7 @@ export interface SrklAccountManifest {
   appName?: string;
   categories?: EcosystemServiceCategory[];
   requiredServices?: string[];
+  includeCredentials?: boolean;
 }
 
 export interface SrklAccountClientOptions {
@@ -46,6 +47,7 @@ export class SrklAccountClient {
   private readonly baseUrl: string;
   private readonly userId: string;
   private readonly appId: string;
+  private cachedAccounts: SrklAccount[] = [];
 
   constructor(options: SrklAccountClientOptions) {
     this.fetchImpl = options.fetchImpl || fetch;
@@ -55,6 +57,11 @@ export class SrklAccountClient {
   }
 
   async sync(manifest: SrklAccountManifest = {}): Promise<SrklAccountSyncResult> {
+    const payload = {
+      ...manifest,
+      appId: manifest.appId || this.appId,
+      includeCredentials: manifest.includeCredentials ?? true,
+    };
     const response = await this.fetchImpl(`${this.baseUrl}/api/ecosystem/accounts`, {
       method: 'POST',
       headers: {
@@ -62,18 +69,38 @@ export class SrklAccountClient {
         'x-user-id': this.userId,
         'x-app-id': this.appId,
       },
-      body: JSON.stringify({ ...manifest, appId: manifest.appId || this.appId }),
+      body: JSON.stringify(payload),
     });
     if (!response.ok) throw new Error(`SRKL account sync failed: ${response.status}`);
-    return response.json() as Promise<SrklAccountSyncResult>;
+    const result = (await response.json()) as SrklAccountSyncResult;
+    this.cachedAccounts = result.accounts || [];
+    return result;
   }
 
   async list(manifest: SrklAccountManifest = {}): Promise<SrklAccountSyncResult> {
-    return this.sync(manifest);
+    return this.sync({
+      ...manifest,
+      includeCredentials: manifest.includeCredentials ?? false,
+    });
   }
 
-  async getByService(serviceId: string): Promise<SrklAccount | undefined> {
-    const result = await this.sync({ requiredServices: [serviceId] });
+  getCachedAccounts(): SrklAccount[] {
+    return this.cachedAccounts;
+  }
+
+  getCachedByService(serviceId: string): SrklAccount | undefined {
+    return this.cachedAccounts.find((account) =>
+      account.serviceId.toLowerCase() === serviceId.toLowerCase() ||
+      account.provider.toLowerCase() === serviceId.toLowerCase()
+    );
+  }
+
+  async getByService(serviceId: string, options?: { forceSync?: boolean }): Promise<SrklAccount | undefined> {
+    if (!options?.forceSync) {
+      const cached = this.getCachedByService(serviceId);
+      if (cached) return cached;
+    }
+    const result = await this.sync({ requiredServices: [serviceId], includeCredentials: true });
     return result.accounts.find((account) =>
       account.serviceId.toLowerCase() === serviceId.toLowerCase() ||
       account.provider.toLowerCase() === serviceId.toLowerCase()
