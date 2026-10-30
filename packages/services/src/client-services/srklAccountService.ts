@@ -49,7 +49,7 @@ export class SrklAccountClient {
 
   constructor(options: SrklAccountClientOptions) {
     this.fetchImpl = options.fetchImpl || fetch;
-    this.baseUrl = options.baseUrl.replace(/\/$/, '');
+    this.baseUrl = options.baseUrl.replace(/\/+$/, '');
     this.userId = options.userId;
     this.appId = options.appId;
   }
