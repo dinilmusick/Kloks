@@ -44,6 +44,7 @@ describe('semantic orchestrator',()=>{
     const source=new CapabilityRequirementSource(registry,{async execute(c,input){expect(c.id).toBe('customer.lookup');expect(input).toEqual({email:'a@b.com'});return 'cust-1';}});
     const resolver=new RequirementResolver(registry,[source]);
     const task=tasks.create('lookup customer');
+    task.context.requirements.push({id:'email',semanticType:'email',description:'Email',required:true,sourceCapability:'customer.lookup',sourceField:'email',value:'a@b.com'});
     const req={id:'customer',semanticType:'customerId',description:'Customer id',required:true,sourceCapability:'order.create'};
     task.context.requirements.push({...req});
     const result=await resolver.resolve(req,{runtime,task:task.context,capabilities:registry.list()});
