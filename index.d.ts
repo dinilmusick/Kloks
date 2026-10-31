@@ -7,3 +7,4 @@ export * from './packages/orchestrations/dist/index.d.ts';
 export * from './packages/contracts/dist/index.d.ts';
 export * from './packages/fod/dist/index.d.ts';
 export * from './packages/aiko/dist/index.d.ts';
+export * from './packages/semantic-runtime/dist/index.d.ts';

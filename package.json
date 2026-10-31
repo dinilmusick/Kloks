@@ -1,6 +1,6 @@
 {
   "name": "@ultrst-armada/kloks",
-  "version": "1.22.2",
+  "version": "1.23.0",
   "private": false,
   "publishConfig": {
     "access": "public",
@@ -17,7 +17,9 @@
     "packages/*/dist/**",
     "packages/*/package.json",
     "packages/*/kloks.manifest.json",
-    ".krusbl-release-attestation.json"
+    ".krusbl-release-attestation.json",
+    "packages/semantic-runtime/dist/**",
+    "packages/semantic-runtime/package.json"
   ],
   "exports": {
     ".": {
@@ -154,6 +156,11 @@
       "types": "./packages/aiko/dist/index.d.ts",
       "import": "./packages/aiko/dist/index.js",
       "default": "./packages/aiko/dist/index.js"
+    },
+    "./semantic-runtime": {
+      "types": "./packages/semantic-runtime/dist/index.d.ts",
+      "import": "./packages/semantic-runtime/dist/index.js",
+      "default": "./packages/semantic-runtime/dist/index.js"
     }
   },
   "scripts": {

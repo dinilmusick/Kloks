@@ -7,3 +7,4 @@ export * from './packages/orchestrations/dist/index.js';
 export * from './packages/contracts/dist/index.js';
 export * from './packages/fod/dist/index.js';
 export * from './packages/aiko/dist/index.js';
+export * from './packages/semantic-runtime/dist/index.js';
