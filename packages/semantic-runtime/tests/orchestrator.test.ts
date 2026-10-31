@@ -50,4 +50,35 @@ describe('semantic orchestrator',()=>{
     const result=await resolver.resolve(req,{runtime,task:task.context,capabilities:registry.list()});
     expect(result).toMatchObject({resolved:true,value:'cust-1',source:'capability-execution'});
   });
+
+  it('resolves chained provider dependencies before execution',async()=>{
+    const registry=new CapabilityRegistry();
+    registry.register({
+      id:'account.lookup',name:'Lookup account',description:'Finds account',kind:'endpoint',
+      provides:[{semanticType:'accountId'}],
+      requirements:[{id:'email',semanticType:'email',description:'Email',required:true,sourceField:'email'}]
+    });
+    registry.register({
+      id:'account.balance',name:'Get balance',description:'Gets account balance',kind:'endpoint',
+      provides:[{semanticType:'balance'}],
+      requirements:[{id:'account',semanticType:'accountId',description:'Account',required:true,sourceField:'accountId'}]
+    });
+    const tasks=new TaskRuntime();
+    const task=tasks.create('get my balance');
+    task.context.requirements.push({
+      id:'email',semanticType:'email',description:'Email',required:true,
+      sourceCapability:'account.balance',value:'a@b.com'
+    });
+    const calls:string[]=[];
+    const source=new CapabilityRequirementSource(registry,{async execute(cap,input)=>{
+      calls.push(cap.id+JSON.stringify(input));
+      return cap.id==='account.lookup'?'acct-1':42;
+    }});
+    const result=await new RequirementResolver(registry,[source]).resolve(
+      {id:'balance',semanticType:'balance',description:'Balance',required:true,sourceCapability:'account.balance'},
+      {runtime,task:task.context,capabilities:registry.list()}
+    );
+    expect(result).toMatchObject({resolved:true,value:42});
+    expect(calls).toEqual(['account.lookup{"email":"a@b.com"}','account.balance{"accountId":"acct-1"}']);
+  });
 });
