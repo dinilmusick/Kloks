@@ -3,6 +3,7 @@ import {CapabilityRegistry} from './registry.js';
 import {RequirementResolver} from './resolution.js';
 import {TaskGraphRuntime} from './graph.js';
 import {TaskRuntime} from './tasks.js';
+import {CapabilityExecutionRuntime,type AuthorizationPolicy} from './execution.js';
 
 export interface SemanticPlanner {
   plan(request:string,context:AgentContext):Promise<SemanticPlan>;
@@ -26,6 +27,7 @@ export class SemanticOrchestrator {
     private readonly requirements:RequirementResolver,
     private readonly planner:SemanticPlanner,
     private readonly executor:SemanticExecutionAdapter,
+    private readonly authorization?:AuthorizationPolicy,
   ) {}
 
   async run(task:Task,context:AgentContext):Promise<OrchestrationResult>{
@@ -55,7 +57,9 @@ export class SemanticOrchestrator {
           const capability=this.capabilities.get(node.capabilityId);
           if(!capability) throw new Error(`Unknown capability: ${node.capabilityId}`);
           const input=this.resolveInput(node.input,task.context.requirements);
-          const value=await this.executor.execute(capability,input,context);
+          const value=this.authorization
+            ? (await new CapabilityExecutionRuntime(this.authorization).execute(capability,input,context,this.executor)).artifact.value
+            : await this.executor.execute(capability,input,context);
           outputs.push(value);
           this.graphs.transition(graph.id,node.id,'completed');
         }));
