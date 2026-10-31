@@ -30,6 +30,7 @@ export interface RuntimeContext {
 export interface TaskContext {
   taskId:string; parentTaskId?:string; request:string;
   intent?:string; requirements:Requirement[]; artifacts:Artifact[];
+  contextId?:string;
 }
 
 export interface KnowledgeContext {
@@ -46,7 +47,21 @@ export interface Artifact {
   taskId:string; provenance?:Record<string,unknown>;
 }
 
-export interface SemanticRequest { id:string; contextId:string; input:string; intent?:string; requirements?:Requirement[]; metadata?:Record<string,unknown>; }\n\nexport interface TaskNode { id:string; capabilityId:string; dependsOn:string[]; input?:unknown; status:TaskStatus; }\n\nexport interface TaskGraph { id:string; requestId:string; nodes:TaskNode[]; }\n\nexport interface Task {
+export interface SemanticRequest {
+  id:string; contextId:string; input:string; intent?:string;
+  requirements?:Requirement[]; metadata?:Record<string,unknown>;
+}
+
+export interface TaskNode {
+  id:string; capabilityId:string; dependsOn:string[];
+  input?:unknown; status:TaskStatus;
+}
+
+export interface TaskGraph {
+  id:string; requestId:string; nodes:TaskNode[];
+}
+
+export interface Task {
   id:string; status:TaskStatus; request:string;
   context:TaskContext; result?:unknown; error?:string;
 }
