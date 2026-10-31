@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {CapabilityRegistry,RequirementResolver,TaskRuntime} from '../src/index.js';
+import {CapabilityRegistry,RequirementResolver,TaskRuntime,TaskGraphRuntime} from '../src/index.js';
 
 describe('semantic runtime',()=>{
   it('registers and discovers capabilities',()=>{
@@ -14,9 +14,9 @@ describe('semantic runtime',()=>{
     expect(result.resolved).toBe(false);
     expect(result.reason).toBe('NO_INTERNAL_RESOLUTION');
   });
-  it('supports resumable task states',()=>{
+  it('creates dependency-aware task graphs',()=>{\n    const graph=new TaskGraphRuntime().create('r1',[{id:'a',capabilityId:'a',dependsOn:[]},{id:'b',capabilityId:'b',dependsOn:['a']}]);\n    expect(graph.nodes.find(n=>n.id==='a')?.status).toBe('submitted');\n  });\n  it('supports resumable task states',()=>{
     const runtime=new TaskRuntime(); const task=runtime.create('create invoice');
-    runtime.transition(task.id,'waiting-for-user');
-    expect(runtime.get(task.id)?.status).toBe('waiting-for-user');
+    runtime.transition(task.id,'input-required');
+    expect(runtime.get(task.id)?.status).toBe('input-required');
   });
 });
