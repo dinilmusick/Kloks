@@ -24,7 +24,8 @@ export class TaskRuntime {
     const task=this.mustGet(id); task.status=status; this.store.set(task); this.events?.emit({type:'task.status',task}); return task;
   }
   addRequirement(id:string,requirement:TaskContext['requirements'][number]):Task {
-    const task=this.mustGet(id); task.context.requirements.push(requirement);
+    const task=this.mustGet(id); const existing=task.context.requirements.find(r=>r.id===requirement.id);
+    if(existing) Object.assign(existing,requirement); else task.context.requirements.push(requirement);
     task.status='input-required'; this.store.set(task); this.events?.emit({type:'task.requirement',task}); return task;
   }
   addArtifact(id:string,artifact:Artifact):Task {
