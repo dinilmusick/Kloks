@@ -33,7 +33,10 @@ export class SemanticOrchestrator {
     try {
       const plan=await this.planner.plan(task.request,context);
       task.context.intent=plan.intent;
-      if(plan.requirements?.length) task.context.requirements.push(...plan.requirements);
+      if(plan.requirements?.length) for(const requirement of plan.requirements){
+        const existing=task.context.requirements.find(r=>r.id===requirement.id);
+        if(existing) Object.assign(existing,{...requirement,value:existing.value}); else task.context.requirements.push(requirement);
+      }
 
       for(const requirement of task.context.requirements){
         if(!requirement.required || requirement.value!==undefined) continue;
