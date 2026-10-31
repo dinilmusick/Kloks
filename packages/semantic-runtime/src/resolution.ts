@@ -34,13 +34,30 @@ export class CapabilityRequirementSource implements RequirementSource {
   async resolve(requirement:Requirement,context:AgentContext):Promise<unknown> {
     const candidates=this.registry.findProviders(requirement.semanticType);
     if(candidates.length===0) throw new Error(`No capability provides ${requirement.semanticType}`);
-    const capability=candidates[0];
+    return this.executeProvider(candidates[0],context,new Set([candidates[0].id]));
+  }
+
+  private async executeProvider(
+    capability:CapabilityDescriptor,
+    context:AgentContext,
+    visiting:Set<string>,
+  ):Promise<unknown>{
     const input:Record<string,unknown>={};
-    for(const template of capability.requirements??[]) {
+    for(const template of capability.requirements??[]){
       if(!template.required) continue;
-      const existing=context.task.requirements.find(r=>r.semanticType===template.semanticType && r.value!==undefined);
-      if(existing){ input[template.sourceField??template.id]=existing.value; continue; }
-      throw new Error(`CAPABILITY_REQUIRES_EXECUTION:${capability.id}:${template.semanticType}`);
+      const existing=context.task.requirements.find(r=>r.semanticType===template.semanticType&&r.value!==undefined);
+      if(existing){
+        input[template.sourceField??template.id]=existing.value;
+        continue;
+      }
+      const providers=this.registry.findProviders(template.semanticType).filter(candidate=>!visiting.has(candidate.id));
+      if(!providers.length)
+        throw new Error(`CAPABILITY_REQUIRES_EXECUTION:${capability.id}:${template.semanticType}`);
+      const provider=providers[0];
+      visiting.add(provider.id);
+      const value=await this.executeProvider(provider,context,visiting);
+      input[template.sourceField??template.id]=value;
+      visiting.delete(provider.id);
     }
     return this.executor.execute(capability,input,context);
   }
