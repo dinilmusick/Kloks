@@ -4,3 +4,6 @@ export * from './context.js';
 export * from './resolution.js';
 export * from './tasks.js';
 export * from './graph.js';
+export * from './agent.js';
+export * from './request.js';
+export * from './execution.js';
