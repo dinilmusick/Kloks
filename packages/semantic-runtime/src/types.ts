@@ -3,10 +3,18 @@ export type TaskStatus='submitted'|'working'|'input-required'|'auth-required'|'c
 
 export interface JsonSchema { type?:string; properties?:Record<string,unknown>; required?:string[]; [key:string]:unknown }
 
+export interface SemanticValueDescriptor {
+  semanticType:string;
+  description?:string;
+  constraints?:Record<string,unknown>;
+}
+
 export interface CapabilityDescriptor {
   id:string; name:string; description:string; kind:CapabilityKind;
   inputSchema?:JsonSchema; outputSchema?:JsonSchema;
-  requirements?:RequirementTemplate[]; examples?:unknown[];
+  requirements?:RequirementTemplate[];
+  provides?:SemanticValueDescriptor[];
+  examples?:unknown[];
   sideEffects?:'read'|'compute'|'write'|'external'|'irreversible';
   metadata?:Record<string,unknown>;
 }
@@ -19,7 +27,7 @@ export interface RequirementTemplate {
 export interface Requirement {
   id:string; semanticType:string; description:string; required:boolean;
   sourceCapability:string; sourceField?:string;
-  constraints?:Record<string,unknown>;
+  constraints?:Record<string,unknown>; value?:unknown;
 }
 
 export interface RuntimeContext {
@@ -64,4 +72,10 @@ export interface TaskGraph {
 export interface Task {
   id:string; status:TaskStatus; request:string;
   context:TaskContext; result?:unknown; error?:string;
+}
+
+export interface SemanticPlan {
+  intent?:string;
+  nodes:Omit<TaskNode,'status'>[];
+  requirements?:Requirement[];
 }
