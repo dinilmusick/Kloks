@@ -1,5 +1,5 @@
 export type CapabilityKind='endpoint'|'service'|'fod-flow'|'gutts'|'knowledge'|'agent';
-export type TaskStatus='submitted'|'planning'|'waiting-for-resolution'|'waiting-for-user'|'ready'|'executing'|'completed'|'failed'|'cancelled';
+export type TaskStatus='submitted'|'working'|'input-required'|'auth-required'|'completed'|'failed'|'canceled'|'rejected';
 
 export interface JsonSchema { type?:string; properties?:Record<string,unknown>; required?:string[]; [key:string]:unknown }
 
@@ -46,7 +46,7 @@ export interface Artifact {
   taskId:string; provenance?:Record<string,unknown>;
 }
 
-export interface Task {
+export interface SemanticRequest { id:string; contextId:string; input:string; intent?:string; requirements?:Requirement[]; metadata?:Record<string,unknown>; }\n\nexport interface TaskNode { id:string; capabilityId:string; dependsOn:string[]; input?:unknown; status:TaskStatus; }\n\nexport interface TaskGraph { id:string; requestId:string; nodes:TaskNode[]; }\n\nexport interface Task {
   id:string; status:TaskStatus; request:string;
   context:TaskContext; result?:unknown; error?:string;
 }
