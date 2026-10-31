@@ -8,3 +8,4 @@ export * from './agent.js';
 export * from './request.js';
 export * from './execution.js';
 export * from './orchestrator.js';
+export * from './conversation.js';
