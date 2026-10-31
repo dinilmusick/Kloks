@@ -13,9 +13,9 @@ class MemoryTaskStore implements TaskStore {
 export class TaskRuntime {
   private readonly store:TaskStore;
   constructor(store:TaskStore=new MemoryTaskStore(),private readonly events?:TaskEventSink){this.store=store;}
-  create(request:string,parentTaskId?:string):Task {
+  create(request:string,parentTaskId?:string,contextId=crypto.randomUUID()):Task {
     const id=crypto.randomUUID();
-    const context:TaskContext={taskId:id,parentTaskId,request,requirements:[],artifacts:[],contextId:parentTaskId};
+    const context:TaskContext={taskId:id,parentTaskId,request,requirements:[],artifacts:[],contextId};
     const task:Task={id,status:'submitted',request,context};
     this.store.set(task); this.events?.emit({type:'task.created',task}); return task;
   }
