@@ -59,9 +59,10 @@ export class RequirementResolver {
       if(await source.canResolve(requirement,context))
         return {resolved:true,value:await source.resolve(requirement,context),source:source.name};
     }
-    const candidates=this.registry.findProviders(requirement.semanticType);
-    if(candidates.length===0)
-      return {resolved:false,reason:'NO_INTERNAL_RESOLUTION'};
-    return {resolved:false,reason:'CAPABILITY_REQUIRES_EXECUTION',capabilityId:candidates[0].id};
+    const providers=this.registry.findProviders(requirement.semanticType);
+    if(providers.length) return {resolved:false,reason:'CAPABILITY_REQUIRES_EXECUTION',capabilityId:providers[0].id};
+    const candidates=this.registry.list().filter(capability=>capability.inputSchema?.properties?.[requirement.sourceField??'']!==undefined);
+    if(candidates.length) return {resolved:false,reason:'CAPABILITY_REQUIRES_EXECUTION',capabilityId:candidates[0].id};
+    return {resolved:false,reason:'NO_INTERNAL_RESOLUTION'};
   }
 }
