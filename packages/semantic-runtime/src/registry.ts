@@ -13,6 +13,15 @@ export class CapabilityRegistry {
   list():CapabilityDescriptor[] { return [...this.items.values()]; }
 
   findBySemanticType(semanticType:string):CapabilityDescriptor[] {
-    return this.list().filter(c=>(c.requirements??[]).some(r=>r.semanticType===semanticType));
+    return this.list().filter(c=>
+      (c.requirements??[]).some(r=>r.semanticType===semanticType) ||
+      (c.provides??[]).some(p=>p.semanticType===semanticType)
+    );
+  }
+
+  findProviders(semanticType:string):CapabilityDescriptor[] {
+    return this.list().filter(c=>
+      (c.provides??[]).some(p=>p.semanticType===semanticType)
+    );
   }
 }
