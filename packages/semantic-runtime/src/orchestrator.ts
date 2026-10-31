@@ -57,10 +57,11 @@ export class SemanticOrchestrator {
           const capability=this.capabilities.get(node.capabilityId);
           if(!capability) throw new Error(`Unknown capability: ${node.capabilityId}`);
           const input=this.resolveInput(node.input,task.context.requirements);
-          const value=this.authorization
-            ? (await new CapabilityExecutionRuntime(this.authorization).execute(capability,input,context,this.executor)).artifact.value
-            : await this.executor.execute(capability,input,context);
-          outputs.push(value);
+          const executionResult=this.authorization
+            ? await new CapabilityExecutionRuntime(this.authorization).execute(capability,input,context,this.executor)
+            : await new CapabilityExecutionRuntime().execute(capability,input,context,this.executor);
+          this.tasks.addArtifact(task.id,executionResult.artifact);
+          outputs.push(executionResult.artifact.value);
           this.graphs.transition(graph.id,node.id,'completed');
         }));
       }

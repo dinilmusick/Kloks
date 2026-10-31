@@ -70,7 +70,7 @@ describe('semantic orchestrator',()=>{
       sourceCapability:'account.balance',value:'a@b.com'
     });
     const calls:string[]=[];
-    const source=new CapabilityRequirementSource(registry,{async execute(cap,input)=>{
+    const source=new CapabilityRequirementSource(registry,{async execute(cap,input){
       calls.push(cap.id+JSON.stringify(input));
       return cap.id==='account.lookup'?'acct-1':42;
     }});

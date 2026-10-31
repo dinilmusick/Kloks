@@ -48,7 +48,12 @@ export class ConversationRuntime {
 
   async send(input:string,conversationId?:string,taskId?:string):Promise<OrchestrationResult>{
     const conversation=this.getOrCreate(conversationId);
-    const task=taskId?this.options.tasks.get(taskId):undefined;
+    let task=taskId?this.options.tasks.get(taskId):undefined;
+    if(!task && conversation.taskIds.length>0){
+      const lastTaskId=conversation.taskIds[conversation.taskIds.length-1];
+      const candidate=this.options.tasks.get(lastTaskId);
+      if(candidate && candidate.status==='input-required') task=candidate;
+    }
     const activeTask=task??this.options.tasks.create(input,undefined,conversation.id);
     if(!task) conversation.taskIds.push(activeTask.id);
     conversation.messages.push({

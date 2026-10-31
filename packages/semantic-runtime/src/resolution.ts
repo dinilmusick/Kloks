@@ -77,9 +77,9 @@ export class RequirementResolver {
         return {resolved:true,value:await source.resolve(requirement,context),source:source.name};
     }
     const providers=this.registry.findProviders(requirement.semanticType);
-    if(providers.length) return {resolved:false,reason:'CAPABILITY_REQUIRES_EXECUTION',capabilityId:providers[0].id};
+    if(providers.length) return {resolved:false,reason:'CAPABILITY_REQUIRES_EXECUTION',source:providers[0].id,capabilityId:providers[0].id};
     const candidates=this.registry.list().filter(capability=>capability.inputSchema?.properties?.[requirement.sourceField??'']!==undefined);
-    if(candidates.length) return {resolved:false,reason:'CAPABILITY_REQUIRES_EXECUTION',capabilityId:candidates[0].id};
+    if(candidates.length) return {resolved:false,reason:'CAPABILITY_REQUIRES_EXECUTION',source:candidates[0].id,capabilityId:candidates[0].id};
     return {resolved:false,reason:'NO_INTERNAL_RESOLUTION'};
   }
 }

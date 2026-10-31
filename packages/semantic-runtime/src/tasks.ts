@@ -1,4 +1,5 @@
 import type {Artifact,Task,TaskContext,TaskStatus} from './types.js';
+export type { Task } from './types.js';
 
 export interface TaskStore { get(id:string):Task|undefined; set(task:Task):void; list():Task[]; }
 export interface TaskEventSink { emit(event:{type:string;task:Task}):void; }
@@ -20,6 +21,7 @@ export class TaskRuntime {
     this.store.set(task); this.events?.emit({type:'task.created',task}); return task;
   }
   get(id:string):Task|undefined{return this.store.get(id);}
+  list():Task[]{return this.store.list();}
   transition(id:string,status:TaskStatus):Task {
     const task=this.mustGet(id); task.status=status; this.store.set(task); this.events?.emit({type:'task.status',task}); return task;
   }

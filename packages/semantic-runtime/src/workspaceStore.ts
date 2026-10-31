@@ -1,5 +1,6 @@
 import type {Conversation,ConversationStore} from './conversation.js';
-import type {Task,TaskStore} from './tasks.js';
+import type {Task} from './types.js';
+import type {TaskStore} from './tasks.js';
 
 export interface WorkspaceFileAdapter {
   readFile(workspaceId:string,path:string):Promise<string|Uint8Array>;
