@@ -23,7 +23,6 @@ export * from './server/index.js';
 export * from './krnl-services.js';
 export * from './resourceEngine/index.js';
 export * from './resolver/systemDatabaseUrl.js';
-export * from './development/index.js';
 
 export {
   authorizeB2,
