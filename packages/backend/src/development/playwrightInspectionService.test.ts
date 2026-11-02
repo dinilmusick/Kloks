@@ -60,8 +60,10 @@ describe('PlaywrightInspectionRuntime', () => {
       expect(result.errors.some(item => item.kind === 'http' && item.status === 404)).toBe(true);
       expect(result.checks.every(item => item.passed)).toBe(true);
       expect(result.screenshots).toHaveLength(2);
+      expect(result.reportPath).toBe(join(directory, 'report.json'));
       expect(result.domSnapshot).toContain('Rendered application');
       expect(await readFile(result.screenshots[0])).toBeTruthy();
+      expect(JSON.parse(await readFile(result.reportPath!, 'utf8')).errors).toHaveLength(result.errors.length);
     } finally {
       if (!process.env.CI) await rm(directory, { recursive: true, force: true });
     }
@@ -73,9 +75,12 @@ describe('PlaywrightInspectionRuntime', () => {
       timeoutMs: 10000,
       waitUntil: 'domcontentloaded',
       checks: [{ selector: 'h1', text: 'Clean page' }],
+      captureDom: true,
     });
     expect(result.checks[0]?.passed).toBe(true);
     expect(result.ok).toBe(true);
     expect(result.errors).toHaveLength(0);
+    expect(result.screenshots).toHaveLength(2);
+    expect(result.reportPath).toBeTruthy();
   });
 });
