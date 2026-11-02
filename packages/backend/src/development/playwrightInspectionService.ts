@@ -71,7 +71,12 @@ export class PlaywrightInspectionRuntime {
     const checks: InspectionCheckResult[] = [];
     const screenshots: string[] = [];
     const timeout = request.timeoutMs ?? 15000;
-    const browser = await loadPlaywright().chromium.launch({ headless: true });
+    let browser: BrowserLike;
+    try { browser = await loadPlaywright().chromium.launch({ headless: true }); }
+    catch (cause) {
+      error(errors, 'browser', cause instanceof Error ? cause.message : String(cause), request.url);
+      return { ok: false, url: request.url, durationMs: Date.now() - started, errors, checks, screenshots };
+    }
     const context = await browser.newContext({ ignoreHTTPSErrors: false });
     const page = await context.newPage();
     let status: number | undefined;
@@ -103,17 +108,21 @@ export class PlaywrightInspectionRuntime {
       try { title = await page.title(); } catch {}
       for (const check of request.checks ?? []) checks.push(await runCheck(page, check));
       for (const viewport of request.viewports ?? [{ width: 1440, height: 900 }]) {
-        await page.setViewportSize(viewport);
-        if (request.screenshotDirectory) {
-          await mkdir(request.screenshotDirectory, { recursive: true });
-          const path = join(request.screenshotDirectory, `inspection-${viewport.width}x${viewport.height}.png`);
-          await page.screenshot({ path, fullPage: true });
-          screenshots.push(path);
-        }
+        try {
+          await page.setViewportSize(viewport);
+          if (request.screenshotDirectory) {
+            await mkdir(request.screenshotDirectory, { recursive: true });
+            const path = join(request.screenshotDirectory, `inspection-${viewport.width}x${viewport.height}.png`);
+            await page.screenshot({ path, fullPage: true });
+            screenshots.push(path);
+          }
+        } catch (cause) { error(errors, 'screenshot', cause instanceof Error ? cause.message : String(cause), request.url); }
       }
       if (request.captureDom) {
-        const html = await page.content();
-        domSnapshot = html.slice(0, request.maxDomCharacters ?? 40000);
+        try {
+          const html = await page.content();
+          domSnapshot = html.slice(0, request.maxDomCharacters ?? 40000);
+        } catch (cause) { error(errors, 'dom', cause instanceof Error ? cause.message : String(cause), request.url); }
       }
     } finally {
       await page.close().catch(() => undefined);
