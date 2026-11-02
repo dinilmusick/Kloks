@@ -37,13 +37,14 @@ afterAll(async () => { await closeServer?.(); });
 
 describe('PlaywrightInspectionRuntime', () => {
   it('captures browser, HTTP and rendered-page evidence', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'kloks-playwright-'));
+    const directory = process.env.CI ? join(process.cwd(), 'artifacts/playwright') : await mkdtemp(join(tmpdir(), 'kloks-playwright-'));
     try {
       const result = await new PlaywrightInspectionRuntime().inspect({
         url: origin,
         timeoutMs: 10000,
         waitUntil: 'networkidle',
         screenshotDirectory: directory,
+        reportPath: join(directory, 'report.json'),
         captureDom: true,
         checks: [
           { selector: 'h1', visible: true, text: 'Rendered application' },
@@ -62,7 +63,7 @@ describe('PlaywrightInspectionRuntime', () => {
       expect(result.domSnapshot).toContain('Rendered application');
       expect(await readFile(result.screenshots[0])).toBeTruthy();
     } finally {
-      await rm(directory, { recursive: true, force: true });
+      if (!process.env.CI) await rm(directory, { recursive: true, force: true });
     }
   });
 
