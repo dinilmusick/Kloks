@@ -113,7 +113,7 @@ export const WebContainerServiceDefinition: ServiceDefinition = createServiceDef
   version: '1.2.0',
   operations: {
     boot: { id: 'WebContainerService.boot', name: 'boot', handler: async () => { await runtime.boot(); return { ready: true }; } },
-    mount: { id: 'WebContainerService.mount', name: 'mount', handler: async (input: { files: Record<string, unknown> }) => runtime.mount(input.files) },
+    mount: { id: 'WebContainerService.mount', name: 'mount', handler: async (input: { files: Record<string, unknown>; mountPoint?: string }) => runtime.mount(input.files, input.mountPoint) },
     run: { id: 'WebContainerService.run', name: 'run', handler: async (input: { task: DevelopmentTask; cwd?: string; env?: Record<string, string> }) => runtime.run(input.task, input.cwd, input.env) },
     runCommand: { id: 'WebContainerService.runCommand', name: 'runCommand', handler: async (input: WebContainerRunCommandInput) => runtime.runCommand(input.command, input.args, input.cwd, input.env) },
     teardown: { id: 'WebContainerService.teardown', name: 'teardown', handler: async () => runtime.teardown() },
