@@ -25,6 +25,6 @@ describe('browser-safe development client entrypoint', () => {
     const runtimeSource = await readFile(resolve(repositoryRoot, entry.import), 'utf8');
     expect(runtimeSource).not.toContain('createRequire');
     expect(runtimeSource).not.toContain('node:module');
-    expect(runtimeSource).not.toMatch(/chunk-[A-Z0-9]+\\.js/);
+    expect(runtimeSource).not.toMatch(/chunk-[A-Z0-9]+\.js/);
   });
 });
