@@ -10,7 +10,11 @@ let closeServer: (() => Promise<void>) | undefined;
 
 beforeAll(async () => {
   const server = createServer((request, response) => {
-    if (request.url === '/clean') {\n      response.writeHead(200, { 'content-type': 'text/html' }).end('<!doctype html><title>Clean</title><h1>Clean page</h1>');\n      return;\n    }\n    if (request.url === '/missing.js') {
+    if (request.url === '/clean') {
+      response.writeHead(200, { 'content-type': 'text/html' }).end('<!doctype html><title>Clean</title><h1>Clean page</h1>');
+      return;
+    }
+    if (request.url === '/missing.js') {
       response.writeHead(404, { 'content-type': 'text/plain' }).end('missing');
       return;
     }
@@ -32,7 +36,7 @@ beforeAll(async () => {
 afterAll(async () => { await closeServer?.(); });
 
 describe('PlaywrightInspectionRuntime', () => {
-  it('captures browser, HTTP, assertion and rendered-page evidence', async () => {
+  it('captures browser, HTTP and rendered-page evidence', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'kloks-playwright-'));
     try {
       const result = await new PlaywrightInspectionRuntime().inspect({
@@ -64,11 +68,13 @@ describe('PlaywrightInspectionRuntime', () => {
 
   it('returns a passing result for a clean rendered page', async () => {
     const result = await new PlaywrightInspectionRuntime().inspect({
-      url: origin,
+      url: `${origin}/clean`,
       timeoutMs: 10000,
       waitUntil: 'domcontentloaded',
-      checks: [{ selector: 'h1', text: 'Rendered application' }],
+      checks: [{ selector: 'h1', text: 'Clean page' }],
     });
-    expect(result.checks[0]?.passed).toBe(true);\n    expect(result.ok).toBe(true);\n    expect(result.errors).toHaveLength(0);
+    expect(result.checks[0]?.passed).toBe(true);
+    expect(result.ok).toBe(true);
+    expect(result.errors).toHaveLength(0);
   });
 });
