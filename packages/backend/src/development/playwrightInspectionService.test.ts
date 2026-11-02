@@ -1,0 +1,74 @@
+import { createServer } from 'node:http';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { PlaywrightInspectionRuntime } from './playwrightInspectionService.js';
+
+let origin = '';
+let closeServer: (() => Promise<void>) | undefined;
+
+beforeAll(async () => {
+  const server = createServer((request, response) => {
+    if (request.url === '/missing.js') {
+      response.writeHead(404, { 'content-type': 'text/plain' }).end('missing');
+      return;
+    }
+    response.writeHead(200, { 'content-type': 'text/html' }).end(`<!doctype html>
+      <html><head><title>Inspection fixture</title></head><body>
+      <h1>Rendered application</h1><button id="action" onclick="document.querySelector('#status').textContent='clicked'">Run</button>
+      <p id="status">idle</p>
+      <script src="/missing.js"></script>
+      <script>console.error('fixture console error'); setTimeout(() => { throw new Error('fixture page exception'); }, 0);</script>
+      </body></html>`);
+  });
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Could not bind inspection fixture');
+  origin = `http://127.0.0.1:${address.port}`;
+  closeServer = () => new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+});
+
+afterAll(async () => { await closeServer?.(); });
+
+describe('PlaywrightInspectionRuntime', () => {
+  it('captures browser, HTTP, assertion and rendered-page evidence', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'kloks-playwright-'));
+    try {
+      const result = await new PlaywrightInspectionRuntime().inspect({
+        url: origin,
+        timeoutMs: 10000,
+        waitUntil: 'networkidle',
+        screenshotDirectory: directory,
+        captureDom: true,
+        checks: [
+          { selector: 'h1', visible: true, text: 'Rendered application' },
+          { selector: '#action', action: { type: 'click' } },
+          { selector: '#status', text: 'clicked' },
+        ],
+        viewports: [{ width: 1440, height: 900 }, { width: 390, height: 844 }],
+      });
+      expect(result.ok).toBe(false);
+      expect(result.title).toBe('Inspection fixture');
+      expect(result.errors.some(item => item.kind === 'console')).toBe(true);
+      expect(result.errors.some(item => item.kind === 'pageerror')).toBe(true);
+      expect(result.errors.some(item => item.kind === 'http' && item.status === 404)).toBe(true);
+      expect(result.checks.every(item => item.passed)).toBe(true);
+      expect(result.screenshots).toHaveLength(2);
+      expect(result.domSnapshot).toContain('Rendered application');
+      expect(await readFile(result.screenshots[0])).toBeTruthy();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('returns a passing result for a clean rendered page', async () => {
+    const result = await new PlaywrightInspectionRuntime().inspect({
+      url: origin,
+      timeoutMs: 10000,
+      waitUntil: 'domcontentloaded',
+      checks: [{ selector: 'h1', text: 'Rendered application' }],
+    });
+    expect(result.checks[0]?.passed).toBe(true);
+  });
+});
