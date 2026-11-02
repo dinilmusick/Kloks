@@ -25,3 +25,10 @@ jobs:
       - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kloks-playwright-inspection
+          path: artifacts/playwright/
+          if-no-files-found: ignore
+          retention-days: 14
