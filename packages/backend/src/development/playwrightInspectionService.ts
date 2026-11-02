@@ -23,6 +23,7 @@ type PageLike = {
   title(): Promise<string>;
   url(): string;
   content(): Promise<string>;
+  evaluate<T>(fn: () => T): Promise<T>;
   locator(selector: string): {
     count(): Promise<number>;
     isVisible(): Promise<boolean>;
@@ -119,6 +120,15 @@ export class PlaywrightInspectionRuntime {
       for (const viewport of request.viewports ?? [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
         try {
           await page.setViewportSize(viewport);
+          const layout = await page.evaluate(() => ({
+            viewportWidth: window.innerWidth,
+            documentWidth: document.documentElement.scrollWidth,
+            brokenImages: Array.from(document.images).filter(image => image.complete && image.naturalWidth === 0).map(image => image.src),
+          }));
+          if (layout.documentWidth > layout.viewportWidth + 1) {
+            error(errors, 'layout', `Horizontal overflow: document width ${layout.documentWidth}px exceeds viewport ${layout.viewportWidth}px`, request.url);
+          }
+          for (const imageUrl of layout.brokenImages) error(errors, 'asset', 'Image failed to render', imageUrl);
           {
             await mkdir(screenshotDirectory, { recursive: true });
             const path = join(screenshotDirectory, `inspection-${viewport.width}x${viewport.height}.png`);
