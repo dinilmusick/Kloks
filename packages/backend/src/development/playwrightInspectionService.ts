@@ -71,6 +71,7 @@ export class PlaywrightInspectionRuntime {
     const checks: InspectionCheckResult[] = [];
     const screenshots: string[] = [];
     const screenshotDirectory = request.screenshotDirectory ?? join(process.cwd(), 'artifacts/playwright', String(started));
+    const reportPath = request.reportPath ?? join(screenshotDirectory, 'report.json');
     const timeout = request.timeoutMs ?? 15000;
     let browser: BrowserLike;
     try { browser = await loadPlaywright().chromium.launch({ headless: true }); }
@@ -140,12 +141,11 @@ export class PlaywrightInspectionRuntime {
       errors,
       checks,
       screenshots,
+      reportPath,
       ...(domSnapshot ? { domSnapshot } : {}),
     };
-    if (request.reportPath) {
-      await mkdir(dirname(request.reportPath), { recursive: true });
-      await writeFile(request.reportPath, JSON.stringify(result, null, 2), 'utf8');
-    }
+    await mkdir(dirname(reportPath), { recursive: true });
+    await writeFile(reportPath, JSON.stringify(result, null, 2), 'utf8');
     return result;
   }
 }
