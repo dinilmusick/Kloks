@@ -17,23 +17,20 @@ export function cleanDbUrl(url?: unknown): string {
 }
 
 export function getUnifiedDbUrl(env?: Record<string, unknown>): string {
-  const fromEnv =
-    cleanDbUrl(env?.SYSTEM_DATABASE_URL_1) ||
-    cleanDbUrl(env?.DATABASE_URL) ||
-    cleanDbUrl(env?.SYSTEM_DATABASE_URL_2);
-
-  if (fromEnv) return fromEnv;
+  const fromBindings = [
+    env?.SYSTEM_DATABASE_URL_1,
+    env?.SYSTEM_DATABASE_URL_2,
+    env?.SYSTEM_DATABASE_URL_3,
+  ].map(cleanDbUrl).find(Boolean);
+  if (fromBindings) return fromBindings;
 
   if (typeof process !== 'undefined' && process.env) {
-    return (
-      cleanDbUrl(process.env.SYSTEM_DATABASE_URL_1) ||
-      cleanDbUrl(process.env.DATABASE_URL) ||
-      cleanDbUrl(process.env.SYSTEM_DATABASE_URL_2) ||
-      cleanDbUrl(process.env.SYSTEM_DATABASE_URL_3) ||
-      ''
-    );
+    return [
+      process.env.SYSTEM_DATABASE_URL_1,
+      process.env.SYSTEM_DATABASE_URL_2,
+      process.env.SYSTEM_DATABASE_URL_3,
+    ].map(cleanDbUrl).find(Boolean) || '';
   }
-
   return '';
 }
 
