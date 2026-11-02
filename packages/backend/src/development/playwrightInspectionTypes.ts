@@ -6,7 +6,10 @@ export type InspectionErrorKind =
   | 'navigation'
   | 'assertion'
   | 'crash'
-  | 'dialog';
+  | 'dialog'
+  | 'browser'
+  | 'screenshot'
+  | 'dom';
 
 export interface InspectionError {
   kind: InspectionErrorKind;
