@@ -41,11 +41,12 @@ if (!report.ok) {
 Every inspection writes a JSON report and screenshots. By default they are stored under `artifacts/playwright/<inspection-start-time>/`. Set `reportPath` or `screenshotDirectory` to choose explicit locations.
 
 The report includes:
-- Browser console errors and warnings.
+- Browser console messages, including errors, warnings, logs and source locations.
 - Uncaught page exceptions.
 - Failed network requests and HTTP responses with status 400 or higher.
 - Navigation failures, browser crashes and unexpected dialogs.
 - Selector assertion and interaction failures.
+- Broken image assets and horizontal overflow at each configured viewport.
 - Page title, final URL, navigation status and elapsed time.
 - Desktop/mobile screenshots and an optional bounded HTML DOM snapshot.
 
