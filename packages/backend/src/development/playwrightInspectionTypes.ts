@@ -21,6 +21,14 @@ export interface InspectionError {
   method?: string;
 }
 
+export interface InspectionLog {
+  type: 'error' | 'warning' | 'log' | 'info' | 'debug' | 'dir' | 'trace' | 'assert' | 'other';
+  message: string;
+  url?: string;
+  line?: number;
+  column?: number;
+}
+
 export interface InspectionCheck {
   selector: string;
   visible?: boolean;
@@ -58,6 +66,7 @@ export interface PlaywrightInspectionResult {
   status?: number;
   durationMs: number;
   errors: InspectionError[];
+  logs: InspectionLog[];
   checks: InspectionCheckResult[];
   screenshots: string[];
   reportPath?: string;
