@@ -1,4 +1,3 @@
-import { createRequire } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -9,63 +8,18 @@ import {
   type ServiceDefinition,
 } from '@ultrst-armada/krnl';
 import type {
-  InspectionCheck,
   InspectionCheckResult,
   InspectionError,
   InspectionLog,
   PlaywrightInspectionRequest,
   PlaywrightInspectionResult,
 } from './playwrightInspectionTypes.js';
-
-type PageLike = {
-  on(event: string, handler: (...args: any[]) => void): void;
-  goto(url: string, options: object): Promise<{ status(): number } | null>;
-  waitForLoadState(state: string, options: object): Promise<void>;
-  title(): Promise<string>;
-  url(): string;
-  content(): Promise<string>;
-  evaluate<T>(fn: () => T): Promise<T>;
-  locator(selector: string): {
-    count(): Promise<number>;
-    isVisible(): Promise<boolean>;
-    innerText(): Promise<string>;
-    click(): Promise<void>;
-    fill(value: string): Promise<void>;
-  };
-  setViewportSize(viewport: { width: number; height: number }): Promise<void>;
-  screenshot(options: { path: string; fullPage: boolean }): Promise<Buffer>;
-  close(): Promise<void>;
-};
-type BrowserLike = {
-  newContext(options: object): Promise<{ newPage(): Promise<PageLike>; close(): Promise<void> }>;
-  close(): Promise<void>;
-};
-type PlaywrightModule = { chromium: { launch(options: object): Promise<BrowserLike> } };
-
-const require = createRequire(import.meta.url);
-
-function loadPlaywright(): PlaywrightModule {
-  try { return require('playwright') as PlaywrightModule; }
-  catch { throw new Error('Playwright is required for browser inspection. Install the optional "playwright" package and Chromium browser.'); }
-}
-
-function error(errors: InspectionError[], kind: InspectionError['kind'], message: string, url?: string, status?: number, method?: string) {
-  errors.push({ kind, message, ...(url ? { url } : {}), ...(status ? { status } : {}), ...(method ? { method } : {}) });
-}
-
-async function runCheck(page: PageLike, check: InspectionCheck): Promise<InspectionCheckResult> {
-  try {
-    const locator = page.locator(check.selector);
-    if (await locator.count() === 0) throw new Error('Selector matched no elements');
-    if (check.visible !== undefined && await locator.isVisible() !== check.visible) throw new Error(`Expected visible=${check.visible}`);
-    if (check.text !== undefined && !(await locator.innerText()).includes(check.text)) throw new Error(`Expected text containing: ${check.text}`);
-    if (check.action?.type === 'click') await locator.click();
-    if (check.action?.type === 'fill') await locator.fill(check.action.value ?? '');
-    return { selector: check.selector, passed: true };
-  } catch (cause) {
-    return { selector: check.selector, passed: false, details: cause instanceof Error ? cause.message : String(cause) };
-  }
-}
+import {
+  loadPlaywright,
+  recordInspectionError,
+  runInspectionCheck,
+  type BrowserLike,
+} from './playwrightInspectionSupport.js';
 
 export class PlaywrightInspectionRuntime {
   async inspect(request: PlaywrightInspectionRequest): Promise<PlaywrightInspectionResult> {
@@ -80,7 +34,7 @@ export class PlaywrightInspectionRuntime {
     let browser: BrowserLike;
     try { browser = await loadPlaywright().chromium.launch({ headless: true }); }
     catch (cause) {
-      error(errors, 'browser', cause instanceof Error ? cause.message : String(cause), request.url);
+      recordInspectionError(errors, 'browser', cause instanceof Error ? cause.message : String(cause), request.url);
       const result: PlaywrightInspectionResult = {
         ok: false, url: request.url, durationMs: Date.now() - started,
         errors, logs, checks, screenshots, reportPath,
@@ -99,16 +53,16 @@ export class PlaywrightInspectionRuntime {
       const location = message.location();
       const type = message.type() as InspectionLog['type'];
       logs.push({ type, message: message.text(), url: page.url(), ...(location.lineNumber ? { line: location.lineNumber } : {}), ...(location.columnNumber ? { column: location.columnNumber } : {}) });
-      if (type === 'error') error(errors, 'console', message.text(), page.url());
+      if (type === 'error') recordInspectionError(errors, 'console', message.text(), page.url());
     });
-    page.on('pageerror', cause => error(errors, 'pageerror', cause instanceof Error ? cause.stack ?? cause.message : String(cause), page.url()));
-    page.on('requestfailed', requestInfo => error(errors, 'requestfailed', requestInfo.failure()?.errorText ?? 'Request failed', requestInfo.url(), undefined, requestInfo.method()));
+    page.on('pageerror', cause => recordInspectionError(errors, 'pageerror', cause instanceof Error ? cause.stack ?? cause.message : String(cause), page.url()));
+    page.on('requestfailed', requestInfo => recordInspectionError(errors, 'requestfailed', requestInfo.failure()?.errorText ?? 'Request failed', requestInfo.url(), undefined, requestInfo.method()));
     page.on('response', response => {
-      if (response.status() >= 400) error(errors, 'http', `HTTP ${response.status()} ${response.statusText()}`, response.url(), response.status(), response.request().method());
+      if (response.status() >= 400) recordInspectionError(errors, 'http', `HTTP ${response.status()} ${response.statusText()}`, response.url(), response.status(), response.request().method());
     });
-    page.on('crash', () => error(errors, 'crash', 'Browser page crashed', page.url()));
+    page.on('crash', () => recordInspectionError(errors, 'crash', 'Browser page crashed', page.url()));
     page.on('dialog', async dialog => {
-      error(errors, 'dialog', `Unexpected ${dialog.type()} dialog: ${dialog.message()}`, page.url());
+      recordInspectionError(errors, 'dialog', `Unexpected ${dialog.type()} dialog: ${dialog.message()}`, page.url());
       await dialog.dismiss();
     });
 
@@ -117,11 +71,11 @@ export class PlaywrightInspectionRuntime {
         const response = await page.goto(request.url, { waitUntil: request.waitUntil ?? 'networkidle', timeout });
         status = response?.status();
       } catch (cause) {
-        error(errors, 'navigation', cause instanceof Error ? cause.message : String(cause), request.url);
+        recordInspectionError(errors, 'navigation', cause instanceof Error ? cause.message : String(cause), request.url);
       }
       try { await page.waitForLoadState('domcontentloaded', { timeout }); } catch {}
       try { title = await page.title(); } catch {}
-      for (const check of request.checks ?? []) checks.push(await runCheck(page, check));
+      for (const check of request.checks ?? []) checks.push(await runInspectionCheck(page, check));
       for (const viewport of request.viewports ?? [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
         try {
           await page.setViewportSize(viewport);
@@ -131,29 +85,29 @@ export class PlaywrightInspectionRuntime {
             brokenImages: Array.from(document.images).filter(image => image.complete && image.naturalWidth === 0).map(image => image.src),
           }));
           if (layout.documentWidth > layout.viewportWidth + 1) {
-            error(errors, 'layout', `Horizontal overflow: document width ${layout.documentWidth}px exceeds viewport ${layout.viewportWidth}px`, request.url);
+            recordInspectionError(errors, 'layout', `Horizontal overflow: document width ${layout.documentWidth}px exceeds viewport ${layout.viewportWidth}px`, request.url);
           }
-          for (const imageUrl of layout.brokenImages) error(errors, 'asset', 'Image failed to render', imageUrl);
+          for (const imageUrl of layout.brokenImages) recordInspectionError(errors, 'asset', 'Image failed to render', imageUrl);
           {
             await mkdir(screenshotDirectory, { recursive: true });
             const path = join(screenshotDirectory, `inspection-${viewport.width}x${viewport.height}.png`);
             await page.screenshot({ path, fullPage: true });
             screenshots.push(path);
           }
-        } catch (cause) { error(errors, 'screenshot', cause instanceof Error ? cause.message : String(cause), request.url); }
+        } catch (cause) { recordInspectionError(errors, 'screenshot', cause instanceof Error ? cause.message : String(cause), request.url); }
       }
       if (request.captureDom) {
         try {
           const html = await page.content();
           domSnapshot = html.slice(0, request.maxDomCharacters ?? 40000);
-        } catch (cause) { error(errors, 'dom', cause instanceof Error ? cause.message : String(cause), request.url); }
+        } catch (cause) { recordInspectionError(errors, 'dom', cause instanceof Error ? cause.message : String(cause), request.url); }
       }
     } finally {
       await page.close().catch(() => undefined);
       await context.close().catch(() => undefined);
       await browser.close().catch(() => undefined);
     }
-    for (const check of checks) if (!check.passed) error(errors, 'assertion', check.details ?? 'Inspection assertion failed', request.url);
+    for (const check of checks) if (!check.passed) recordInspectionError(errors, 'assertion', check.details ?? 'Inspection assertion failed', request.url);
     const result: PlaywrightInspectionResult = {
       ok: errors.length === 0,
       url: request.url,
