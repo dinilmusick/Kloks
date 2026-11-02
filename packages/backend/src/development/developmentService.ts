@@ -5,25 +5,18 @@ import {
   type ServiceDefinition,
 } from '@ultrst-armada/krnl';
 import { GitHubActionsClient } from './githubActionsService.js';
-import { WebContainerRuntime } from './webContainerService.js';
+import { resolveWebContainerCommand, WebContainerRuntime } from './webContainerService.js';
 import type { DevelopmentRequest, DevelopmentResult } from './types.js';
 
 export function resolveDevelopmentCommand(task: DevelopmentRequest['task']) {
-  const commands: Record<DevelopmentRequest['task'], [string, string[]]> = {
-    install: ['pnpm', ['install', '--no-frozen-lockfile']],
-    lint: ['pnpm', ['lint']],
-    test: ['pnpm', ['test']],
-    build: ['pnpm', ['build']],
-    validate: ['pnpm', ['validate']],
-    check: ['pnpm', ['lint']],
-  };
-  return commands[task];
+  const { command, args } = resolveWebContainerCommand(task);
+  return [command, args] as [string, string[]];
 }
 
 export const DevelopmentServiceDefinition: ServiceDefinition = createServiceDefinition({
   id: 'kloks.backend.development',
   name: 'DevelopmentService',
-  version: '1.0.0',
+  version: '1.1.0',
   operations: {
     plan: {
       id: 'DevelopmentService.plan',
@@ -56,7 +49,6 @@ export class DevelopmentRuntime {
 
   async run(request: DevelopmentRequest): Promise<DevelopmentResult> {
     if (request.provider === 'webcontainer') {
-      const [command, args] = resolveDevelopmentCommand(request.task);
       const result = await this.webContainer.run(request.task, request.cwd, request.env);
       return { provider: request.provider, task: request.task, ok: result.exitCode === 0, exitCode: result.exitCode, output: result.output };
     }
