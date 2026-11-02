@@ -171,6 +171,11 @@
       "types": "./packages/backend/dist/development/webContainerService.d.ts",
       "import": "./packages/backend/dist/development/webContainerService.js",
       "default": "./packages/backend/dist/development/webContainerService.js"
+    },
+    "./development/client": {
+      "types": "./packages/backend/dist/development/client.d.ts",
+      "import": "./packages/backend/dist/development/client.js",
+      "default": "./packages/backend/dist/development/client.js"
     }
   },
   "scripts": {
