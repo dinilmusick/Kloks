@@ -166,6 +166,11 @@
       "types": "./packages/semantic-runtime/dist/index.d.ts",
       "import": "./packages/semantic-runtime/dist/index.js",
       "default": "./packages/semantic-runtime/dist/index.js"
+    },
+    "./development/webcontainer": {
+      "types": "./packages/backend/dist/development/webContainerService.d.ts",
+      "import": "./packages/backend/dist/development/webContainerService.js",
+      "default": "./packages/backend/dist/development/webContainerService.js"
     }
   },
   "scripts": {
