@@ -107,6 +107,8 @@ export class WebContainerRuntime {
   }
 }
 
+const runtime = new WebContainerRuntime();
+
 export const WebContainerServiceDefinition: ServiceDefinition = createServiceDefinition({
   id: 'kloks.backend.webContainer',
   name: 'WebContainerService',
