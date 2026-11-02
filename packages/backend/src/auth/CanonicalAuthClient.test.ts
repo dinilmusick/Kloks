@@ -9,11 +9,12 @@ describe('CanonicalAuthClient', () => {
       return new Response(JSON.stringify({
         user: { id: 'u1', email: 'user@example.com', name: 'User', role: 'user' },
         session: { token: 'session-token' },
-      }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }), { status: 200, headers: { 'content-type': 'application/json', 'set-auth-token': 'session-token' } });
     };
     const client = new CanonicalAuthClient({ baseUrl: 'https://auth.example.com/', fetcher: fetcher as typeof fetch });
     const result = await client.signInEmail(' User@Example.com ', 'password123');
     expect(result.success).toBe(true);
+    expect(result.token).toBe('session-token');
     expect(calls[0].url).toBe('https://auth.example.com/api/auth/sign-in/email');
     expect(JSON.parse(String(calls[0].init?.body))).toEqual({ email: 'user@example.com', password: 'password123' });
   });
@@ -31,6 +32,21 @@ describe('CanonicalAuthClient', () => {
     await client.getSession('better-auth.session_token=session-token');
     expect(new Headers(requestInit?.headers).get('Cookie')).toBe('better-auth.session_token=session-token');
     expect(requestInit?.credentials).toBe('include');
+  });
+
+  it('resolves a session using the canonical Better Auth bearer token', async () => {
+    let requestInit: RequestInit | undefined;
+    const fetcher = async (_url: string, init?: RequestInit) => {
+      requestInit = init;
+      return new Response(JSON.stringify({
+        user: { id: 'u1', email: 'user@example.com', name: 'User' },
+        session: { token: 'session-token' },
+      }), { status: 200 });
+    };
+    const client = new CanonicalAuthClient({ baseUrl: 'https://auth.example.com', fetcher: fetcher as typeof fetch });
+    const session = await client.getSessionWithToken('session-token');
+    expect(session?.user.id).toBe('u1');
+    expect(new Headers(requestInit?.headers).get('Authorization')).toBe('Bearer session-token');
   });
 
   it('requests Google Drive incrementally instead of during Google identity sign-in', async () => {

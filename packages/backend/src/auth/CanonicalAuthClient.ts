@@ -27,6 +27,7 @@ export interface AuthResult {
   session?: Record<string, unknown>;
   error?: string;
   redirectUrl?: string;
+  token?: string;
 }
 
 const cleanBaseUrl = (value: string) => value.trim().replace(/\/+$/, '');
@@ -43,7 +44,7 @@ export class CanonicalAuthClient {
     this.credentials = options.credentials ?? 'include';
   }
 
-  private async request<T>(path: string, init: RequestInit = {}): Promise<{ status: number; data: T }> {
+  private async request<T>(path: string, init: RequestInit = {}): Promise<{ status: number; data: T; token?: string }> {
     const response = await this.fetcher(`${this.baseUrl}/api/auth${path}`, {
       ...init,
       credentials: this.credentials,
@@ -52,7 +53,7 @@ export class CanonicalAuthClient {
     const text = await response.text();
     let data: any = {};
     try { data = text ? JSON.parse(text) : {}; } catch { data = { message: text }; }
-    return { status: response.status, data };
+    return { status: response.status, data, token: response.headers.get('set-auth-token') ?? undefined };
   }
 
   async signInEmail(email: string, password: string): Promise<AuthResult> {
@@ -63,7 +64,7 @@ export class CanonicalAuthClient {
     if (result.status >= 400 || result.data?.error) {
       return { success: false, status: result.status, error: result.data?.error?.message ?? result.data?.message ?? 'Authentication failed.' };
     }
-    return { success: true, status: result.status, user: result.data?.user, session: result.data?.session };
+    return { success: true, status: result.status, user: result.data?.user, session: result.data?.session, token: result.token };
   }
 
   async signUpEmail(email: string, password: string, name: string): Promise<AuthResult> {
@@ -74,7 +75,7 @@ export class CanonicalAuthClient {
     if (result.status >= 400 || result.data?.error) {
       return { success: false, status: result.status, error: result.data?.error?.message ?? result.data?.message ?? 'Registration failed.' };
     }
-    return { success: true, status: result.status, user: result.data?.user, session: result.data?.session };
+    return { success: true, status: result.status, user: result.data?.user, session: result.data?.session, token: result.data?.token ?? result.data?.session?.token };
   }
 
   async signInGoogle(callbackURL: string): Promise<AuthResult> {
@@ -113,6 +114,13 @@ export class CanonicalAuthClient {
     const headers: Record<string, string> = {};
     if (cookie) headers.Cookie = cookie;
     const result = await this.request<any>('/get-session', { headers });
+    if (result.status >= 400 || !result.data?.user) return null;
+    return result.data;
+  }
+
+  async getSessionWithToken(token: string): Promise<CanonicalAuthSession | null> {
+    if (!token?.trim()) return null;
+    const result = await this.request<any>('/get-session', { headers: { Authorization: `Bearer ${token}` } });
     if (result.status >= 400 || !result.data?.user) return null;
     return result.data;
   }
