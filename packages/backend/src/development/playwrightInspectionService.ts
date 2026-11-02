@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
-import { mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import {
   createService,
   createServiceDefinition,
@@ -121,7 +121,7 @@ export class PlaywrightInspectionRuntime {
       await browser.close().catch(() => undefined);
     }
     for (const check of checks) if (!check.passed) error(errors, 'assertion', check.details ?? 'Inspection assertion failed', request.url);
-    return {
+    const result: PlaywrightInspectionResult = {
       ok: errors.length === 0,
       url: request.url,
       ...(title ? { title } : {}),
@@ -132,6 +132,11 @@ export class PlaywrightInspectionRuntime {
       screenshots,
       ...(domSnapshot ? { domSnapshot } : {}),
     };
+    if (request.reportPath) {
+      await mkdir(dirname(request.reportPath), { recursive: true });
+      await writeFile(request.reportPath, JSON.stringify(result, null, 2), 'utf8');
+    }
+    return result;
   }
 }
 
