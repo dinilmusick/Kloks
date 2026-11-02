@@ -30,7 +30,7 @@ describe('parseDevelopmentDiagnostics', () => {
       'src/app.ts:4:2 error Unexpected any @typescript-eslint/no-explicit-any',
       '✘ [ERROR] Build failed with 1 error:',
       '✘ [ERROR] Build failed with 1 error:',
-    ].join('\\n'), 1);
+    ].join('\n'), 1);
     expect(result.map(item => item.source)).toEqual(['eslint', 'bundler']);
     expect(result.every(item => item.severity === 'error')).toBe(true);
   });
