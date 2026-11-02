@@ -10,7 +10,7 @@ let closeServer: (() => Promise<void>) | undefined;
 
 beforeAll(async () => {
   const server = createServer((request, response) => {
-    if (request.url === '/missing.js') {
+    if (request.url === '/clean') {\n      response.writeHead(200, { 'content-type': 'text/html' }).end('<!doctype html><title>Clean</title><h1>Clean page</h1>');\n      return;\n    }\n    if (request.url === '/missing.js') {
       response.writeHead(404, { 'content-type': 'text/plain' }).end('missing');
       return;
     }
@@ -69,6 +69,6 @@ describe('PlaywrightInspectionRuntime', () => {
       waitUntil: 'domcontentloaded',
       checks: [{ selector: 'h1', text: 'Rendered application' }],
     });
-    expect(result.checks[0]?.passed).toBe(true);
+    expect(result.checks[0]?.passed).toBe(true);\n    expect(result.ok).toBe(true);\n    expect(result.errors).toHaveLength(0);
   });
 });
