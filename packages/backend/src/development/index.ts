@@ -9,5 +9,3 @@ export * from './typescriptLanguageServerTypes.js';
 export * from './typescriptLanguageServerService.js';
 export * from './agentHarnessTypes.js';
 export * from './agentHarnessService.js';
-export * from './playwrightInspectionTypes.js';
-export * from './playwrightInspectionService.js';
