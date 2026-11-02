@@ -39,7 +39,7 @@ export function parseDevelopmentDiagnostics(output: string, exitCode = 0): Devel
     if (/\bWARN(?:ING)?\b/i.test(line)) add({ source: 'package-manager', severity: 'warning', message: line.trim() });
   }
   if (exitCode !== 0 && diagnostics.every(item => item.severity !== 'error')) {
-    add({ source: 'unknown', severity: 'error', message: \`Command failed with exit code \${exitCode}; inspect captured output for details.\` });
+    add({ source: 'unknown', severity: 'error', message: 'Command failed with exit code ' + exitCode + '; inspect captured output for details.' });
   }
   return diagnostics;
 }
