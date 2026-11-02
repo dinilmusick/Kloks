@@ -44,6 +44,24 @@ export function parseDevelopmentDiagnostics(output: string, exitCode = 0): Devel
   return diagnostics;
 }
 
+export function captureDevelopmentProcess<T extends { output: ReadableStream<string>; exit: Promise<number> }>(process: T) {
+  const [consumerOutput, diagnosticOutput] = process.output.tee();
+  const logs = (async () => {
+    const reader = diagnosticOutput.getReader();
+    let output = '';
+    try {
+      while (true) {
+        const next = await reader.read();
+        if (next.done) break;
+        output += next.value;
+      }
+    } finally { reader.releaseLock(); }
+    const exitCode = await process.exit;
+    return { output, exitCode, diagnostics: parseDevelopmentDiagnostics(output, exitCode) };
+  })();
+  return { ...process, output: consumerOutput, logs };
+}
+
 export function resolveWebContainerCommand(task: DevelopmentTask): WebContainerCommand {
   const command = COMMANDS[task];
   return { command: command.command, args: [...command.args] };
@@ -126,7 +144,8 @@ export class WebContainerRuntime {
 
   async spawnCommand(command: string, args: string[] = [], cwd?: string, env?: Record<string, string | number | boolean>) {
     const container = await this.boot();
-    return container.spawn(command, args, { cwd, env });
+    const process = await container.spawn(command, args, { cwd, env });
+    return captureDevelopmentProcess(process);
   }
 
   async teardown() {
