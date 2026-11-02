@@ -75,7 +75,7 @@ export class CanonicalAuthClient {
     if (result.status >= 400 || result.data?.error) {
       return { success: false, status: result.status, error: result.data?.error?.message ?? result.data?.message ?? 'Registration failed.' };
     }
-    return { success: true, status: result.status, user: result.data?.user, session: result.data?.session };
+    return { success: true, status: result.status, user: result.data?.user, session: result.data?.session, token: result.data?.token ?? result.data?.session?.token };
   }
 
   async signInGoogle(callbackURL: string): Promise<AuthResult> {
