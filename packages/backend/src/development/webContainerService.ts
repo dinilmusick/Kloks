@@ -28,36 +28,35 @@ export interface WebContainerRunCommandInput {
 }
 
 let runQueue: Promise<void> = Promise.resolve();
+let sharedContainer: any = null;
+let sharedContainerPromise: Promise<any> | null = null;
 
 export class WebContainerRuntime {
-  private container: any = null;
-  private instancePromise: Promise<any> | null = null;
-
   async boot() {
     if (typeof window !== 'undefined' && !window.crossOriginIsolated) {
       throw new Error('WebContainer requires a cross-origin-isolated page. Ensure COOP=same-origin and COEP=require-corp are served.');
     }
-    if (this.container) return this.container;
-    if (!this.instancePromise) {
-      this.instancePromise = import('@webcontainer/api').then(async module => {
+    if (sharedContainer) return sharedContainer;
+    if (!sharedContainerPromise) {
+      sharedContainerPromise = import('@webcontainer/api').then(async module => {
         const container = await module.WebContainer.boot({
           coep: 'require-corp',
           workdirName: 'kloks-development',
         });
-        this.container = container;
+        sharedContainer = container;
         return container;
       }).catch(error => {
-        this.instancePromise = null;
+        sharedContainerPromise = null;
         throw error;
       });
     }
-    return this.instancePromise;
+    return sharedContainerPromise;
   }
 
-  async mount(files: Record<string, unknown>) {
+  async mount(files: Record<string, unknown>, mountPoint?: string) {
     const container = await this.boot();
-    await container.mount(files);
-    return { mounted: true };
+    await container.mount(files, mountPoint ? { mountPoint } : undefined);
+    return { mounted: true, mountPoint: mountPoint ?? '/' };
   }
 
   private async runProcess(command: string, args: string[], cwd?: string, env?: Record<string, string | number | boolean>) {
@@ -100,15 +99,13 @@ export class WebContainerRuntime {
   }
 
   async teardown() {
-    const container = this.container;
-    this.container = null;
-    this.instancePromise = null;
+    const container = sharedContainer;
+    sharedContainer = null;
+    sharedContainerPromise = null;
     await container?.teardown();
     return { tornDown: true };
   }
 }
-
-const runtime = new WebContainerRuntime();
 
 export const WebContainerServiceDefinition: ServiceDefinition = createServiceDefinition({
   id: 'kloks.backend.webContainer',
