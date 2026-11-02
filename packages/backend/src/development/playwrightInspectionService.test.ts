@@ -14,14 +14,14 @@ beforeAll(async () => {
       response.writeHead(200, { 'content-type': 'text/html' }).end('<!doctype html><title>Clean</title><h1>Clean page</h1>');
       return;
     }
-    if (request.url === '/missing.js') {
+    if (request.url === '/missing.js' || request.url === '/broken.png') {
       response.writeHead(404, { 'content-type': 'text/plain' }).end('missing');
       return;
     }
     response.writeHead(200, { 'content-type': 'text/html' }).end(`<!doctype html>
       <html><head><title>Inspection fixture</title></head><body>
       <h1>Rendered application</h1><button id="action" onclick="document.querySelector('#status').textContent='clicked'">Run</button>
-      <p id="status">idle</p>
+      <p id="status">idle</p><img src="/broken.png" alt="broken fixture image">
       <script src="/missing.js"></script>
       <script>console.error('fixture console error'); setTimeout(() => { throw new Error('fixture page exception'); }, 0);</script>
       </body></html>`);
@@ -58,6 +58,7 @@ describe('PlaywrightInspectionRuntime', () => {
       expect(result.errors.some(item => item.kind === 'console')).toBe(true);
       expect(result.errors.some(item => item.kind === 'pageerror')).toBe(true);
       expect(result.errors.some(item => item.kind === 'http' && item.status === 404)).toBe(true);
+      expect(result.errors.some(item => item.kind === 'asset' && item.url?.endsWith('/broken.png'))).toBe(true);
       expect(result.checks.every(item => item.passed)).toBe(true);
       expect(result.screenshots).toHaveLength(2);
       expect(result.reportPath).toBe(join(directory, 'report.json'));
