@@ -12,6 +12,7 @@ import type {
   InspectionCheck,
   InspectionCheckResult,
   InspectionError,
+  InspectionLog,
   PlaywrightInspectionRequest,
   PlaywrightInspectionResult,
 } from './playwrightInspectionTypes.js';
@@ -70,6 +71,7 @@ export class PlaywrightInspectionRuntime {
   async inspect(request: PlaywrightInspectionRequest): Promise<PlaywrightInspectionResult> {
     const started = Date.now();
     const errors: InspectionError[] = [];
+    const logs: InspectionLog[] = [];
     const checks: InspectionCheckResult[] = [];
     const screenshots: string[] = [];
     const screenshotDirectory = request.screenshotDirectory ?? join(process.cwd(), 'artifacts/playwright', randomUUID());
@@ -81,7 +83,7 @@ export class PlaywrightInspectionRuntime {
       error(errors, 'browser', cause instanceof Error ? cause.message : String(cause), request.url);
       const result: PlaywrightInspectionResult = {
         ok: false, url: request.url, durationMs: Date.now() - started,
-        errors, checks, screenshots, reportPath,
+        errors, logs, checks, screenshots, reportPath,
       };
       await mkdir(dirname(reportPath), { recursive: true });
       await writeFile(reportPath, JSON.stringify(result, null, 2), 'utf8');
@@ -94,7 +96,10 @@ export class PlaywrightInspectionRuntime {
     let domSnapshot: string | undefined;
 
     page.on('console', message => {
-      if (message.type() === 'error' || message.type() === 'warning') error(errors, 'console', message.text(), page.url());
+      const location = message.location();
+      const type = message.type() as InspectionLog['type'];
+      logs.push({ type, message: message.text(), url: page.url(), ...(location.lineNumber ? { line: location.lineNumber } : {}), ...(location.columnNumber ? { column: location.columnNumber } : {}) });
+      if (type === 'error') error(errors, 'console', message.text(), page.url());
     });
     page.on('pageerror', cause => error(errors, 'pageerror', cause instanceof Error ? cause.stack ?? cause.message : String(cause), page.url()));
     page.on('requestfailed', requestInfo => error(errors, 'requestfailed', requestInfo.failure()?.errorText ?? 'Request failed', requestInfo.url(), undefined, requestInfo.method()));
@@ -156,6 +161,7 @@ export class PlaywrightInspectionRuntime {
       ...(status !== undefined ? { status } : {}),
       durationMs: Date.now() - started,
       errors,
+      logs,
       checks,
       screenshots,
       reportPath,
