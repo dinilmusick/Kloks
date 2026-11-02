@@ -4,7 +4,7 @@ import {
   type IService,
   type ServiceDefinition,
 } from '@ultrst-armada/krnl';
-import type { DevelopmentTask, WebContainerCommand } from './types.js';
+import type { DevelopmentDiagnostic, DevelopmentTask, WebContainerCommand } from './types.js';
 
 const COMMANDS: Record<DevelopmentTask, WebContainerCommand> = {
   install: { command: 'pnpm', args: ['install', '--no-frozen-lockfile'] },
@@ -14,6 +14,35 @@ const COMMANDS: Record<DevelopmentTask, WebContainerCommand> = {
   validate: { command: 'pnpm', args: ['validate'] },
   check: { command: 'pnpm', args: ['lint'] },
 };
+
+
+export function parseDevelopmentDiagnostics(output: string, exitCode = 0): DevelopmentDiagnostic[] {
+  const diagnostics: DevelopmentDiagnostic[] = [];
+  const seen = new Set<string>();
+  const add = (diagnostic: DevelopmentDiagnostic) => {
+    const key = [diagnostic.source, diagnostic.code, diagnostic.file, diagnostic.line, diagnostic.message].join('|');
+    if (!seen.has(key)) { seen.add(key); diagnostics.push(diagnostic); }
+  };
+  for (const line of output.split(/\\r?\\n/)) {
+    const typescript = line.match(/^(.+?)\\((\\d+),(\\d+)\\):\\s*(error|warning)\\s+(TS\\d+):\\s*(.+)$/);
+    if (typescript) {
+      add({ source: 'typescript', severity: typescript[4] as 'error' | 'warning', file: typescript[1], line: Number(typescript[2]), column: Number(typescript[3]), code: typescript[5], message: typescript[6] });
+      continue;
+    }
+    const eslint = line.match(/^(.+?):(\\d+):(\\d+)\\s+(error|warning)\\s+(.+?)\\s+([^\\s]+)$/);
+    if (eslint) {
+      add({ source: 'eslint', severity: eslint[4] as 'error' | 'warning', file: eslint[1], line: Number(eslint[2]), column: Number(eslint[3]), code: eslint[6], message: eslint[5] });
+      continue;
+    }
+    const bundler = line.match(/(?:✘|×|ERROR|error:|Error:)\\s*(.+)$/);
+    if (bundler) add({ source: 'bundler', severity: 'error', message: bundler[1].trim() });
+    if (/\\bWARN(?:ING)?\\b/i.test(line)) add({ source: 'package-manager', severity: 'warning', message: line.trim() });
+  }
+  if (exitCode !== 0 && diagnostics.every(item => item.severity !== 'error')) {
+    add({ source: 'unknown', severity: 'error', message: `Command failed with exit code ${exitCode}; inspect captured output for details.` });
+  }
+  return diagnostics;
+}
 
 export function resolveWebContainerCommand(task: DevelopmentTask): WebContainerCommand {
   const command = COMMANDS[task];
@@ -62,6 +91,7 @@ export class WebContainerRuntime {
   private async runProcess(command: string, args: string[], cwd?: string, env?: Record<string, string | number | boolean>) {
     const container = await this.boot();
     const process = await container.spawn(command, args, { cwd, env });
+    const started = Date.now();
     let output = '';
     const reader = process.output.getReader();
     try {
@@ -73,7 +103,8 @@ export class WebContainerRuntime {
     } finally {
       reader.releaseLock();
     }
-    return { exitCode: await process.exit, output };
+    const exitCode = await process.exit;
+    return { exitCode, output, command: [command, ...args].join(' '), durationMs: Date.now() - started, diagnostics: parseDevelopmentDiagnostics(output, exitCode) };
   }
 
   async run(task: DevelopmentTask, cwd?: string, env?: Record<string, string>) {
