@@ -20,15 +20,25 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: npm install --prefix /tmp/kloks-playwright --no-save --package-lock=false playwright
-      - run: /tmp/kloks-playwright/node_modules/.bin/playwright install --with-deps chromium
-      - run: pnpm build
-      - run: pnpm typecheck
-      - run: pnpm test
-      - uses: actions/upload-artifact@v4
+      - name: Install isolated Playwright host runtime
+        run: |
+          npm install --prefix /tmp/kloks-playwright --no-save --package-lock=false playwright
+          /tmp/kloks-playwright/node_modules/.bin/playwright install --with-deps chromium
+      - name: Build all packages
+        run: |
+          mkdir -p artifacts/diagnostics
+          pnpm build 2>&1 | tee artifacts/diagnostics/build.log
+      - name: Typecheck all packages
+        if: always()
+        run: pnpm typecheck 2>&1 | tee artifacts/diagnostics/typecheck.log
+      - name: Run unit and browser-inspection tests
+        if: always()
+        run: pnpm test 2>&1 | tee artifacts/diagnostics/test.log
+      - name: Upload build, typecheck, test and browser evidence
+        uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: kloks-playwright-inspection
-          path: artifacts/playwright/
-          if-no-files-found: ignore
+          name: kloks-diagnostics-and-playwright
+          path: artifacts/
+          if-no-files-found: warn
           retention-days: 14
