@@ -70,6 +70,7 @@ export class PlaywrightInspectionRuntime {
     const errors: InspectionError[] = [];
     const checks: InspectionCheckResult[] = [];
     const screenshots: string[] = [];
+    const screenshotDirectory = request.screenshotDirectory ?? join(process.cwd(), 'artifacts/playwright', String(started));
     const timeout = request.timeoutMs ?? 15000;
     let browser: BrowserLike;
     try { browser = await loadPlaywright().chromium.launch({ headless: true }); }
@@ -107,12 +108,12 @@ export class PlaywrightInspectionRuntime {
       try { await page.waitForLoadState('domcontentloaded', { timeout }); } catch {}
       try { title = await page.title(); } catch {}
       for (const check of request.checks ?? []) checks.push(await runCheck(page, check));
-      for (const viewport of request.viewports ?? [{ width: 1440, height: 900 }]) {
+      for (const viewport of request.viewports ?? [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
         try {
           await page.setViewportSize(viewport);
-          if (request.screenshotDirectory) {
-            await mkdir(request.screenshotDirectory, { recursive: true });
-            const path = join(request.screenshotDirectory, `inspection-${viewport.width}x${viewport.height}.png`);
+          {
+            await mkdir(screenshotDirectory, { recursive: true });
+            const path = join(screenshotDirectory, `inspection-${viewport.width}x${viewport.height}.png`);
             await page.screenshot({ path, fullPage: true });
             screenshots.push(path);
           }
