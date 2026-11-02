@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import {
@@ -70,7 +71,7 @@ export class PlaywrightInspectionRuntime {
     const errors: InspectionError[] = [];
     const checks: InspectionCheckResult[] = [];
     const screenshots: string[] = [];
-    const screenshotDirectory = request.screenshotDirectory ?? join(process.cwd(), 'artifacts/playwright', String(started));
+    const screenshotDirectory = request.screenshotDirectory ?? join(process.cwd(), 'artifacts/playwright', randomUUID());
     const reportPath = request.reportPath ?? join(screenshotDirectory, 'report.json');
     const timeout = request.timeoutMs ?? 15000;
     let browser: BrowserLike;
