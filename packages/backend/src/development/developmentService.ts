@@ -50,7 +50,7 @@ export class DevelopmentRuntime {
   async run(request: DevelopmentRequest): Promise<DevelopmentResult> {
     if (request.provider === 'webcontainer') {
       const result = await this.webContainer.run(request.task, request.cwd, request.env);
-      return { provider: request.provider, task: request.task, ok: result.exitCode === 0, exitCode: result.exitCode, output: result.output };
+      return { provider: request.provider, task: request.task, ok: result.exitCode === 0, exitCode: result.exitCode, output: result.output, command: result.command, durationMs: result.durationMs, diagnostics: result.diagnostics };
     }
     if (!this.githubActions || !request.repository || !request.workflowId || !request.ref) {
       throw new Error('GitHub Actions execution requires repository, workflowId, ref, and an authenticated client');
