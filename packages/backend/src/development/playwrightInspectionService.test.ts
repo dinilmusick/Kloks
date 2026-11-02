@@ -23,7 +23,7 @@ beforeAll(async () => {
       <h1>Rendered application</h1><button id="action" onclick="document.querySelector('#status').textContent='clicked'">Run</button>
       <p id="status">idle</p><img src="/broken.png" alt="broken fixture image"><div style="width:600px;height:1px"></div>
       <script src="/missing.js"></script>
-      <script>console.error('fixture console error'); setTimeout(() => { throw new Error('fixture page exception'); }, 0);</script>
+      <script>console.log('fixture console info'); console.warn('fixture console warning'); console.error('fixture console error'); setTimeout(() => { throw new Error('fixture page exception'); }, 0);</script>
       </body></html>`);
   });
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -57,6 +57,8 @@ describe('PlaywrightInspectionRuntime', () => {
       expect(result.title).toBe('Inspection fixture');
       expect(result.errors.some(item => item.kind === 'console')).toBe(true);
       expect(result.logs.some(item => item.message === 'fixture console error')).toBe(true);
+      expect(result.logs.some(item => item.type === 'log' && item.message.includes('fixture console info'))).toBe(true);
+      expect(result.logs.some(item => item.type === 'warning' && item.message.includes('fixture console warning'))).toBe(true);
       expect(result.logs.some(item => item.type === 'error' && item.message.includes('fixture console error'))).toBe(true);
       expect(result.errors.some(item => item.kind === 'pageerror')).toBe(true);
       expect(result.errors.some(item => item.kind === 'http' && item.status === 404)).toBe(true);
