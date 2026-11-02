@@ -33,6 +33,21 @@ describe('CanonicalAuthClient', () => {
     expect(requestInit?.credentials).toBe('include');
   });
 
+  it('resolves a session using the canonical Better Auth bearer token', async () => {
+    let requestInit: RequestInit | undefined;
+    const fetcher = async (_url: string, init?: RequestInit) => {
+      requestInit = init;
+      return new Response(JSON.stringify({
+        user: { id: 'u1', email: 'user@example.com', name: 'User' },
+        session: { token: 'session-token' },
+      }), { status: 200 });
+    };
+    const client = new CanonicalAuthClient({ baseUrl: 'https://auth.example.com', fetcher: fetcher as typeof fetch });
+    const session = await client.getSessionWithToken('session-token');
+    expect(session?.user.id).toBe('u1');
+    expect(new Headers(requestInit?.headers).get('Authorization')).toBe('Bearer session-token');
+  });
+
   it('requests Google Drive incrementally instead of during Google identity sign-in', async () => {
     const calls: string[] = [];
     const fetcher = async (url: string) => {
