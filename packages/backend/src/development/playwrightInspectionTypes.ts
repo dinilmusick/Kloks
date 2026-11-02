@@ -58,5 +58,6 @@ export interface PlaywrightInspectionResult {
   errors: InspectionError[];
   checks: InspectionCheckResult[];
   screenshots: string[];
+  reportPath?: string;
   domSnapshot?: string;
 }
