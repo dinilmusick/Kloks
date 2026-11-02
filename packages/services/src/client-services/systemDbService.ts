@@ -55,9 +55,7 @@ export class SystemDbService {
 
   private listeners: Set<() => void> = new Set();
 
-  constructor() {
-    this.refreshStatus();
-  }
+  constructor() {}
 
   async refreshStatus() {
     try {
