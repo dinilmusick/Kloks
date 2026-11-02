@@ -26,14 +26,19 @@ jobs:
           /tmp/kloks-playwright/node_modules/.bin/playwright install --with-deps chromium
       - name: Build all packages
         run: |
+          set -o pipefail
           mkdir -p artifacts/diagnostics
           pnpm build 2>&1 | tee artifacts/diagnostics/build.log
       - name: Typecheck all packages
         if: always()
-        run: pnpm typecheck 2>&1 | tee artifacts/diagnostics/typecheck.log
+        run: |
+          set -o pipefail
+          pnpm typecheck 2>&1 | tee artifacts/diagnostics/typecheck.log
       - name: Run unit and browser-inspection tests
         if: always()
-        run: pnpm test 2>&1 | tee artifacts/diagnostics/test.log
+        run: |
+          set -o pipefail
+          pnpm test 2>&1 | tee artifacts/diagnostics/test.log
       - name: Upload build, typecheck, test and browser evidence
         uses: actions/upload-artifact@v4
         if: always()
