@@ -77,7 +77,13 @@ export class PlaywrightInspectionRuntime {
     try { browser = await loadPlaywright().chromium.launch({ headless: true }); }
     catch (cause) {
       error(errors, 'browser', cause instanceof Error ? cause.message : String(cause), request.url);
-      return { ok: false, url: request.url, durationMs: Date.now() - started, errors, checks, screenshots };
+      const result: PlaywrightInspectionResult = {
+        ok: false, url: request.url, durationMs: Date.now() - started,
+        errors, checks, screenshots, reportPath,
+      };
+      await mkdir(dirname(reportPath), { recursive: true });
+      await writeFile(reportPath, JSON.stringify(result, null, 2), 'utf8');
+      return result;
     }
     const context = await browser.newContext({ ignoreHTTPSErrors: false });
     const page = await context.newPage();
