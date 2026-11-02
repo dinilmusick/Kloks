@@ -8,6 +8,8 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      NODE_PATH: /tmp/kloks-playwright/node_modules
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -18,6 +20,30 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: pnpm typecheck
-      - run: pnpm test
+      - name: Install isolated Playwright host runtime
+        run: |
+          npm install --prefix /tmp/kloks-playwright --no-save --package-lock=false playwright
+          /tmp/kloks-playwright/node_modules/.bin/playwright install --with-deps chromium
+      - name: Build all packages
+        run: |
+          set -o pipefail
+          mkdir -p artifacts/diagnostics
+          pnpm build 2>&1 | tee artifacts/diagnostics/build.log
+      - name: Typecheck all packages
+        if: always()
+        run: |
+          set -o pipefail
+          pnpm typecheck 2>&1 | tee artifacts/diagnostics/typecheck.log
+      - name: Run unit and browser-inspection tests
+        if: always()
+        run: |
+          set -o pipefail
+          pnpm test 2>&1 | tee artifacts/diagnostics/test.log
+      - name: Upload build, typecheck, test and browser evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kloks-diagnostics-and-playwright
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
