@@ -120,6 +120,7 @@
     "@webcontainer/api": "^1.6.4"
   },
   "peerDependencies": {
+    "playwright": "^1.56.1",
     "@aws-sdk/client-s3": "^3.600.0",
     "@aws-sdk/lib-storage": "^3.600.0",
     "@neondatabase/serverless": "^0.10.0",
@@ -127,7 +128,8 @@
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.0.0",
     "react": "^18.0.0 || ^19.0.0",
-    "zod": "^3.22.0"
+    "zod": "^3.22.0",
+    "playwright": "^1.56.1"
   },
   "peerDependenciesMeta": {
     "better-sqlite3": {
@@ -152,6 +154,9 @@
       "optional": true
     },
     "react": {
+      "optional": true
+    },
+    "playwright": {
       "optional": true
     }
   },
