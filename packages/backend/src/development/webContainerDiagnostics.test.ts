@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { parseDevelopmentDiagnostics } from './webContainerService.js';
+import { captureDevelopmentProcess, parseDevelopmentDiagnostics } from './webContainerService.js';
 
 describe('parseDevelopmentDiagnostics', () => {
+  it('captures live dev-server output while preserving the consumer stream', async () => {
+    const process = {
+      output: new ReadableStream<string>({ start(controller) { controller.enqueue('src/main.ts(3,2): error TS1005: expected token'); controller.close(); } }),
+      exit: Promise.resolve(1),
+    };
+    const captured = captureDevelopmentProcess(process);
+    const result = await captured.logs;
+    expect(result.exitCode).toBe(1);
+    expect(result.diagnostics[0]?.code).toBe('TS1005');
+    const reader = captured.output.getReader();
+    expect((await reader.read()).value).toContain('TS1005');
+    reader.releaseLock();
+  });
+
   it('extracts TypeScript file, line, column and diagnostic code', () => {
     const result = parseDevelopmentDiagnostics('src/app.tsx(12,8): error TS2322: Type string is not assignable to number.', 2);
     expect(result).toEqual([{
