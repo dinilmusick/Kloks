@@ -56,6 +56,7 @@ describe('PlaywrightInspectionRuntime', () => {
       expect(result.ok).toBe(false);
       expect(result.title).toBe('Inspection fixture');
       expect(result.errors.some(item => item.kind === 'console')).toBe(true);
+      expect(result.logs.some(item => item.type === 'error' && item.message.includes('fixture console error'))).toBe(true);
       expect(result.errors.some(item => item.kind === 'pageerror')).toBe(true);
       expect(result.errors.some(item => item.kind === 'http' && item.status === 404)).toBe(true);
       expect(result.errors.some(item => item.kind === 'asset' && item.url?.endsWith('/broken.png'))).toBe(true);
