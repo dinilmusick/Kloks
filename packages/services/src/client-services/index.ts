@@ -96,12 +96,12 @@ export const SystemDbClientServiceDefinition: ServiceDefinition = createServiceD
     getEnvStatus: {
       id: 'SystemDbClientService.getEnvStatus',
       name: 'getEnvStatus',
-      handler: async () => systemDbService.getEnvStatus(),
+      handler: async () => { await systemDbService.refreshStatus(); return systemDbService.getEnvStatus(); },
     },
     getTelemetry: {
       id: 'SystemDbClientService.getTelemetry',
       name: 'getTelemetry',
-      handler: async () => systemDbService.getTelemetry(),
+      handler: async () => { await systemDbService.refreshStatus(); return systemDbService.getTelemetry(); },
     },
   },
 });
