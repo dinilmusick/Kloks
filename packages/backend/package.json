@@ -153,9 +153,6 @@
     },
     "react": {
       "optional": true
-    },
-    "playwright": {
-      "optional": true
     }
   },
   "devDependencies": {
