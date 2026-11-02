@@ -9,7 +9,9 @@ export type InspectionErrorKind =
   | 'dialog'
   | 'browser'
   | 'screenshot'
-  | 'dom';
+  | 'dom'
+  | 'layout'
+  | 'asset';
 
 export interface InspectionError {
   kind: InspectionErrorKind;
