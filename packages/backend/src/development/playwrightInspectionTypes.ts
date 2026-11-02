@@ -35,6 +35,7 @@ export interface PlaywrightInspectionRequest {
   viewports?: InspectionViewport[];
   checks?: InspectionCheck[];
   screenshotDirectory?: string;
+  reportPath?: string;
   captureDom?: boolean;
   maxDomCharacters?: number;
 }
