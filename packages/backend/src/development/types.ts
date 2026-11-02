@@ -21,12 +21,25 @@ export interface DevelopmentRequest {
   env?: Record<string, string>;
 }
 
+export interface DevelopmentDiagnostic {
+  severity: 'error' | 'warning' | 'info';
+  source: 'typescript' | 'eslint' | 'bundler' | 'package-manager' | 'runtime' | 'unknown';
+  code?: string;
+  file?: string;
+  line?: number;
+  column?: number;
+  message: string;
+}
+
 export interface DevelopmentResult {
   provider: DevelopmentProvider;
   task: DevelopmentTask;
   ok: boolean;
   exitCode?: number;
   output?: string;
+  command?: string;
+  durationMs?: number;
+  diagnostics?: DevelopmentDiagnostic[];
   runId?: number;
   url?: string;
 }
