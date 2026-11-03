@@ -3,14 +3,14 @@ import { WebContainerServiceDefinition, resolveWebContainerCommand } from './web
 import { resolveDevelopmentCommand } from './developmentService.js';
 
 describe('WebContainerService', () => {
-  it('exposes the complete canonical lifecycle and generic execution surface', () => {
+  it('exposes the canonical lifecycle, execution and isolated-session surface', () => {
     expect(Object.keys(WebContainerServiceDefinition.operations)).toEqual([
-      'boot', 'mount', 'run', 'runCommand', 'teardown', 'command',
+      'boot', 'mount', 'run', 'runCommand', 'spawnCommand', 'teardown', 'command',
     ]);
   });
 
   it.each([
-    ['install', ['install', '--no-frozen-lockfile']],
+    ['install', ['install', '--frozen-lockfile']],
     ['lint', ['lint']],
     ['test', ['test']],
     ['build', ['build']],
