@@ -51,6 +51,7 @@ export interface PlaywrightInspectionRequest {
   reportPath?: string;
   captureDom?: boolean;
   maxDomCharacters?: number;
+  executablePath?: string;
 }
 
 export interface InspectionCheckResult {

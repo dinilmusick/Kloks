@@ -15,6 +15,7 @@ import type {
   PlaywrightInspectionResult,
 } from './playwrightInspectionTypes.js';
 import {
+  findSystemChromiumExecutable,
   loadPlaywright,
   recordInspectionError,
   runInspectionCheck,
@@ -32,7 +33,13 @@ export class PlaywrightInspectionRuntime {
     const reportPath = request.reportPath ?? join(screenshotDirectory, 'report.json');
     const timeout = request.timeoutMs ?? 15000;
     let browser: BrowserLike;
-    try { browser = await loadPlaywright().chromium.launch({ headless: true }); }
+    try {
+      const executablePath = request.executablePath ?? findSystemChromiumExecutable();
+      browser = await loadPlaywright().chromium.launch({
+        headless: true,
+        ...(executablePath ? { executablePath } : {}),
+      });
+    }
     catch (cause) {
       recordInspectionError(errors, 'browser', cause instanceof Error ? cause.message : String(cause), request.url);
       const result: PlaywrightInspectionResult = {

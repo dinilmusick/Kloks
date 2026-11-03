@@ -36,3 +36,5 @@ export function createFodServiceFacadeForWorkspace(buildRuntime:(workspaceId:str
   const service:IService=createService(definition);
   return {id:definition.id,name:definition.name,version:definition.version,runtime:'server' as const,deployment:'local' as const,definition,createInstance:()=>createService(definition),execute:async<TIn=unknown,TOut=unknown>(op:string,input?:TIn)=>{await service.start();return service.call<TIn,TOut>(op,input)}};
 }
+
+export const FodServiceFacade = createFodServiceFacade(new FodRuntime({ workspaceId: 'default', workspaceService: null as any }));
