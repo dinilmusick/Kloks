@@ -1,6 +1,6 @@
 {
   "name": "@kloks/client",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Kloks Browser-Safe Execution Client & Shared Contracts with Zero Server Closure",
   "type": "module",
   "private": false,
@@ -28,9 +28,13 @@
     "zod": "^3.24.1"
   },
   "peerDependencies": {
+    "better-auth": ">=1.7.0",
     "react": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
+    "better-auth": {
+      "optional": true
+    },
     "react": {
       "optional": true
     }
