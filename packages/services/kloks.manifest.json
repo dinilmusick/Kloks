@@ -151,6 +151,25 @@
           "BackendFacade.services"
         ]
       }
+    },
+    {
+      "id": "kloks.serviceDiscovery",
+      "name": "KLOKS Service Discovery",
+      "version": "1.0.0",
+      "description": "Canonical machine-readable service identity, deterministic duplicate detection, semantic matching and reuse recommendations.",
+      "backend": {
+        "package": "@kloks/services",
+        "export": "KLOKSServiceIndex",
+        "facade": "KLOKSServiceIndex"
+      },
+      "modes": [
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      }
     }
   ]
 }
