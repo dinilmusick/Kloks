@@ -1,6 +1,4 @@
-import { randomUUID } from 'node:crypto';
 import type { DevelopmentDiagnostic, DevelopmentTask, WebContainerCommand } from './types.js';
-
 const COMMANDS: Record<DevelopmentTask, WebContainerCommand> = {
   install: { command: 'pnpm', args: ['install', '--frozen-lockfile'] },
   lint: { command: 'pnpm', args: ['lint'] },
@@ -142,7 +140,7 @@ export class WebContainerRuntime {
   async spawnCommand(command: string, args: string[] = [], cwd?: string, env?: Record<string, string | number | boolean>, sourceSha?: string) {
     const container = await this.boot();
     const process = await container.spawn(command, args, { cwd, env });
-    return { processId: randomUUID(), sourceSha, command: [command, ...args].join(' '), startedAt: new Date().toISOString(), process: captureDevelopmentProcess(process) };
+    return { processId: globalThis.crypto.randomUUID(), sourceSha, command: [command, ...args].join(' '), startedAt: new Date().toISOString(), process: captureDevelopmentProcess(process) };
   }
 
   async teardown(mountPoint?: string) {
