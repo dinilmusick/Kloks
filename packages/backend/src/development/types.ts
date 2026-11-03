@@ -19,6 +19,7 @@ export interface DevelopmentRequest {
   workflowInputs?: Record<string, string>;
   cwd?: string;
   env?: Record<string, string>;
+  sourceSha?: string;
 }
 
 export interface DevelopmentDiagnostic {
@@ -40,6 +41,7 @@ export interface DevelopmentResult {
   command?: string;
   durationMs?: number;
   diagnostics?: DevelopmentDiagnostic[];
+  sourceSha?: string;
   runId?: number;
   url?: string;
 }
