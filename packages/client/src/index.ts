@@ -14,3 +14,4 @@ export * from './WorkspaceAutosaveController.js';
 export * from './OPFSWorkspaceStorage.js';
 
 export * from './canonicalAuthClient.js';
+export * from './auth.js';
