@@ -121,12 +121,10 @@ describe('Kloks Public Package Library (@kloks/* built on KrnlTS)', () => {
       { provider: string; initialized: boolean }
     >('resolveAdapterType', { provider: 'local' });
     expect(storageStatus.initialized).toBe(true);
-
-    const authLimit = await AuthServiceFacade.execute<{ key: string }, { allowed: boolean }>(
-      'checkRateLimit',
-      { key: 'user-1' }
-    );
-    expect(authLimit.allowed).toBe(true);
+    expect((AuthServiceFacade as any).definition.operations.login).toBeDefined();
+    expect((AuthServiceFacade as any).definition.operations.resolveUser).toBeDefined();
+    expect((AuthServiceFacade as any).definition.operations.createSession).toBeUndefined();
+    expect((AuthServiceFacade as any).definition.operations.checkRateLimit).toBeUndefined();
 
     const backendExports = [AuthServiceFacade, StorageServiceFacade, WorkspaceServiceFacade, SrklServiceFacade];
     expect(backendExports.every((service) => typeof service.execute === 'function')).toBe(true);
