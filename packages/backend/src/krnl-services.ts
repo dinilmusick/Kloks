@@ -13,11 +13,9 @@ import {
   type IService,
   type ServiceDefinition,
 } from '@ultrst-armada/krnl';
-import { SessionManager } from './auth/SessionManager.js';
 import { loginSystemUser, resolveUserFromToken } from './auth/UnifiedAuthCore.js';
 import { queryUnifiedDb } from './core/unifiedDb.js';
-import { RateLimiter } from './auth/RateLimiter.js';
-import type { UserRole } from './auth/types.js';
+type UserRole = 'admin' | 'user';
 import { StorageAdapterFactory } from './storage/StorageAdapterFactory.js';
 import { b2ListBuckets } from './storage/B2DirectClient.js';
 import { getSrklAccounts, srklListBackblazeBuckets } from './srkl/SrklDiscoveryService.js';
@@ -36,14 +34,6 @@ export const AuthServiceDefinition: ServiceDefinition = createServiceDefinition(
     initial: { activeSessions: 0 },
   },
   operations: {
-    createSession: {
-      id: 'AuthService.createSession',
-      name: 'createSession',
-      handler: async (input: { userId: string; role?: UserRole }) => {
-        const sm = new SessionManager();
-        return sm.createSession(input.userId, input.role ?? 'user');
-      },
-    },
     login: {
       id: 'AuthService.login',
       name: 'login',
@@ -55,15 +45,6 @@ export const AuthServiceDefinition: ServiceDefinition = createServiceDefinition(
       name: 'resolveUser',
       handler: async (input: { tokenOrUserId: string; env?: Record<string, unknown> }) =>
         resolveUserFromToken(input.tokenOrUserId, (sql, params) => queryUnifiedDb(sql, params, input.env), input.env),
-    },
-    checkRateLimit: {
-      id: 'AuthService.checkRateLimit',
-      name: 'checkRateLimit',
-      handler: async (input: { key: string; maxRequests?: number; windowMs?: number }) => {
-        const limiter = new RateLimiter(input.windowMs ?? 60000, input.maxRequests ?? 60);
-        limiter.check(input.key);
-        return { allowed: true, key: input.key };
-      },
     },
   },
 });
