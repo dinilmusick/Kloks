@@ -1,5 +1,6 @@
 import {
   LuthAuthClient,
+  DEFAULT_LUTH_URL,
   type LuthAuthTokenStore,
   type LuthSessionResult,
 } from '@dinilmusick/gutts';
@@ -15,18 +16,7 @@ export interface SystemUser {
   emailVerified?: boolean;
 }
 
-export interface AuthEnvironment {
-  LUTH_AUTH_BASE_URL?: string;
-  [key: string]: unknown;
-}
-
-function requireAuthBaseUrl(env?: AuthEnvironment): string {
-  const baseUrl = String(env?.LUTH_AUTH_BASE_URL ?? (typeof process !== 'undefined' ? process.env.LUTH_AUTH_BASE_URL : '') ?? '').trim();
-  if (!baseUrl) {
-    throw new Error('LUTH_AUTH_BASE_URL is required. Local application auth is not supported.');
-  }
-  return baseUrl;
-}
+export type AuthEnvironment = Record<string, unknown>;
 
 function tokenStore(initial = ''): LuthAuthTokenStore {
   let token = initial;
@@ -41,7 +31,7 @@ function createClient(env: AuthEnvironment | undefined, token = ''): LuthAuthCli
   return new LuthAuthClient({
     ecosystemId: 'ultrst-armada',
     applicationId: 'kloks-backend',
-    luthUrl: requireAuthBaseUrl(env),
+    luthUrl: DEFAULT_LUTH_URL,
     autoRegister: false,
     tokenStore: tokenStore(token),
   });
