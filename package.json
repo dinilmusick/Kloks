@@ -233,9 +233,5 @@
     "type": "git",
     "url": "git+https://github.com/dinilmusick/Kloks.git"
   },
-  "pnpm": {
-    "overrides": {
-      "@dinilmusick/gutts": "git+https://github.com/dinilmusick/GutTS.git#95f8e1b7c0c8ef878897d953ba35ea1aa6e5f2a0"
-    }
-  }
+  "pnpm": {}
 }
