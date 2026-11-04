@@ -30,7 +30,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@dinilmusick/gutts": "^1.4.3",
+    "@dinilmusick/gutts": "^1.4.4",
     "zod": "^3.24.1"
   },
   "peerDependencies": {
