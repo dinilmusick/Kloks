@@ -1,4 +1,3 @@
-export * from './authCore.js';
 export * from './b2DirectCore.js';
 export * from './unifiedDb.js';
 export * from './workspaceSyncEngine.js';
