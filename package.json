@@ -1,6 +1,6 @@
 {
   "name": "@ultrst-armada/kloks",
-  "version": "1.24.9",
+  "version": "1.24.10",
   "private": false,
   "publishConfig": {
     "access": "public",
@@ -202,7 +202,7 @@
   "peerDependencies": {
     "@neondatabase/serverless": "^0.10.0 || ^1.0.0",
     "@supabase/supabase-js": "^2.45.0",
-    "@ultrst-armada/krnl": "^1.0.9",
+    "@ultrst-armada/krnl": "^1.0.11",
     "react": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
@@ -226,7 +226,7 @@
     "@supabase/supabase-js": "^2.45.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
-    "@ultrst-armada/krnl": "^1.0.9",
+    "@ultrst-armada/krnl": "^1.0.11",
     "playwright": "^1.64.1",
     "react": "^19.0.1",
     "tsup": "^8.4.0",
