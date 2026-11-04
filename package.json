@@ -1,6 +1,6 @@
 {
   "name": "@ultrst-armada/kloks",
-  "version": "1.24.6",
+  "version": "1.24.7",
   "private": false,
   "publishConfig": {
     "access": "public",
@@ -176,6 +176,11 @@
       "types": "./packages/backend/dist/development/client.d.ts",
       "import": "./packages/backend/dist/development/client.js",
       "default": "./packages/backend/dist/development/client.js"
+    },
+    "./auth": {
+      "types": "./packages/client/dist/auth.d.ts",
+      "import": "./packages/client/dist/auth.js",
+      "default": "./packages/client/dist/auth.js"
     }
   },
   "scripts": {
@@ -187,7 +192,7 @@
     "clean": "pnpm -r run clean"
   },
   "dependencies": {
-    "@dinilmusick/gutts": "git+https://github.com/dinilmusick/GutTS.git#2ccc70f0026e77ef85717c6fb8696c23a6779499",
+    "@dinilmusick/gutts": "^1.4.3",
     "@aws-sdk/client-s3": "^3.600.0",
     "@webcontainer/api": "^1.6.4",
     "ws": "^8.18.0",
@@ -235,7 +240,7 @@
   },
   "pnpm": {
     "overrides": {
-      "@dinilmusick/gutts": "git+https://github.com/dinilmusick/GutTS.git#2ccc70f0026e77ef85717c6fb8696c23a6779499"
+      "@dinilmusick/gutts": "^1.4.3"
     },
     "onlyBuiltDependencies": [
       "@dinilmusick/gutts"
