@@ -1,5 +1,5 @@
 {
-  "name": "@kloks/fod",
+  "name": "@ultrst-armada/kloks-fod",
   "version": "1.0.0",
   "description": "Embedded FOD workflow orchestration module for Skipo applications.",
   "type": "module",
@@ -25,8 +25,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@kloks/backend": "workspace:*",
-    "@kloks/state-graph": "workspace:*"
+    "@ultrst-armada/kloks": "workspace:*"
   },
   "devDependencies": {
     "@ultrst-armada/krnl": "^1.0.9",
