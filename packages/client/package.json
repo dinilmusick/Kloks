@@ -17,10 +17,15 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./auth": {
+      "import": "./dist/auth.js",
+      "types": "./dist/auth.d.ts",
+      "default": "./dist/auth.js"
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean --external react --external zod",
+    "build": "tsup src/index.ts src/auth.ts --format esm --dts --clean --external react --external zod",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
