@@ -5,6 +5,7 @@ export {
   resolveClientOrigin,
   resolveClientEnvironment,
   LuthAuthError,
+  DEFAULT_LUTH_URL,
 } from '@dinilmusick/gutts/auth';
 
 export type {
