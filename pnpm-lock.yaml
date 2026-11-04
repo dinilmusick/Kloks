@@ -148,12 +148,9 @@ importers:
 
   packages/fod:
     dependencies:
-      '@kloks/backend':
+      '@ultrst-armada/kloks':
         specifier: workspace:*
-        version: link:../backend
-      '@kloks/state-graph':
-        specifier: workspace:*
-        version: link:../state-graph
+        version: link:../..
     devDependencies:
       '@ultrst-armada/krnl':
         specifier: ^1.0.9
