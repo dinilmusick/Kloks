@@ -67,7 +67,7 @@ export async function loginSystemUser(
 
   try {
     const client = createClient(env);
-    const result = await client.signInWithEmail({ email: email.trim(), password: rawPass });
+    await client.signInWithEmail({ email: email.trim(), password: rawPass });
     const session = await client.getSession();
     if (!session.authenticated || !session.user || !session.session) {
       return { success: false, status: 401, error: 'Canonical authentication service did not establish a session.' };
