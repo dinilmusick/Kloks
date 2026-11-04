@@ -47,6 +47,16 @@ describe('Kloks Luth-backed auth compatibility facade', () => {
     expect(queryDb).not.toHaveBeenCalled();
   });
 
+  it('preserves Luth credential rejection status instead of reporting a provider outage', async () => {
+    globalThis.fetch = vi.fn(async () => new Response(
+      JSON.stringify({ message: 'Invalid email or password' }),
+      { status: 401, headers: { 'content-type': 'application/json' } },
+    )) as typeof fetch;
+    const result = await loginSystemUser('user@example.test', 'wrong-password', false, async () => ({ rows: [] }));
+    expect(result.success).toBe(false);
+    expect(result.status).toBe(401);
+  });
+
   it('rejects application-local administrator login before contacting Luth', async () => {
     const fetchMock = vi.fn();
     globalThis.fetch = fetchMock as typeof fetch;
