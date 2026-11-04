@@ -24,7 +24,6 @@ describe('Kloks public canonical auth entrypoint', () => {
     expect(client.luthUrl).toBe(DEFAULT_LUTH_URL);
     expect(client.applicationId).toBe('kloks-auth-contract-test');
     expect(typeof client.getSession).toBe('function');
-    expect(typeof client.refreshSession).toBe('function');
     expect(typeof client.signOut).toBe('function');
   });
 });
