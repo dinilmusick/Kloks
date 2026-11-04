@@ -192,7 +192,7 @@
     "clean": "pnpm -r run clean"
   },
   "dependencies": {
-    "@dinilmusick/gutts": "^1.4.3",
+    "@dinilmusick/gutts": "^1.4.4",
     "@aws-sdk/client-s3": "^3.600.0",
     "@webcontainer/api": "^1.6.4",
     "ws": "^8.18.0",
