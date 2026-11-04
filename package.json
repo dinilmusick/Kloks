@@ -236,6 +236,9 @@
   "pnpm": {
     "overrides": {
       "@dinilmusick/gutts": "git+https://github.com/dinilmusick/GutTS.git#2ccc70f0026e77ef85717c6fb8696c23a6779499"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "@dinilmusick/gutts"
+    ]
   }
 }
