@@ -115,7 +115,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@dinilmusick/gutts": "^1.4.0",
+    "@dinilmusick/gutts": "^1.4.3",
     "@kloks/functions": "workspace:*",
     "@kloks/state-graph": "workspace:*",
     "@webcontainer/api": "^1.6.4"
