@@ -187,6 +187,7 @@
     "clean": "pnpm -r run clean"
   },
   "dependencies": {
+    "@dinilmusick/gutts": "^1.4.0",
     "@aws-sdk/client-s3": "^3.600.0",
     "@webcontainer/api": "^1.6.4",
     "bcryptjs": "^2.4.3",
