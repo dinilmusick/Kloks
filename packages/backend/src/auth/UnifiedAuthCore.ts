@@ -3,7 +3,7 @@ import {
   DEFAULT_LUTH_URL,
   type LuthAuthTokenStore,
   type LuthSessionResult,
-} from '@dinilmusick/gutts';
+} from '@dinilmusick/gutts/auth';
 
 export interface SystemUser {
   id: string;
