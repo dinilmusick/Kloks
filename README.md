@@ -8,3 +8,5 @@ Kloks stands for KrnlTS BLOcKS. It is the reusable library layer for services bu
 <!-- GutTS 1.4.3 registry propagation check 2026-11-04 -->
 
 <!-- auth consolidation retry 1793797410196 -->
+
+<!-- canonical auth build retry -->
