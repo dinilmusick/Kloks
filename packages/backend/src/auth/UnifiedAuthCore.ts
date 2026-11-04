@@ -65,7 +65,7 @@ export async function loginSystemUser(
     }
     const user = toSystemUser(session.user);
     const authorization = (client.getAuthHeaders() as Record<string, string>).Authorization || '';
-    const token = authorization.replace(/^Bearer\\s+/i, '').trim();
+    const token = authorization.replace(/^Bearer\s+/i, '').trim();
     if (!token) return { success: false, status: 502, error: 'Luth did not return a usable bearer session token.' };
     return {
       success: true,
@@ -74,7 +74,11 @@ export async function loginSystemUser(
       token,
     };
   } catch (error) {
-    return { success: false, status: 503, error: error instanceof Error ? error.message : 'Canonical authentication service unavailable' };
+    const status = error && typeof error === 'object' && 'status' in error
+      && typeof (error as { status?: unknown }).status === 'number'
+      ? (error as { status: number }).status
+      : 503;
+    return { success: false, status, error: error instanceof Error ? error.message : 'Canonical authentication service unavailable' };
   }
 }
 
