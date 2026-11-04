@@ -54,6 +54,7 @@ export async function loginSystemUser(
   env?: AuthEnvironment,
 ): Promise<{ success: boolean; status: number; token?: string; user?: SystemUser; error?: string }> {
   if (!email?.trim() || !rawPass) return { success: false, status: 400, error: 'Email and password are required' };
+  if (isAdmin) return { success: false, status: 403, error: 'Administrative authentication is not provided by canonical Luth user login.' };
 
   try {
     const client = createClient(env);
@@ -66,9 +67,6 @@ export async function loginSystemUser(
     const authorization = (client.getAuthHeaders() as Record<string, string>).Authorization || '';
     const token = authorization.replace(/^Bearer\\s+/i, '').trim();
     if (!token) return { success: false, status: 502, error: 'Luth did not return a usable bearer session token.' };
-    if (isAdmin) {
-      return { success: false, status: 403, error: 'Administrative authentication is not provided by canonical Luth user login.' };
-    }
     return {
       success: true,
       status: 200,
