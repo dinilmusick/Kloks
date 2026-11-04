@@ -47,21 +47,13 @@ describe('Kloks Luth-backed auth compatibility facade', () => {
     expect(queryDb).not.toHaveBeenCalled();
   });
 
-  it('does not provide application-local administrator authentication', async () => {
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.endsWith('/api/auth/sign-in/email')) {
-        return new Response('{}', { status: 200, headers: { 'set-auth-token': 'luth-token' } });
-      }
-      return new Response(JSON.stringify({
-        authenticated: true,
-        user: { id: 'luth-user-1', email: 'admin@example.test', name: 'Admin' },
-        session: { id: 'session-1' },
-      }), { status: 200 });
-    }) as typeof fetch;
+  it('rejects application-local administrator login before contacting Luth', async () => {
+    const fetchMock = vi.fn();
+    globalThis.fetch = fetchMock as typeof fetch;
     const result = await loginSystemUser('admin@example.test', 'password-not-real', true, async () => ({ rows: [] }));
     expect(result.success).toBe(false);
     expect(result.status).toBe(403);
     expect(result.error).toMatch(/Administrative authentication is not provided/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
