@@ -5,7 +5,7 @@ import {
   LuthAuthClient,
   createCanonicalAuthClient,
   createLuthAuthClient,
-} from '@ultrst-armada/kloks/auth';
+} from './auth.js';
 
 describe('Kloks public canonical auth entrypoint', () => {
   it('exports the shared GutTS client and compatibility aliases', () => {
