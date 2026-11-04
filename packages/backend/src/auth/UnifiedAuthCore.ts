@@ -27,7 +27,7 @@ function tokenStore(initial = ''): LuthAuthTokenStore {
   };
 }
 
-function createClient(env: AuthEnvironment | undefined, token = ''): LuthAuthClient {
+function createClient(_env: AuthEnvironment | undefined, token = ''): LuthAuthClient {
   return new LuthAuthClient({
     ecosystemId: 'ultrst-armada',
     applicationId: 'kloks-backend',
@@ -63,6 +63,9 @@ export async function loginSystemUser(
       return { success: false, status: 401, error: 'Canonical authentication service did not establish a session.' };
     }
     const user = toSystemUser(session.user);
+    const authorization = (client.getAuthHeaders() as Record<string, string>).Authorization || '';
+    const token = authorization.replace(/^Bearer\\s+/i, '').trim();
+    if (!token) return { success: false, status: 502, error: 'Luth did not return a usable bearer session token.' };
     if (isAdmin) {
       return { success: false, status: 403, error: 'Administrative authentication is not provided by canonical Luth user login.' };
     }
@@ -70,7 +73,7 @@ export async function loginSystemUser(
       success: true,
       status: 200,
       user,
-      token: session.session.token,
+      token,
     };
   } catch (error) {
     return { success: false, status: 503, error: error instanceof Error ? error.message : 'Canonical authentication service unavailable' };
