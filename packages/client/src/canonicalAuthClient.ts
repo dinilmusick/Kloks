@@ -3,7 +3,7 @@ export {
   createLuthAuthClient,
   resolveClientOrigin,
   resolveClientEnvironment,
-} from '@dinilmusick/gutts/auth';
+} from '@dinilmusick/gutts';
 
 export type {
   DeploymentEnvironment,
@@ -14,9 +14,9 @@ export type {
   LuthAuthTokenStore,
   LuthSessionResult,
   RegisterApplicationResult,
-} from '@dinilmusick/gutts/auth';
+} from '@dinilmusick/gutts';
 
-export { LuthAuthError } from '@dinilmusick/gutts/auth';
+export { LuthAuthError } from '@dinilmusick/gutts';
 
-export { LuthAuthClient as CanonicalAuthClient } from '@dinilmusick/gutts/auth';
-export { createLuthAuthClient as createCanonicalAuthClient } from '@dinilmusick/gutts/auth';
+export { LuthAuthClient as CanonicalAuthClient } from '@dinilmusick/gutts';
+export { createLuthAuthClient as createCanonicalAuthClient } from '@dinilmusick/gutts';
