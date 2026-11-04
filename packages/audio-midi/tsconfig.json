@@ -10,7 +10,6 @@
     ],
     "strict": false,
     "noImplicitAny": false,
-    "baseUrl": ".",
     "paths": {
       "@kloks/functions": [
         "../functions/dist/index.d.ts"
