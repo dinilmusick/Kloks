@@ -2,6 +2,7 @@ export {
   LuthAuthClient,
   createLuthAuthClient,
   hydrateLuthTokenFromUrl,
+  refreshSession,
   resolveClientOrigin,
   resolveClientEnvironment,
   LuthAuthError,
