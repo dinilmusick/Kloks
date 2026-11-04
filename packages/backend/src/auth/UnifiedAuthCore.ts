@@ -1,10 +1,18 @@
-import { createCanonicalAuthClient, type CanonicalAuthUser } from './CanonicalAuthClient.js';
+import {
+  LuthAuthClient,
+  type LuthAuthTokenStore,
+  type LuthSessionResult,
+} from '@dinilmusick/gutts';
 
-export interface SystemUser extends CanonicalAuthUser {
+export interface SystemUser {
+  id: string;
+  email: string;
+  name: string;
   username: string;
   role: string;
   status: string;
   appProfiles?: Record<string, unknown>;
+  emailVerified?: boolean;
 }
 
 export interface AuthEnvironment {
@@ -20,6 +28,34 @@ function requireAuthBaseUrl(env?: AuthEnvironment): string {
   return baseUrl;
 }
 
+function tokenStore(initial = ''): LuthAuthTokenStore {
+  let token = initial;
+  return {
+    get: () => token,
+    set: (value) => { token = value; },
+    clear: () => { token = ''; },
+  };
+}
+
+function createClient(env: AuthEnvironment | undefined, token = ''): LuthAuthClient {
+  return new LuthAuthClient({
+    ecosystemId: 'ultrst-armada',
+    applicationId: 'kloks-backend',
+    luthUrl: requireAuthBaseUrl(env),
+    autoRegister: false,
+    tokenStore: tokenStore(token),
+  });
+}
+
+function toSystemUser(user: NonNullable<LuthSessionResult['user']>): SystemUser {
+  return {
+    ...user,
+    username: user.email.split('@')[0],
+    role: 'user',
+    status: 'ACTIVE',
+  };
+}
+
 export async function loginSystemUser(
   email: string,
   rawPass: string,
@@ -30,24 +66,21 @@ export async function loginSystemUser(
   if (!email?.trim() || !rawPass) return { success: false, status: 400, error: 'Email and password are required' };
 
   try {
-    const client = createCanonicalAuthClient(requireAuthBaseUrl(env));
-    const result = await client.signInEmail(email, rawPass);
-    if (!result.success || !result.user) {
-      return { success: false, status: result.status, error: result.error ?? 'Invalid email or password' };
+    const client = createClient(env);
+    const result = await client.signInWithEmail({ email: email.trim(), password: rawPass });
+    const session = await client.getSession();
+    if (!session.authenticated || !session.user || !session.session) {
+      return { success: false, status: 401, error: 'Canonical authentication service did not establish a session.' };
     }
-    if (isAdmin && result.user.role !== 'admin') {
-      return { success: false, status: 403, error: 'Insufficient administrative privileges' };
+    const user = toSystemUser(session.user);
+    if (isAdmin) {
+      return { success: false, status: 403, error: 'Administrative authentication is not provided by canonical Luth user login.' };
     }
     return {
       success: true,
-      status: result.status,
-      user: {
-        ...result.user,
-        username: result.user.username ?? result.user.email.split('@')[0],
-        role: result.user.role ?? 'user',
-        status: result.user.status ?? 'ACTIVE',
-      },
-      token: typeof result.session?.token === 'string' ? result.session.token : undefined,
+      status: 200,
+      user,
+      token: session.session.token,
     };
   } catch (error) {
     return { success: false, status: 503, error: error instanceof Error ? error.message : 'Canonical authentication service unavailable' };
@@ -61,22 +94,12 @@ export async function resolveUserFromToken(
 ): Promise<SystemUser | null> {
   if (!tokenOrUserId) return null;
   try {
-    const client = createCanonicalAuthClient(requireAuthBaseUrl(env));
-    const credential = tokenOrUserId.trim();
+    const credential = tokenOrUserId.trim().replace(/^Bearer[ \t]+/i, '').trim();
     if (!credential) return null;
-
-    // Accept a raw Better Auth session token or an explicit Bearer token. A user ID
-    // is not a credential and must never be treated as proof of authentication.
-    const token = credential.replace(/^Bearer[ \t]+/i, '').trim();
-    if (!token) return null;
-    const session = await client.getSession(`better-auth.session_token=${token}`);
-    if (!session?.user) return null;
-    return {
-      ...session.user,
-      username: session.user.username ?? session.user.email.split('@')[0],
-      role: session.user.role ?? 'user',
-      status: session.user.status ?? 'ACTIVE',
-    };
+    const client = createClient(env, credential);
+    const session = await client.getSession();
+    if (!session.authenticated || !session.user) return null;
+    return toSystemUser(session.user);
   } catch {
     return null;
   }
