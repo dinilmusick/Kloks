@@ -16,14 +16,14 @@ export interface SystemUser {
 }
 
 export interface AuthEnvironment {
-  SRKL_AUTH_BASE_URL?: string;
+  LUTH_AUTH_BASE_URL?: string;
   [key: string]: unknown;
 }
 
 function requireAuthBaseUrl(env?: AuthEnvironment): string {
-  const baseUrl = String(env?.SRKL_AUTH_BASE_URL ?? (typeof process !== 'undefined' ? process.env.SRKL_AUTH_BASE_URL : '') ?? '').trim();
+  const baseUrl = String(env?.LUTH_AUTH_BASE_URL ?? (typeof process !== 'undefined' ? process.env.LUTH_AUTH_BASE_URL : '') ?? '').trim();
   if (!baseUrl) {
-    throw new Error('SRKL_AUTH_BASE_URL is required. Local application auth is not supported.');
+    throw new Error('LUTH_AUTH_BASE_URL is required. Local application auth is not supported.');
   }
   return baseUrl;
 }
