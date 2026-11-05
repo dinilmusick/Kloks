@@ -28,6 +28,11 @@ jobs:
           tar -xzf "$RUNNER_TEMP/ultrst-armada-krnl-1.0.13.tgz" -C "$RUNNER_TEMP/krnl-audit"
           KRNL_PACKAGE_DIR="$RUNNER_TEMP/krnl-audit/package" node scripts/audit-krnl-artifact.mjs
       - run: pnpm install --force --no-frozen-lockfile
+      - name: Capture generated lockfile for reconciliation
+        if: always()
+        run: |
+          mkdir -p artifacts/diagnostics
+          cp pnpm-lock.yaml artifacts/diagnostics/pnpm-lock.generated.yaml
       - name: Install isolated Playwright host runtime
         run: |
           npm install --prefix /tmp/kloks-playwright --no-save --package-lock=false playwright
