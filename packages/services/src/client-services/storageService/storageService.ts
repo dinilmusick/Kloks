@@ -204,64 +204,44 @@ class StorageService {
   }
 
 
-  saveConnection(conn: UserStorageConnection): UserStorageConnection {
-    const existingIndex = this.connections.findIndex((c) => c.id === conn.id);
-    if (existingIndex >= 0) {
-      this.connections[existingIndex] = { ...conn, updatedAt: new Date().toISOString() };
-    } else {
-      if (this.connections.length === 0 || conn.role === 'primary') {
-        this.connections.forEach((c) => (c.role = 'redundant_clone'));
-        conn.role = 'primary';
-      } else if (!conn.role) {
-        conn.role = 'redundant_clone';
-      }
-      this.connections.push(conn);
-    }
-    this.persistState();
-    return conn;
+  saveConnection(_conn: UserStorageConnection): UserStorageConnection {
+    throw new Error("Storage provider accounts are managed in SRKL. Update credentials in the SRKL account manager.");
   }
 
-  setPrimaryConnection(id: string) {
-    this.connections = this.connections.map((c) => ({
-      ...c,
-      role: c.id === id ? 'primary' : 'redundant_clone',
-    }));
-    this.persistState();
+  setPrimaryConnection(_id: string): never {
+    throw new Error("Primary storage provider selection is managed by SRKL.");
   }
 
-  deleteConnection(id: string) {
-    this.connections = this.connections.filter((c) => c.id !== id);
-    if (this.connections.length > 0 && !this.connections.some((c) => c.role === 'primary')) {
-      this.connections[0].role = 'primary';
-    }
-    this.persistState();
+  deleteConnection(_id: string): never {
+    throw new Error("Storage provider accounts must be removed in SRKL.");
   }
 
   async testConnection(conn: UserStorageConnection): Promise<{ success: boolean; latencyMs: number; error?: string }> {
+    const startedAt = Date.now();
     try {
-      const res = await fetch('/api/storage/test', {
+      const client = await this.createSrklClient();
+      const remote = await client.getByService((conn as any).serviceId || conn.provider, { forceSync: true });
+      if (!remote) return { success: false, latencyMs: Date.now() - startedAt, error: "Storage account is not available in SRKL." };
+      const connection = this.mapSrklAccount(remote);
+      const response = await fetch('/api/storage/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ connection: conn }),
+        body: JSON.stringify({ connection }),
       });
-      const data = await res.json();
-      const latencyMs = data.latencyMs || 10;
-
-      const match = this.connections.find((c) => c.id === conn.id);
+      const data = await response.json();
+      const latencyMs = data.latencyMs || Date.now() - startedAt;
+      const match = this.connections.find((item) => item.id === conn.id);
       if (match) {
         match.testedAt = new Date().toISOString();
         match.testStatus = data.success ? 'ok' : 'failed';
         match.latencyMs = latencyMs;
-        this.persistState();
+        this.notify();
       }
-
-      if (data.success) {
-        return { success: true, latencyMs };
-      } else {
-        return { success: false, latencyMs, error: data.error || 'Connection probe failed' };
-      }
-    } catch (err: any) {
-      return { success: false, latencyMs: 50, error: err.message || 'Storage probe connection failed' };
+      return data.success
+        ? { success: true, latencyMs }
+        : { success: false, latencyMs, error: data.error || 'Connection probe failed' };
+    } catch (error) {
+      return { success: false, latencyMs: Date.now() - startedAt, error: error instanceof Error ? error.message : 'Storage probe connection failed' };
     }
   }
 
