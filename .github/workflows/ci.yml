@@ -19,6 +19,14 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      - name: Audit the exact Krnl tarball before dependency installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm pack @ultrst-armada/krnl@1.0.13 --ignore-scripts --pack-destination "$RUNNER_TEMP"
+          mkdir -p "$RUNNER_TEMP/krnl-audit"
+          tar -xzf "$RUNNER_TEMP/ultrst-armada-krnl-1.0.13.tgz" -C "$RUNNER_TEMP/krnl-audit"
+          KRNL_PACKAGE_DIR="$RUNNER_TEMP/krnl-audit/package" node scripts/audit-krnl-artifact.mjs
       - run: pnpm install --force --no-frozen-lockfile
       - name: Install isolated Playwright host runtime
         run: |
