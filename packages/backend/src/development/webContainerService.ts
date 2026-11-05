@@ -26,6 +26,7 @@ export const WebContainerServiceDefinition: ServiceDefinition = createServiceDef
     run: { id: 'WebContainerService.run', name: 'run', handler: async (input: { task: DevelopmentTask; cwd?: string; env?: Record<string, string>; sourceSha?: string }) => runtime.run(input.task, input.cwd, input.env, input.sourceSha) },
     runCommand: { id: 'WebContainerService.runCommand', name: 'runCommand', handler: async (input: WebContainerRunCommandInput) => runtime.runCommand(input.command, input.args, input.cwd, input.env, input.sourceSha) },
     spawnCommand: { id: 'WebContainerService.spawnCommand', name: 'spawnCommand', handler: async (input: WebContainerRunCommandInput) => runtime.spawnCommand(input.command, input.args, input.cwd, input.env, input.sourceSha) },
+    waitForServerReady: { id: 'WebContainerService.waitForServerReady', name: 'waitForServerReady', handler: async (input: { port?: number; timeoutMs?: number } = {}) => runtime.waitForServerReady(input) },
     teardown: { id: 'WebContainerService.teardown', name: 'teardown', handler: async (input?: { mountPoint?: string }) => runtime.teardown(input?.mountPoint) },
     command: { id: 'WebContainerService.command', name: 'command', handler: async (input: { task: DevelopmentTask }) => ({ task: input.task, command: resolveWebContainerCommand(input.task) }) },
   },
