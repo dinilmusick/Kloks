@@ -6,6 +6,7 @@
 
 import { queryUnifiedDb } from './unifiedDb';
 import { b2ListBuckets } from './b2DirectCore';
+import { createSrklClient } from '../srkl/SrklClient';
 
 let cachedSrklUrl: { url: string; expiresAt: number } | null = null;
 
@@ -52,120 +53,33 @@ function deduplicateAccounts(items: any[]): any[] {
 export async function getSrklAccounts(
   userId?: string,
   service?: string,
-  env?: Record<string, unknown>
+  env?: Record<string, unknown>,
+  authToken?: string
 ): Promise<{ success: boolean; deploymentUrl: string; userId?: string; count: number; accounts: any[]; error?: string }> {
-  const rawAccounts: any[] = [];
   const srklUrl = await getPrimarySrklDeploymentUrl(env);
-
-  // 1. Query Unified Database for user's storage connections across app profiles
-  if (userId) {
-    try {
-      const uRes = await queryUnifiedDb(
-        `SELECT app_profiles FROM "ultrst-users" WHERE id = $1 OR email = $1 LIMIT 1`,
-        [userId],
-        env
-      );
-      if (uRes.rows.length > 0) {
-        const p = typeof uRes.rows[0].app_profiles === 'string'
-          ? JSON.parse(uRes.rows[0].app_profiles)
-          : (uRes.rows[0].app_profiles || {});
-        
-        const conns: any[] = [];
-        for (const app of Object.values(p)) {
-          if (app && typeof app === 'object' && Array.isArray((app as any).storage_connections)) {
-            conns.push(...(app as any).storage_connections);
-          }
-        }
-
-        for (const c of conns) {
-          if (!service || (c.provider || '').toLowerCase().includes(service.toLowerCase())) {
-            rawAccounts.push({
-              id: c.id,
-              name: c.label || c.name || 'Backblaze B2 Account',
-              provider: c.provider === 'backblaze_b2' ? 'backblaze' : c.provider,
-              serviceId: 'backblaze',
-              category: 'storage',
-              groupIds: c.groupIds || (c.groupId ? [c.groupId] : []),
-              credentials: {
-                keyId: c.b2KeyId || c.keyId || c.accessKeyId || '',
-                applicationKey: c.b2ApplicationKey || c.applicationKey || c.secretAccessKey || '',
-                bucketName: c.b2BucketName || c.bucketName || '',
-                bucketId: c.b2BucketId || c.bucketId || '',
-                endpoint: c.b2Endpoint || c.endpoint || 's3.eu-central-003.backblazeb2.com',
-                region: c.b2Region || c.region || 'eu-central-003',
-              },
-            });
-          }
-        }
-      }
-    } catch (err: any) {
-      console.warn('[SrklCore] Storage connection DB lookup fallback:', err.message);
-    }
+  if (!userId || !authToken) {
+    return { success: false, deploymentUrl: srklUrl, userId, count: 0, accounts: [], error: 'A verified Luth session is required to retrieve SRKL accounts.' };
   }
-
-  // 2. Also check any stored connections in .skipo/accounts.json
   try {
-    const fs = await import('fs/promises');
-    const path = await import('path');
-    const accPath = path.resolve('.skipo/accounts.json');
-    const raw = await fs.readFile(accPath, 'utf-8');
-    const localUsers = JSON.parse(raw);
-    for (const u of Object.values<any>(localUsers)) {
-      const conns = Array.isArray(u.storage_connections) ? u.storage_connections : [];
-      for (const c of conns) {
-        if (!service || (c.provider || '').toLowerCase().includes(service.toLowerCase())) {
-          rawAccounts.push({
-            id: c.id,
-            name: c.label || c.name || 'Local B2 Account',
-            provider: 'backblaze',
-            serviceId: 'backblaze',
-            credentials: {
-              keyId: c.b2KeyId || c.keyId || '',
-              applicationKey: c.b2ApplicationKey || c.applicationKey || '',
-              bucketName: c.b2BucketName || c.bucketName || '',
-              bucketId: c.b2BucketId || '',
-              endpoint: c.b2Endpoint || 's3.eu-central-003.backblazeb2.com',
-              region: c.b2Region || 'eu-central-003',
-            },
-          });
-        }
-      }
-    }
-  } catch {}
-
-  // 3. Query remote SRKL deployment endpoint for ecosystem accounts
-  let fetchError: string | undefined;
-  try {
-    const srklRes = await fetch(`${srklUrl}/api/srkl/accounts?service=${service || 'backblaze'}`, {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (srklRes.ok) {
-      const sData: any = await srklRes.json();
-      if (Array.isArray(sData.accounts)) {
-        for (const sa of sData.accounts) {
-          rawAccounts.push(sa);
-        }
-      }
-    }
+    const client = createSrklClient({ srklUrl, userId, token: authToken });
+    const accounts = await client.fetchEcosystemAccounts({
+      appId: 'kloks',
+      appName: 'Kloks',
+      categories: service?.toLowerCase().includes('cloudflare') ? ['deployment'] : ['storage'],
+      requiredServices: service ? [service] : [],
+    }, { timeoutMs: 6000 });
+    const filtered = deduplicateAccounts(accounts);
+    return { success: true, deploymentUrl: srklUrl, userId, count: filtered.length, accounts: filtered };
   } catch (err: any) {
-    fetchError = err.message;
+    return { success: false, deploymentUrl: srklUrl, userId, count: 0, accounts: [], error: err?.message || 'SRKL account lookup failed.' };
   }
-
-  const accounts = deduplicateAccounts(rawAccounts);
-  return {
-    success: true,
-    deploymentUrl: srklUrl,
-    userId,
-    count: accounts.length,
-    accounts,
-    error: accounts.length > 0 ? undefined : fetchError,
-  };
 }
 
 export async function listBackblazeBuckets(
   payload: any,
   rawUserId?: string,
-  env?: Record<string, unknown>
+  env?: Record<string, unknown>,
+  authToken?: string
 ): Promise<{ success: boolean; buckets?: any[]; error?: string }> {
   try {
     const userId = rawUserId || payload?.userId || payload?.credentials?.userId || '';
@@ -176,7 +90,7 @@ export async function listBackblazeBuckets(
     const bucketName = (payload?.bucketName || payload?.b2BucketName || creds.bucketName || creds.b2BucketName || '').trim();
 
     if ((!keyId || !appKey) && (payload?.accountId || payload?.id)) {
-      const srkl = await getSrklAccounts(userId, 'backblaze', env);
+      const srkl = await getSrklAccounts(userId, 'backblaze', env, authToken);
       const matched = srkl.accounts?.find((a: any) => a.id === (payload.accountId || payload.id));
       if (matched?.credentials) {
         keyId = (matched.credentials.keyId || matched.credentials.b2KeyId || matched.credentials.accessKeyId || keyId).trim();
@@ -193,18 +107,7 @@ export async function listBackblazeBuckets(
       console.warn('[SrklCore] Direct B2 bucket query failed, trying SRKL fallback:', err.message);
     }
 
-    const srklUrl = await getPrimarySrklDeploymentUrl(env);
-    const srklRes = await fetch(`${srklUrl}/api/backblaze/buckets`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-user-id': userId || '' },
-      body: JSON.stringify({ keyId, applicationKey: appKey, bucketId: bucketId || undefined }),
-      signal: AbortSignal.timeout(6000),
-    });
-    if (srklRes.ok) {
-      const data: any = await srklRes.json();
-      if (data.success && Array.isArray(data.buckets)) return { success: true, buckets: data.buckets };
-    }
-    return { success: true, buckets: [] };
+    return { success: false, error: 'Direct Backblaze bucket lookup failed; SRKL credentials were not forwarded to a secondary endpoint.' };
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to list Backblaze buckets' };
   }
@@ -216,8 +119,9 @@ export const srklListBackblazeBuckets = (
   bucketId?: string,
   bucketName?: string,
   userId?: string,
-  accountId?: string
-) => listBackblazeBuckets({ keyId, applicationKey, bucketId, bucketName, accountId }, userId);
+  accountId?: string,
+  authToken?: string
+) => listBackblazeBuckets({ keyId, applicationKey, bucketId, bucketName, accountId }, userId, undefined, authToken);
 
 export async function getSrklStatus(env?: Record<string, unknown>) {
   const srklUrl = await getPrimarySrklDeploymentUrl(env);
