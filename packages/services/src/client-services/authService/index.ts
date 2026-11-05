@@ -34,7 +34,8 @@ export class AuthService {
   private listeners = new Set<AuthListener>();
 
   private get token(): string | null {
-    const value = new Headers(this.getClient().getAuthHeaders()).get("authorization") || "";
+    if (!this.client) return null;
+    const value = new Headers(this.client.getAuthHeaders()).get("authorization") || "";
     return value.replace(/^Bearer\\s+/i, "").trim() || null;
   }
 
