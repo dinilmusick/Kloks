@@ -220,7 +220,7 @@ class StorageService {
     const startedAt = Date.now();
     try {
       const client = await this.createSrklClient();
-      const remote = await client.getByService((conn as any).serviceId || conn.provider, { forceSync: true });
+      const remote = await client.getByService((conn as any).serviceId || (conn.provider === 'backblaze_b2' ? 'backblaze' : conn.provider), { forceSync: true });
       if (!remote) return { success: false, latencyMs: Date.now() - startedAt, error: "Storage account is not available in SRKL." };
       const connection = this.mapSrklAccount(remote);
       const response = await fetch('/api/storage/test', {
