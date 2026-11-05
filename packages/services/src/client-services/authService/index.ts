@@ -56,6 +56,10 @@ export class AuthService {
     return this.currentUser;
   }
 
+  getAuthToken(): string | null {
+    return this.token;
+  }
+
   getRegisteredUsers(): UserAccount[] {
     // Luth owns the identity directory; Kloks must not enumerate or cache local users.
     return [];
