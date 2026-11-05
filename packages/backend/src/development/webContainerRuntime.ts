@@ -71,16 +71,60 @@ let runQueue: Promise<void> = Promise.resolve();
 let sharedContainer: any = null;
 let sharedContainerPromise: Promise<any> | null = null;
 
+type ServerReadyWaiter = {
+  port?: number;
+  resolve: (value: { port: number; url: string }) => void;
+  reject: (error: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+};
+
 export class WebContainerRuntime {
+  private serverReadyContainer: any = null;
+  private readonly serverReadyWaiters = new Set<ServerReadyWaiter>();
+
+  private attachServerReady(container: any) {
+    if (this.serverReadyContainer === container) return;
+    this.serverReadyContainer = container;
+    container.on('server-ready', (port: number, url: string) => {
+      for (const waiter of [...this.serverReadyWaiters]) {
+        if (waiter.port !== undefined && waiter.port !== port) continue;
+        clearTimeout(waiter.timer);
+        this.serverReadyWaiters.delete(waiter);
+        waiter.resolve({ port, url });
+      }
+    });
+  }
+
+  async waitForServerReady(input: { port?: number; timeoutMs?: number } = {}) {
+    await this.boot();
+    const timeoutMs = Math.max(1000, Math.min(input.timeoutMs ?? 30000, 120000));
+    return new Promise<{ port: number; url: string }>((resolve, reject) => {
+      const waiter: ServerReadyWaiter = {
+        port: input.port,
+        resolve,
+        reject,
+        timer: setTimeout(() => {
+          this.serverReadyWaiters.delete(waiter);
+          reject(new Error('WebContainer server-ready event timed out after ' + timeoutMs + 'ms'));
+        }, timeoutMs),
+      };
+      this.serverReadyWaiters.add(waiter);
+    });
+  }
+
   async boot() {
     if (typeof window !== 'undefined' && !window.crossOriginIsolated) {
       throw new Error('WebContainer requires a cross-origin-isolated page. Ensure COOP=same-origin and COEP=require-corp are served.');
     }
-    if (sharedContainer) return sharedContainer;
+    if (sharedContainer) {
+      this.attachServerReady(sharedContainer);
+      return sharedContainer;
+    }
     if (!sharedContainerPromise) {
       sharedContainerPromise = import('@webcontainer/api').then(async module => {
         const container = await module.WebContainer.boot({ coep: 'require-corp', workdirName: 'kloks-development' });
         sharedContainer = container;
+        this.attachServerReady(container);
         return container;
       }).catch(error => {
         sharedContainerPromise = null;
@@ -152,6 +196,12 @@ export class WebContainerRuntime {
     }
     sharedContainer = null;
     sharedContainerPromise = null;
+    this.serverReadyContainer = null;
+    for (const waiter of [...this.serverReadyWaiters]) {
+      clearTimeout(waiter.timer);
+      this.serverReadyWaiters.delete(waiter);
+      waiter.reject(new Error('WebContainer was torn down before server-ready'));
+    }
     await container.teardown();
     return { tornDown: true, mountPoint: '/' };
   }
