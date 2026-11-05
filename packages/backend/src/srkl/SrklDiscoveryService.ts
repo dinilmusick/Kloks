@@ -6,30 +6,77 @@
 
 import { b2ListBuckets } from '../storage/B2DirectClient.js';
 
-let cachedSrklUrl: { url: string; expiresAt: number } | null = null;
+let cachedSrklUrls: { urls: string[]; expiresAt: number } | null = null;
+let roundRobinIndex = 0;
 
-export async function getPrimarySrklDeploymentUrl(
+export async function getRegisteredSrklDeploymentUrls(
   queryDb?: (sql: string, params?: unknown[]) => Promise<{ rows: any[] }>
-): Promise<string> {
-  if (cachedSrklUrl && Date.now() < cachedSrklUrl.expiresAt) return cachedSrklUrl.url;
+): Promise<string[]> {
+  if (cachedSrklUrls && Date.now() < cachedSrklUrls.expiresAt && cachedSrklUrls.urls.length > 0) {
+    return cachedSrklUrls.urls;
+  }
 
   if (queryDb) {
     try {
       const res = await queryDb(
-        `SELECT url FROM "ultrst-srkl-deployments" WHERE is_active = true ORDER BY is_primary DESC, priority DESC, created_at ASC LIMIT 1`,
+        `SELECT url FROM "ultrst-srkl-deployments" WHERE is_active = true ORDER BY is_primary DESC, priority DESC, created_at ASC`,
         []
       );
-      if (res.rows.length > 0 && res.rows[0].url) {
-        const url = res.rows[0].url.trim().replace(/\/+$/, '');
-        cachedSrklUrl = { url, expiresAt: Date.now() + 10 * 60 * 1000 };
-        return url;
+      if (res.rows.length > 0) {
+        const urls = res.rows
+          .map((r: any) => String(r.url || '').trim().replace(/\/+$/, ''))
+          .filter(Boolean);
+        if (urls.length > 0) {
+          cachedSrklUrls = { urls, expiresAt: Date.now() + 10 * 60 * 1000 };
+          return urls;
+        }
       }
     } catch {}
   }
 
-  const fallback = 'https://srkl-engine.vercel.app';
-  cachedSrklUrl = { url: fallback, expiresAt: Date.now() + 10 * 60 * 1000 };
+  const fallback = ['https://srkl-engine.vercel.app'];
+  cachedSrklUrls = { urls: fallback, expiresAt: Date.now() + 10 * 60 * 1000 };
   return fallback;
+}
+
+export async function getPrimarySrklDeploymentUrl(
+  queryDb?: (sql: string, params?: unknown[]) => Promise<{ rows: any[] }>
+): Promise<string> {
+  const urls = await getRegisteredSrklDeploymentUrls(queryDb);
+  return urls[0] || 'https://srkl-engine.vercel.app';
+}
+
+export async function getNextSrklDeploymentUrl(
+  queryDb?: (sql: string, params?: unknown[]) => Promise<{ rows: any[] }>
+): Promise<string> {
+  const urls = await getRegisteredSrklDeploymentUrls(queryDb);
+  if (urls.length === 0) return 'https://srkl-engine.vercel.app';
+  const next = urls[roundRobinIndex % urls.length];
+  roundRobinIndex = (roundRobinIndex + 1) % urls.length;
+  return next;
+}
+
+export async function fetchSrklWithFallback(
+  path: string,
+  init?: RequestInit,
+  queryDb?: (sql: string, params?: unknown[]) => Promise<{ rows: any[] }>
+): Promise<Response> {
+  const urls = await getRegisteredSrklDeploymentUrls(queryDb);
+  let lastError: unknown = null;
+  for (let i = 0; i < urls.length; i++) {
+    const idx = (roundRobinIndex + i) % urls.length;
+    const base = urls[idx];
+    try {
+      const res = await fetch(`${base}${path}`, init);
+      if (res.ok || (res.status >= 200 && res.status < 500)) {
+        roundRobinIndex = idx;
+        return res;
+      }
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error('All SRKL deployments failed to respond.');
 }
 
 export async function getSrklAccounts(

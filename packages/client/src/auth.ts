@@ -1,3 +1,5 @@
+import type { DeploymentEnvironment } from '@dinilmusick/gutts/auth';
+
 export {
   LuthAuthClient,
   createLuthAuthClient,
@@ -20,6 +22,16 @@ export type {
   LuthSessionResult,
   RegisterApplicationResult,
 } from '@dinilmusick/gutts/auth';
+
+export interface LuthDeploymentRecord {
+  id: string;
+  url: string;
+  label?: string;
+  environment?: DeploymentEnvironment;
+  isActive: boolean;
+  isPrimary?: boolean;
+  priority?: number;
+}
 
 export {
   LuthAuthClient as CanonicalAuthClient,
