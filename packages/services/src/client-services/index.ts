@@ -36,6 +36,31 @@ export const AuthClientServiceDefinition: ServiceDefinition = createServiceDefin
       name: 'getState',
       handler: async () => authService.getState(),
     },
+    getSession: {
+      id: 'AuthClientService.getSession',
+      name: 'getSession',
+      handler: async () => authService.refreshSession(),
+    },
+    login: {
+      id: 'AuthClientService.login',
+      name: 'login',
+      handler: async (input: { email: string; password: string }) => authService.login(input.email, input.password),
+    },
+    register: {
+      id: 'AuthClientService.register',
+      name: 'register',
+      handler: async (input: { email: string; password: string; name: string }) => authService.register(input),
+    },
+    logout: {
+      id: 'AuthClientService.logout',
+      name: 'logout',
+      handler: async () => authService.logout(),
+    },
+    refreshSession: {
+      id: 'AuthClientService.refreshSession',
+      name: 'refreshSession',
+      handler: async () => authService.refreshSession(),
+    },
   },
 });
 
