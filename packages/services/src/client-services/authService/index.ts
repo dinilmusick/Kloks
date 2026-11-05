@@ -60,6 +60,10 @@ export class AuthService {
     return this.token;
   }
 
+  getAuthHeaders(): Record<string, string> {
+    return Object.fromEntries(new Headers(this.getClient().getAuthHeaders()).entries());
+  }
+
   getRegisteredUsers(): UserAccount[] {
     // Luth owns the identity directory; Kloks must not enumerate or cache local users.
     return [];
