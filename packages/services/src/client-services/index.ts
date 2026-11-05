@@ -127,6 +127,8 @@ export const SystemDbClientServiceFacade = {
 // ══════════════════════════════════════════════════════════════════════════════
 // KRNL CANONICAL CLIENT SERVICE EXPORTS (Standardized krnl* Prefix Rule)
 // ══════════════════════════════════════════════════════════════════════════════
+export const krnlAuthClientServiceDefinition = AuthClientServiceDefinition;
+export const krnlAuthClientServiceFacade = AuthClientServiceFacade;
 export const krnlStorageClientServiceDefinition = StorageClientServiceDefinition;
 export const krnlStorageClientServiceFacade = StorageClientServiceFacade;
 export const krnlSystemDbClientServiceDefinition = SystemDbClientServiceDefinition;
