@@ -1,4 +1,4 @@
-import { createLuthAuthClient, type LuthSessionResult, type LuthUser } from "@dinilmusick/gutts/auth";
+import { createLuthAuthClient, type LuthAuthClient, type LuthSessionResult, type LuthUser } from "@dinilmusick/gutts/auth";
 import { AuthServiceUISchema } from "./auth.ui.js";
 
 export type UserRole = "user" | "admin";
@@ -18,16 +18,23 @@ export type AuthListener = (state: AuthState) => void;
 export class AuthService {
   static readonly ui = AuthServiceUISchema;
   readonly ui = AuthServiceUISchema;
-  private readonly client = createLuthAuthClient({
-    ecosystemId: "ultrst-armada",
-    applicationId: "kloks",
-    autoRegister: true,
-  });
+  private client: LuthAuthClient | null = null;
+
+  private getClient(): LuthAuthClient {
+    if (!this.client) {
+      this.client = createLuthAuthClient({
+        ecosystemId: "ultrst-armada",
+        applicationId: "kloks",
+        autoRegister: true,
+      });
+    }
+    return this.client;
+  }
   private currentUser: UserAccount | null = null;
   private listeners = new Set<AuthListener>();
 
   private get token(): string | null {
-    const value = new Headers(this.client.getAuthHeaders()).get("authorization") || "";
+    const value = new Headers(this.getClient().getAuthHeaders()).get("authorization") || "";
     return value.replace(/^Bearer\\s+/i, "").trim() || null;
   }
 
@@ -66,7 +73,7 @@ export class AuthService {
   }
 
   async refreshSession(): Promise<LuthSessionResult> {
-    const session = await this.client.refreshSession();
+    const session = await this.getClient().refreshSession();
     this.currentUser = session.authenticated && session.user
       ? { ...session.user, username: session.user.email.split("@")[0], role: "user" }
       : null;
@@ -79,7 +86,7 @@ export class AuthService {
       return { success: false, error: "Administrative access is managed by Luth and SRKL policy." };
     }
     try {
-      await this.client.signInWithEmail({ email, password });
+      await this.getClient().signInWithEmail({ email, password });
       const session = await this.refreshSession();
       if (!session.authenticated || !session.user) {
         return { success: false, error: "Luth did not establish an authenticated session." };
@@ -103,7 +110,7 @@ export class AuthService {
       return { success: false, error: "Administrative registration is managed by Luth." };
     }
     try {
-      await this.client.signUpWithEmail({ email: params.email, password: params.password, name: params.name });
+      await this.getClient().signUpWithEmail({ email: params.email, password: params.password, name: params.name });
       const session = await this.refreshSession();
       if (!session.authenticated || !session.user) {
         return { success: false, error: "Luth registration did not establish an authenticated session." };
@@ -115,7 +122,7 @@ export class AuthService {
   }
 
   async logout(): Promise<void> {
-    await this.client.signOut();
+    await this.getClient().signOut();
     this.currentUser = null;
     this.notify();
   }
