@@ -235,7 +235,9 @@ class StorageService {
       const connection = this.mapSrklAccount(remote);
       const response = await fetch('/api/storage/test', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json', ...authService.getAuthHeaders() },
         body: JSON.stringify({ connection }),
       });
       const data = await response.json();
