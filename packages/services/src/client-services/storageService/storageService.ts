@@ -51,6 +51,7 @@ class StorageService {
     const metadata = account.metadata || {};
     return {
       ...metadata,
+      ...credentials,
       id: account.id,
       srklAccountId: account.id,
       name: account.name,
