@@ -25,6 +25,9 @@ for (const file of files.filter(file => /[.]m?js$/.test(file))) {
   if (/docustackAuthToken|depm_registered_users_db|admin@depm[.]vault|admin123|sess::/.test(source)) {
     suspicious.push(relative + ": contains legacy local credentials or session tokens");
   }
+  if (/ultrst-users|[.]skipo[/\\\\]accounts[.]json/.test(source)) {
+    suspicious.push(relative + ": reads from a legacy local user/account authority");
+  }
   if (/passwordHash/.test(source) && /(?:localStorage|sessionStorage)/.test(source)) {
     suspicious.push(relative + ": persists password hashes in browser storage");
   }
