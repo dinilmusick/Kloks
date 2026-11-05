@@ -1,7 +1,6 @@
 export * from './b2DirectCore.js';
 export * from './unifiedDb.js';
 export * from './workspaceSyncEngine.js';
-export * from './SrklStorageService.js';
 export {
   listBackblazeBuckets,
   getSrklStatus,
