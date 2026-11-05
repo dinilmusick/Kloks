@@ -23,16 +23,23 @@ class StorageService {
   private listeners: Set<StorageListener> = new Set();
 
   constructor() {
-    void this.loadState();
+    authService.subscribe((state) => {
+      if (state.isAuthenticated) void this.loadState();
+      else {
+        this.connections = [];
+        this.notify();
+      }
+    });
+    void authService.refreshSession().catch(() => undefined);
   }
 
   private async createSrklClient() {
-    const session = await authService.refreshSession();
-    if (!session.authenticated || !session.user) throw new Error("A verified Luth session is required.");
+    const state = authService.getState();
+    if (!state.isAuthenticated || !state.currentUser) throw new Error("A verified Luth session is required.");
     const token = authService.getAuthToken() || undefined;
     return createSrklAccountClient({
       baseUrl: DEFAULT_SRKL_API_URL,
-      userId: session.user.id,
+      userId: state.currentUser.id,
       appId: "kloks",
       token: token ? `Bearer ${token}` : undefined,
       sessionToken: token,
