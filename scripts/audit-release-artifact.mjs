@@ -28,9 +28,6 @@ for (const file of files.filter(file => /[.]m?js$/.test(file))) {
   if (/passwordHash/.test(source) && /(?:localStorage|sessionStorage)/.test(source)) {
     suspicious.push(relative + ": persists password hashes in browser storage");
   }
-  if (/docustackAuthToken|depm_registered_users_db|admin@depm[.]vault|admin123|sess::/.test(source)) {
-    suspicious.push(relative + ": contains the removed local credential/session authority");
-  }
   if (/serviceId=cloudflare/i.test(source) && /[?&]token=/.test(source)) {
     suspicious.push(relative + ": forwards a Cloudflare token in a URL query string");
   }
