@@ -29,6 +29,13 @@ jobs:
           set -o pipefail
           mkdir -p artifacts/diagnostics
           pnpm build 2>&1 | tee artifacts/diagnostics/build.log
+      - name: Audit the packed release artifact
+        run: |
+          set -euo pipefail
+          PACKED="$(npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP" | tail -n 1)"
+          mkdir -p "$RUNNER_TEMP/kloks-package"
+          tar -xzf "$RUNNER_TEMP/$PACKED" -C "$RUNNER_TEMP/kloks-package"
+          KLOKS_PACKAGE_DIR="$RUNNER_TEMP/kloks-package/package" node scripts/audit-release-artifact.mjs
       - name: Typecheck all packages
         if: always()
         run: |
