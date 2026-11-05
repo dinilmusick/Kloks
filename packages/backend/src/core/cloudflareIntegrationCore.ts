@@ -22,7 +22,8 @@ function buildHeaders(token?: string, authKey?: string, authEmail?: string): Rec
 export async function fetchCloudflareData(
   payload: Record<string, any>,
   rawUserId?: string,
-  env?: Record<string, unknown>
+  env?: Record<string, unknown>,
+  authToken?: string
 ): Promise<{
   success: boolean;
   provider?: string;
@@ -52,7 +53,7 @@ export async function fetchCloudflareData(
 
   if (!token && !authKey && (payload?.accountId || payload?.id) && userId) {
     try {
-      const srkl = await getSrklAccounts(userId, 'cloudflare', env);
+      const srkl = await getSrklAccounts(userId, 'cloudflare', env, authToken);
       const matched = srkl.accounts?.find((a: any) => a.id === (payload.accountId || payload.id));
       const mCreds = matched?.credentials || matched?.metadata?.credentials || {};
       token = (mCreds.token || mCreds.apiToken || mCreds.accessToken || token).trim();
