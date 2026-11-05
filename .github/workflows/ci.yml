@@ -41,7 +41,8 @@ jobs:
         run: |
           set -euo pipefail
           PACKED="$(npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP" | tail -n 1)"
-          mkdir -p "$RUNNER_TEMP/kloks-package"
+          mkdir -p "$RUNNER_TEMP/kloks-package" artifacts/security
+          cp "$RUNNER_TEMP/$PACKED" artifacts/security/
           tar -xzf "$RUNNER_TEMP/$PACKED" -C "$RUNNER_TEMP/kloks-package"
           KLOKS_PACKAGE_DIR="$RUNNER_TEMP/kloks-package/package" node scripts/audit-release-artifact.mjs
       - name: Typecheck all packages
