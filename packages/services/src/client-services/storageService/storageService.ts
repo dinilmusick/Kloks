@@ -5,10 +5,9 @@ import {
 } from '@kloks/state-graph';
 import { authService } from '../authService';
 import { systemDbService } from '../systemDbService';
+import { createSrklAccountClient, DEFAULT_SRKL_API_URL, type SrklAccount } from '../srklAccountService.js';
 import {
-  STORAGE_KEY_CONNECTIONS,
   CLEAN_DATABASE_CLUSTER,
-  DEFAULT_CONNECTIONS,
 } from './helpers';
 import { StorageServiceUISchema } from './storage.ui.js';
 import type { ServiceUISchema } from '@kloks/contracts';
@@ -24,37 +23,51 @@ class StorageService {
   private listeners: Set<StorageListener> = new Set();
 
   constructor() {
-    this.loadState();
+    void this.loadState();
   }
 
-  private loadState() {
-    try {
-      if (typeof window !== 'undefined') {
-        const storedConn = localStorage.getItem(STORAGE_KEY_CONNECTIONS);
-        if (storedConn) {
-          this.connections = JSON.parse(storedConn);
-        } else {
-          const userConns = authService.getUserStorageConnections();
-          if (userConns.length > 0) {
-            this.connections = userConns;
-          } else {
-            this.connections = [...DEFAULT_CONNECTIONS];
-          }
-        }
-      }
-    } catch {
-      // ignore
-    }
+  private async createSrklClient() {
+    const session = await authService.refreshSession();
+    if (!session.authenticated || !session.user) throw new Error("A verified Luth session is required.");
+    const token = authService.getAuthToken() || undefined;
+    return createSrklAccountClient({
+      baseUrl: DEFAULT_SRKL_API_URL,
+      userId: session.user.id,
+      appId: "kloks",
+      token: token ? `Bearer ${token}` : undefined,
+      sessionToken: token,
+    });
   }
 
-  private persistState() {
+  private mapSrklAccount(account: SrklAccount): UserStorageConnection {
+    const credentials = account.credentials || {};
+    const metadata = account.metadata || {};
+    return {
+      ...metadata,
+      id: account.id,
+      srklAccountId: account.id,
+      name: account.name,
+      label: account.name,
+      provider: account.provider === "backblaze" ? "backblaze_b2" : account.provider,
+      role: metadata.role === "primary" ? "primary" : "redundant_clone",
+      b2KeyId: credentials.keyId || credentials.b2KeyId || credentials.accessKeyId,
+      b2ApplicationKey: credentials.applicationKey || credentials.b2ApplicationKey || credentials.secretAccessKey,
+      b2BucketName: credentials.bucketName || credentials.b2BucketName,
+      b2BucketId: credentials.bucketId || credentials.b2BucketId,
+      b2Endpoint: credentials.endpoint || credentials.b2Endpoint,
+      b2Region: credentials.region || credentials.b2Region,
+      credentials,
+      source: "SRKL",
+    } as unknown as UserStorageConnection;
+  }
+
+  private async loadState() {
     try {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY_CONNECTIONS, JSON.stringify(this.connections));
-      }
-      authService.updateCurrentUserStorage(this.connections);
+      const client = await this.createSrklClient();
+      const result = await client.list({ categories: ["storage"], includeCredentials: false });
+      this.connections = (result.accounts || []).map((account) => this.mapSrklAccount(account));
     } catch {
-      // ignore
+      this.connections = [];
     }
     this.notify();
   }
