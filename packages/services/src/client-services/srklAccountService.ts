@@ -2,6 +2,8 @@
  * Canonical SRKL account client used by ecosystem applications.
  * SRKL is authoritative; applications explicitly synchronize into local state.
  */
+export const DEFAULT_SRKL_API_URL = 'https://srkl-engine.vercel.app';
+
 export type EcosystemServiceCategory =
   | 'deployment' | 'storage' | 'vcs' | 'ai' | 'database' | 'general';
 
