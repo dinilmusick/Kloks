@@ -50,9 +50,11 @@ class StorageService {
     const credentials = account.credentials || {};
     const metadata = account.metadata || {};
     return {
+      ...account,
       ...metadata,
       ...credentials,
       id: account.id,
+      serviceId: account.serviceId,
       srklAccountId: account.id,
       name: account.name,
       label: account.name,
