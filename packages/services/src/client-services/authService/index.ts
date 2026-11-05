@@ -153,6 +153,3 @@ export class AuthService {
 }
 
 export const authService = new AuthService();
-export * from "./authService.js";
-export * from "./auth.ui.js";
-export type { AuthState, UserAccount, UserRole, UserSession, UserWorkspaceRecord, AuthListener } from "./authService.js";
