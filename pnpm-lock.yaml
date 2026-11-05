@@ -80,8 +80,8 @@ importers:
         version: link:../state-graph
     devDependencies:
       '@ultrst-armada/krnl':
-        specifier: ^1.0.9
-        version: 1.0.9(@types/node@22.20.5)
+        specifier: 1.0.13
+        version: 1.0.13(@types/node@22.20.5)
 
   packages/backend:
     dependencies:
@@ -117,8 +117,8 @@ importers:
         version: 3.25.76
     devDependencies:
       '@ultrst-armada/krnl':
-        specifier: ^1.0.9
-        version: 1.0.9(@types/node@22.20.5)
+        specifier: 1.0.13
+        version: 1.0.13(@types/node@22.20.5)
 
   packages/client:
     dependencies:
@@ -133,8 +133,8 @@ importers:
         version: 3.25.76
     devDependencies:
       '@ultrst-armada/krnl':
-        specifier: ^1.0.9
-        version: 1.0.9(@types/node@22.20.5)
+        specifier: 1.0.13
+        version: 1.0.13(@types/node@22.20.5)
 
   packages/contracts:
     dependencies:
@@ -143,8 +143,8 @@ importers:
         version: 3.25.76
     devDependencies:
       '@ultrst-armada/krnl':
-        specifier: ^1.0.9
-        version: 1.0.9(@types/node@22.20.5)
+        specifier: 1.0.13
+        version: 1.0.13(@types/node@22.20.5)
 
   packages/fod:
     dependencies:
@@ -153,8 +153,8 @@ importers:
         version: link:../..
     devDependencies:
       '@ultrst-armada/krnl':
-        specifier: ^1.0.9
-        version: 1.0.9(@types/node@22.20.5)
+        specifier: 1.0.13
+        version: 1.0.13(@types/node@22.20.5)
       tsup:
         specifier: ^8.4.0
         version: 8.5.1(postcss@8.5.29)(typescript@5.9.3)
@@ -175,8 +175,8 @@ importers:
         specifier: ^22.0.0
         version: 22.20.5
       '@ultrst-armada/krnl':
-        specifier: ^1.0.9
-        version: 1.0.9(@types/node@22.20.5)
+        specifier: 1.0.13
+        version: 1.0.13(@types/node@22.20.5)
 
   packages/orchestrations:
     dependencies:
@@ -191,8 +191,8 @@ importers:
         version: link:../state-graph
     devDependencies:
       '@ultrst-armada/krnl':
-        specifier: ^1.0.9
-        version: 1.0.9(@types/node@22.20.5)
+        specifier: 1.0.13
+        version: 1.0.13(@types/node@22.20.5)
 
   packages/semantic-runtime:
     dependencies:
@@ -212,6 +212,9 @@ importers:
 
   packages/services:
     dependencies:
+      '@dinilmusick/gutts':
+        specifier: 1.4.4
+        version: 1.4.4(@types/node@22.20.5)
       '@kloks/contracts':
         specifier: workspace:*
         version: link:../contracts
@@ -220,8 +223,8 @@ importers:
         version: link:../state-graph
     devDependencies:
       '@ultrst-armada/krnl':
-        specifier: ^1.0.9
-        version: 1.0.9(@types/node@22.20.5)
+        specifier: 1.0.13
+        version: 1.0.13(@types/node@22.20.5)
 
   packages/state-graph:
     dependencies:
@@ -236,8 +239,8 @@ importers:
         version: 5.0.15(@types/react@19.3.0)(react@19.3.0)
     devDependencies:
       '@ultrst-armada/krnl':
-        specifier: ^1.0.9
-        version: 1.0.9(@types/node@22.20.5)
+        specifier: 1.0.13
+        version: 1.0.13(@types/node@22.20.5)
 
 packages:
 
@@ -1095,10 +1098,6 @@ packages:
 
   '@ultrst-armada/krnl@1.0.13':
     resolution: {integrity: sha512-peZa/J4i+BLOZxM3uhyV7IIIrOhetMP5YwVTzLcd59I4Pdg5YK2dCHJvLmmu/p5//WQERyHpmPtP5rmdX6obuQ==}
-    hasBin: true
-
-  '@ultrst-armada/krnl@1.0.9':
-    resolution: {integrity: sha512-/vgaxta3vOiBXDviTvzwp72H65sknDbF6CLDs3D+YiZGRNi/VSyAL9Nrs/jYF4jEMYR92ik3T9nnnYibvaJ6pQ==}
     hasBin: true
 
   '@vitest/expect@3.2.7':
@@ -2518,18 +2517,6 @@ snapshots:
       csstype: 3.2.3
 
   '@ultrst-armada/krnl@1.0.13(@types/node@22.20.5)':
-    dependencies:
-      '@dinilmusick/gutts': 1.4.4(@types/node@22.20.5)
-      esbuild: 0.28.2
-      ts-morph: 25.0.1
-      ws: 8.22.0
-    transitivePeerDependencies:
-      - '@types/node'
-      - ai
-      - bufferutil
-      - utf-8-validate
-
-  '@ultrst-armada/krnl@1.0.9(@types/node@22.20.5)':
     dependencies:
       '@dinilmusick/gutts': 1.4.4(@types/node@22.20.5)
       esbuild: 0.28.2
