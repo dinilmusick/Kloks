@@ -5,7 +5,7 @@ import { resolveDevelopmentCommand } from './developmentService.js';
 describe('WebContainerService', () => {
   it('exposes the canonical lifecycle, execution and isolated-session surface', () => {
     expect(Object.keys(WebContainerServiceDefinition.operations)).toEqual([
-      'boot', 'mount', 'run', 'runCommand', 'spawnCommand', 'teardown', 'command',
+      'boot', 'mount', 'run', 'runCommand', 'spawnCommand', 'waitForServerReady', 'teardown', 'command',
     ]);
   });
 
