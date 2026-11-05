@@ -23,6 +23,12 @@ for (const file of files.filter(file => /[.]m?js$/.test(file))) {
     suspicious.push(relative + ": serializes the complete process environment");
   }
   if (/docustackAuthToken|depm_registered_users_db|admin@depm[.]vault|admin123|sess::/.test(source)) {
+    suspicious.push(relative + ": contains legacy local credentials or session tokens");
+  }
+  if (/passwordHash/.test(source) && /(?:localStorage|sessionStorage)/.test(source)) {
+    suspicious.push(relative + ": persists password hashes in browser storage");
+  }
+  if (/docustackAuthToken|depm_registered_users_db|admin@depm[.]vault|admin123|sess::/.test(source)) {
     suspicious.push(relative + ": contains the removed local credential/session authority");
   }
   if (/serviceId=cloudflare/i.test(source) && /[?&]token=/.test(source)) {
