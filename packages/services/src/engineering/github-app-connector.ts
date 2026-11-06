@@ -36,7 +36,7 @@ const pemToDer = (pem: string): Uint8Array => {
 const signAppJwt = async (installation: GitHubAppInstallation, nowSeconds: number): Promise<string> => {
   const header = base64Url(encoder.encode(JSON.stringify({ alg: "RS256", typ: "JWT" })));
   const payload = base64Url(encoder.encode(JSON.stringify({ iat: nowSeconds - 30, exp: nowSeconds + 540, iss: String(installation.appId) })));
-  const key = await crypto.subtle.importKey("pkcs8", pemToDer(installation.privateKey), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+  const key = await crypto.subtle.importKey("pkcs8", pemToDer(installation.privateKey).buffer as ArrayBuffer, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
   const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, encoder.encode(header + "." + payload));
   return header + "." + payload + "." + base64Url(new Uint8Array(signature));
 };
@@ -128,7 +128,7 @@ export class GitHubAppConnector {
     const deadline = this.now() + timeoutMs;
     while (this.now() <= deadline) {
       const result = await this.request<{ workflow_runs: GitHubWorkflowRun[] }>(account, "/repos/" + repository + "/actions/workflows/" + workflow + "/runs?branch=" + encodeURIComponent(ref) + "&per_page=20");
-      if (!result.ok) return result;
+      if (!result.ok) return { ok: false, operation: result.operation, error: result.error };
       const run = result.data.workflow_runs.find((candidate) => candidate.created_at >= startedAfter);
       if (run && ["completed", "cancelled"].includes(run.status)) return { ...result, data: run };
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
