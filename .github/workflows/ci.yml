@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NODE_PATH: /tmp/kloks-playwright/node_modules
+      PLAYWRIGHT_RUNTIME_PATH: /tmp/kloks-playwright
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -24,6 +25,8 @@ jobs:
         run: |
           npm install --prefix /tmp/kloks-playwright --no-save --package-lock=false playwright
           /tmp/kloks-playwright/node_modules/.bin/playwright install --with-deps chromium
+      - name: Verify isolated Playwright runtime
+        run: node scripts/verify-playwright-runtime.mjs
       - name: Build all packages
         run: |
           set -o pipefail

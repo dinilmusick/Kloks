@@ -32,6 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NODE_PATH: /tmp/kloks-playwright/node_modules
+      PLAYWRIGHT_RUNTIME_PATH: /tmp/kloks-playwright
     steps:
       - name: Check out main
         uses: actions/checkout@v4
