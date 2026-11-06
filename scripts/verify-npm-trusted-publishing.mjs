@@ -1,6 +1,6 @@
 import fs from "node:fs";
 
-const workflow = fs.readFileSync(".github/workflows/npm-trusted-publish.yml", "utf8");
+const workflow = fs.readFileSync(".github/workflows/npm-release.yml", "utf8");
 const required = [
   "id-token: write",
   "registry-url: https://registry.npmjs.org/",
