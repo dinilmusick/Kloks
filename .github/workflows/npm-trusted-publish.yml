@@ -1,0 +1,117 @@
+name: npm Trusted Publish
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish the current package to npm"
+        required: true
+        type: boolean
+        default: false
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-trusted-publish-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish) ||
+      github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Node.js for npm Trusted Publishing
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org/
+
+      - name: Update npm CLI
+        run: npm install --global npm@latest
+
+      - name: Verify Trusted Publishing configuration
+        run: node scripts/verify-npm-trusted-publishing.mjs
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Test
+        run: pnpm run test
+
+      - name: Inspect package
+        run: npm pack --dry-run
+
+      - name: Read package metadata
+        id: package
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE' >> "$GITHUB_OUTPUT"
+          import fs from "node:fs";
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          if (pkg.private) throw new Error("Refusing to publish a private package.");
+          if (!pkg.name || !pkg.version) throw new Error("package.json requires name and version.");
+          if (pkg.publishConfig?.registry !== "https://registry.npmjs.org/") {
+            throw new Error("publishConfig.registry must be https://registry.npmjs.org/.");
+          }
+          console.log("name=" + pkg.name);
+          console.log("version=" + pkg.version);
+          NODE
+
+      - name: Check whether this version is already published
+        id: registry
+        env:
+          PACKAGE_NAME: ${{ steps.package.outputs.name }}
+          PACKAGE_VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish with npm Trusted Publishing / OIDC
+        if: steps.registry.outputs.exists == 'false'
+        run: npm publish --provenance --access public
+
+      - name: Independently verify npm publication
+        if: steps.registry.outputs.exists == 'false'
+        env:
+          PACKAGE_NAME: ${{ steps.package.outputs.name }}
+          PACKAGE_VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
+              echo "Verified ${PACKAGE_NAME}@${PACKAGE_VERSION} on npm."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "npm publication was not independently observable."
+          exit 1
