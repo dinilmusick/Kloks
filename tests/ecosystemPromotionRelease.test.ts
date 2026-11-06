@@ -12,12 +12,12 @@ describe("ecosystem promotion release metadata", () => {
 
 
 it("notifies FLOKS when a new KLOKS package version is published", () => {
-  const workflow = readFileSync(".github/workflows/npm-trusted-publish.yml", "utf8");
+  const workflow = readFileSync(".github/workflows/npm-release.yml", "utf8");
   expect(workflow).toContain("const consumers = ['Floks', 'Kult-Engine', 'Theta-Engine', 'Kelt-Engine', 'Skipo'];");
 });
 
 it("uses OIDC Trusted Publishing without a long-lived npm token", () => {
-  const workflow = readFileSync(".github/workflows/npm-trusted-publish.yml", "utf8");
+  const workflow = readFileSync(".github/workflows/npm-release.yml", "utf8");
   expect(workflow).toContain("id-token: write");
   expect(workflow).not.toContain("NPM_TOKEN");
 });
