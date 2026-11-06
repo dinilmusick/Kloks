@@ -187,9 +187,10 @@
     "build": "pnpm -r run build",
     "postbuild": "node -e \"import('fs').then(fs => { for (const pkg of fs.readdirSync('packages')) { const d = 'packages/' + pkg + '/dist'; if (!fs.existsSync(d)) continue; for (const f of fs.readdirSync(d, { recursive: true })) { const p = d + '/' + f; if (fs.statSync(p).isFile() && (p.endsWith('.js') || p.endsWith('.d.ts'))) { const c = fs.readFileSync(p, 'utf8'); const n = c.replaceAll('@kloks/', '@ultrst-armada/kloks/').replaceAll('@ultrst/kloks/', '@ultrst-armada/kloks/').replaceAll('\\\"kloks/', '\\\"@ultrst-armada/kloks/').replaceAll('\\'kloks/', '\\'@ultrst-armada/kloks/'); if (c !== n) fs.writeFileSync(p, n); } } } })\"",
     "prepublishOnly": "npm run postbuild",
-    "test": "vitest run",
+    "test": "vitest run && pnpm run verify:npm-trusted-publishing",
     "typecheck": "pnpm -r run typecheck",
-    "clean": "pnpm -r run clean"
+    "clean": "pnpm -r run clean",
+    "verify:npm-trusted-publishing": "node scripts/verify-npm-trusted-publishing.mjs"
   },
   "dependencies": {
     "@dinilmusick/gutts": "^1.4.4",
