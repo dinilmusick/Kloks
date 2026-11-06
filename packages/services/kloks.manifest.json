@@ -170,6 +170,34 @@
           "BackendFacade.services"
         ]
       }
+    },
+    {
+      "id": "kloks.service.githubAppConnector",
+      "name": "GitHub App Connector",
+      "version": "1.0.0",
+      "description": "Portable GitHub App integration with multiple installations, repository/file/commit/PR operations and asynchronous workflow dispatch/monitoring.",
+      "backend": {
+        "package": "@ultrst-armada/kloks",
+        "export": "GitHubAppConnector",
+        "facade": "GitHubAppConnector"
+      },
+      "modes": [
+        "backend"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ]
+      },
+      "capabilities": [
+        "github-app",
+        "repositories",
+        "files",
+        "commits",
+        "pull-requests",
+        "workflow-dispatch",
+        "workflow-monitoring"
+      ]
     }
   ]
 }
