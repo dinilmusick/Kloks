@@ -43,3 +43,5 @@ export * from './ai-tools/index.js';
 export * from './krnl-ai-services.js';
 
 
+
+export * from './development/wasmRuntimeService.js';
