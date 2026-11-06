@@ -177,6 +177,11 @@
       "import": "./packages/backend/dist/development/client.js",
       "default": "./packages/backend/dist/development/client.js"
     },
+    "./wasm-runtime": {
+      "types": "./packages/wasm-runtime/dist/index.d.ts",
+      "import": "./packages/wasm-runtime/dist/index.js",
+      "default": "./packages/wasm-runtime/dist/index.js"
+    },
     "./auth": {
       "types": "./packages/client/dist/auth.d.ts",
       "import": "./packages/client/dist/auth.js",
