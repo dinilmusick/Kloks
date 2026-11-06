@@ -4,15 +4,6 @@
   "description": "Browser compiler and runner host for the WASM-OJ SDK.",
   "license": "MIT",
   "author": "JacobLinCool",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/wasm-oj/forge.git",
-    "directory": "packages/browser"
-  },
-  "homepage": "https://github.com/wasm-oj/forge#readme",
-  "bugs": {
-    "url": "https://github.com/wasm-oj/forge/issues"
-  },
   "keywords": [
     "online-judge",
     "wasi",

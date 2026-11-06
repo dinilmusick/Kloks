@@ -4,15 +4,6 @@
   "description": "Host-neutral compiler, runner, judge, dependency, and replay orchestration for WASM-OJ.",
   "license": "MIT",
   "author": "JacobLinCool",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/wasm-oj/forge.git",
-    "directory": "packages/core"
-  },
-  "homepage": "https://github.com/wasm-oj/forge#readme",
-  "bugs": {
-    "url": "https://github.com/wasm-oj/forge/issues"
-  },
   "keywords": [
     "online-judge",
     "wasi",
