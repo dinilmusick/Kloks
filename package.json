@@ -19,7 +19,8 @@
     "packages/*/kloks.manifest.json",
     ".krusbl-release-attestation.json",
     "packages/semantic-runtime/dist/**",
-    "packages/semantic-runtime/package.json"
+    "packages/semantic-runtime/package.json",
+    "packages/wasm-runtime/vendor/**"
   ],
   "exports": {
     ".": {
