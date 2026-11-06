@@ -128,7 +128,7 @@ export class GitHubAppConnector {
     const deadline = this.now() + timeoutMs;
     while (this.now() <= deadline) {
       const result = await this.request<{ workflow_runs: GitHubWorkflowRun[] }>(account, "/repos/" + repository + "/actions/workflows/" + workflow + "/runs?branch=" + encodeURIComponent(ref) + "&per_page=20");
-      if (!result.ok) return { ok: false, operation: result.operation, error: result.error };
+      if (result.ok === false) return result as GitHubOperationError;
       const run = result.data.workflow_runs.find((candidate) => candidate.created_at >= startedAfter);
       if (run && ["completed", "cancelled"].includes(run.status)) return { ...result, data: run };
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
