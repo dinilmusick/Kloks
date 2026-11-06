@@ -24,7 +24,7 @@ jobs:
       - name: Install isolated Playwright host runtime
         run: |
           npm install --prefix /tmp/kloks-playwright --no-save --package-lock=false playwright
-          /tmp/kloks-playwright/node_modules/.bin/playwright install --with-deps chromium
+          /tmp/kloks-playwright/node_modules/.bin/playwright install chromium
       - name: Verify isolated Playwright runtime
         run: node scripts/verify-playwright-runtime.mjs
       - name: Build all packages
