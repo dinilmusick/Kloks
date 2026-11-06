@@ -1,4 +1,4 @@
-name: npm Trusted Publish
+name: npm Release
 
 on:
   workflow_run:
