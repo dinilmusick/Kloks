@@ -1,0 +1,32 @@
+{
+  "name": "@kloks/wasm-runtime",
+  "version": "1.0.0",
+  "description": "Kloks Intelligent Polyglot WASM Runtime backed by the WASM-OJ Forge runtime.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@wasm-oj/browser": "0.2.6",
+    "@wasm-oj/toolchain-go": "0.2.0",
+    "@wasm-oj/toolchain-rust": "0.2.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.3",
+    "vitest": "^3.1.0"
+  }
+}
