@@ -44,7 +44,7 @@ describe("GitHubAppConnector", () => {
     });
     const result = await connector.getRepository("primary", "private/repo");
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.status).toBe(403);
+    if (result.ok === false) expect(result.error.status).toBe(403);
   });
 
   it("dispatches workflows and polls to a terminal run", async () => {
