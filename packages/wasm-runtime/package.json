@@ -19,11 +19,7 @@
     "test": "vitest run",
     "clean": "rm -rf dist"
   },
-  "dependencies": {
-    "@wasm-oj/browser": "0.2.6",
-    "@wasm-oj/toolchain-go": "0.2.0",
-    "@wasm-oj/toolchain-rust": "0.2.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "tsup": "^8.4.0",
     "typescript": "^5.7.3",
