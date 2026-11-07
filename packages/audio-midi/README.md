@@ -91,3 +91,19 @@ import {
 ```
 
 Create and own each service in the application composition layer, then pass snapshots and callbacks into the matching Floks panel. The UI package does not import or instantiate Kloks services. The Skipo repository currently declares compatible ranges (`@ultrst-armada/kloks ^1.26.0`, `@ultrst-armada/floks ^1.13.15`); these ranges accept the candidate repository versions 1.26.0 and 1.13.18. Actual Skipo workspace execution against unpublished PR package artifacts remains a separate integration gate before release.
+
+Skipo's manifest registers the three independent facades from the side-effect-isolated `@ultrst-armada/kloks/audio-midi/services` subpath:
+
+```ts
+import {
+  ClockServiceFacade,
+  CanonicalMidiServiceFacade,
+  OscServiceFacade,
+} from '@ultrst-armada/kloks/audio-midi/services';
+
+const clock = ClockServiceFacade.createInstance({ tempo: 120 });
+const midi = CanonicalMidiServiceFacade.createInstance(createWebMidiBackend());
+const osc = OscServiceFacade.createInstance(createNodeUdpOscTransport());
+```
+
+The legacy `@ultrst-armada/kloks/services` export is preserved for the existing services package. The canonical facade entry is deliberately a distinct subpath so importing these services does not evaluate the legacy audio hardware barrel. The Floks panels remain controlled components and are composed explicitly with service snapshots/callbacks; Skipo does not auto-mount them without required props.
