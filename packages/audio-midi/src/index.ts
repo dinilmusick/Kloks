@@ -327,3 +327,5 @@ export * from './engine/index.js';
 
 // Explicit public exports preserve the canonical facade names alongside engine re-exports.
 export { AudioHardwareServiceFacade, MidiServiceFacade, AudioMidiOrchestratorDefinition };
+
+export * from './canonical-services.js';
