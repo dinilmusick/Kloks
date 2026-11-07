@@ -77,7 +77,7 @@ export const StorageServiceDefinition: ServiceDefinition = createServiceDefiniti
     resolveAdapterType: {
       id: 'StorageService.resolveAdapterType',
       name: 'resolveAdapterType',
-      handler: async (input: { provider: 'local' | 'local_fs' | 's3' | 'b2' | 'supabase'; basePath?: string }) => {
+      handler: async (input: { provider: 'local' | 'local_fs' | 's3' | 's3_compatible' | 'b2' | 'supabase' | 'google_drive'; basePath?: string }) => {
         const normalized = input.provider === 'local' ? 'local_fs' : input.provider;
         if (normalized === 'local_fs') {
           const adapter = StorageAdapterFactory.create({
