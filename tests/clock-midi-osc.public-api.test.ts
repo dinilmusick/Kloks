@@ -11,10 +11,10 @@ describe('canonical timing and protocol public entry points',()=>{
  it('registers three independent Skipo service facades without a combined transport service',()=>{
   expect(ClockServiceFacade.id).toBe('kloks.clock');expect(CanonicalMidiServiceFacade.id).toBe('kloks.midi');expect(OscServiceFacade.id).toBe('kloks.osc');
   expect(typeof ClockServiceFacade.createInstance).toBe('function');expect(typeof CanonicalMidiServiceFacade.createInstance).toBe('function');expect(typeof OscServiceFacade.createInstance).toBe('function');
-  const manifest=JSON.parse(readFileSync(new URL('../packages/audio-midi/kloks.manifest.json',import.meta.url),'utf8')) as {services:Array<{id:string;backend:{export:string}}>};
+  const manifest=JSON.parse(readFileSync(new URL('../packages/audio-midi/kloks.manifest.json',import.meta.url),'utf8')) as {services:Array<{id:string;backend:{export:string;subpath?:string}}>};
   expect(manifest.services.find(service=>service.id==='clock')?.backend.export).toBe('ClockServiceFacade');
   expect(manifest.services.find(service=>service.id==='midi-protocol')?.backend.export).toBe('CanonicalMidiServiceFacade');
-  expect(manifest.services.find(service=>service.id==='osc')?.backend.export).toBe('OscServiceFacade');
+  expect(manifest.services.find(service=>service.id==='osc')?.backend.export).toBe('OscServiceFacade');expect(manifest.services.filter(service=>['clock','midi-protocol','osc'].includes(service.id)).every(service=>service.backend.subpath==='audio-midi/services')).toBe(true);
  });
  it('exposes three independent service APIs and the Node-only OSC adapter',async()=>{
   expect(typeof ClockService).toBe('function');expect(typeof MidiService).toBe('function');expect(typeof OscService).toBe('function');
