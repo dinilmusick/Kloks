@@ -20,7 +20,9 @@
     ".krusbl-release-attestation.json",
     "packages/semantic-runtime/dist/**",
     "packages/semantic-runtime/package.json",
-    "packages/wasm-runtime/vendor/**"
+    "packages/wasm-runtime/vendor/**",
+    "!packages/wasm-runtime/vendor/**/*.bin",
+    "!packages/wasm-runtime/vendor/forge/toolchain-assets/**"
   ],
   "exports": {
     ".": {
