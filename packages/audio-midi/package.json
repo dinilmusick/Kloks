@@ -40,7 +40,7 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram --clean && tsup src/clock/index.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram && tsup src/midi/index.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram && tsup src/osc/index.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram && tsup src/osc/node-udp.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram",
+    "build": "tsup src/index.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram --clean && tsup src/clock/index.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram --outDir dist/clock && tsup src/midi/index.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram --outDir dist/midi && tsup src/osc/index.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram --outDir dist/osc && tsup src/osc/node-udp.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram --outDir dist/osc",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
