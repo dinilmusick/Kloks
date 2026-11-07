@@ -1,9 +1,9 @@
-import { createClockKernelService } from './clock/kernel.js';
-import { ClockService, type ClockOptions } from './clock/clock.js';
-import { createMidiKernelService } from './midi/kernel.js';
-import { createWebMidiBackend, type MidiBackend } from './midi/service.js';
-import { createOscKernelService } from './osc/kernel.js';
-import type { OscTransport } from './osc/service.js';
+import { createClockKernelService } from './clock/index.js';
+import { ClockService, type ClockOptions } from './clock/index.js';
+import { createMidiKernelService } from './midi/index.js';
+import { createWebMidiBackend, type MidiBackend } from './midi/index.js';
+import { createOscKernelService } from './osc/index.js';
+import type { OscTransport } from './osc/index.js';
 import type { ServiceDefinition } from '@ultrst-armada/krnl';
 
 /** Default timing facade; each Skipo app can create an isolated clock instance. */
