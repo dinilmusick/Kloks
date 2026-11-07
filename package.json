@@ -187,6 +187,26 @@
       "types": "./packages/wasm-runtime/dist/index.d.ts",
       "import": "./packages/wasm-runtime/dist/index.js",
       "default": "./packages/wasm-runtime/dist/index.js"
+    },
+    "./clock": {
+      "types": "./packages/audio-midi/dist/clock/index.d.ts",
+      "import": "./packages/audio-midi/dist/clock/index.js",
+      "default": "./packages/audio-midi/dist/clock/index.js"
+    },
+    "./midi": {
+      "types": "./packages/audio-midi/dist/midi/index.d.ts",
+      "import": "./packages/audio-midi/dist/midi/index.js",
+      "default": "./packages/audio-midi/dist/midi/index.js"
+    },
+    "./osc": {
+      "types": "./packages/audio-midi/dist/osc/index.d.ts",
+      "import": "./packages/audio-midi/dist/osc/index.js",
+      "default": "./packages/audio-midi/dist/osc/index.js"
+    },
+    "./osc/node": {
+      "types": "./packages/audio-midi/dist/osc/node-udp.d.ts",
+      "import": "./packages/audio-midi/dist/osc/node-udp.js",
+      "default": "./packages/audio-midi/dist/osc/node-udp.js"
     }
   },
   "scripts": {

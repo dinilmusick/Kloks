@@ -17,10 +17,30 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./clock": {
+      "types": "./dist/clock/index.d.ts",
+      "import": "./dist/clock/index.js",
+      "default": "./dist/clock/index.js"
+    },
+    "./midi": {
+      "types": "./dist/midi/index.d.ts",
+      "import": "./dist/midi/index.js",
+      "default": "./dist/midi/index.js"
+    },
+    "./osc": {
+      "types": "./dist/osc/index.d.ts",
+      "import": "./dist/osc/index.js",
+      "default": "./dist/osc/index.js"
+    },
+    "./osc/node": {
+      "types": "./dist/osc/node-udp.d.ts",
+      "import": "./dist/osc/node-udp.js",
+      "default": "./dist/osc/node-udp.js"
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean --external @kloks/state-graph --external ws",
+    "build": "tsup src/index.ts src/clock/index.ts src/midi/index.ts src/osc/index.ts src/osc/node-udp.ts --format esm --dts --clean --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
