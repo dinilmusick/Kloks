@@ -37,24 +37,65 @@ export class MidiService{
  private requireDevice(id:string){const d=this.devices.get(id);if(!d)throw new Error('Unknown MIDI device: '+id);return d;}
  private assertActive(){if(this.disposed)throw new Error('MidiService has been disposed');}
 }
-type WebMidiInput={id:string;name?:string|null;manufacturer?:string|null;state?:string;onmidimessage:((event:{data:ArrayLike<number>})=>void)|null};
-type WebMidiOutput={id:string;name?:string|null;manufacturer?:string|null;state?:string;send(data:number[]):void};
-type WebMidiAccess={inputs:{forEach(fn:(port:WebMidiInput)=>void):void};outputs:{forEach(fn:(port:WebMidiOutput)=>void):void}};
-type WebMidiNavigator=Navigator&{requestMIDIAccess?:(options?:{sysex?:boolean})=>Promise<WebMidiAccess>};
-export function createWebMidiBackend():MidiBackend{
- const nav=typeof navigator==='undefined'?null:navigator as WebMidiNavigator;
- const supported=typeof nav?.requestMIDIAccess==='function';
- let access:WebMidiAccess|null=null;const inputs=new Map<string,WebMidiInput>();const outputs=new Map<string,WebMidiOutput>();
- return{
-  capabilities:{physicalInput:supported,physicalOutput:supported,virtualDeviceCreation:false},
-  async discover(){if(!nav?.requestMIDIAccess)return[];access=access??await nav.requestMIDIAccess({sysex:false});inputs.clear();outputs.clear();
-   access.inputs.forEach(p=>inputs.set(p.id,p));access.outputs.forEach(p=>outputs.set(p.id,p));const found:MidiDevice[]=[];
-   inputs.forEach(p=>found.push({id:p.id,name:p.name??p.id,manufacturer:p.manufacturer??undefined,direction:'input',origin:'physical',state:p.state==='connected'?'connected':'disconnected',capabilities:{input:true,output:false,virtualDeviceCreation:false}}));
-   outputs.forEach(p=>found.push({id:p.id,name:p.name??p.id,manufacturer:p.manufacturer??undefined,direction:'output',origin:'physical',state:p.state==='connected'?'connected':'disconnected',capabilities:{input:false,output:true,virtualDeviceCreation:false}}));return found;},
-  async connectInput(id,listener){const p=inputs.get(id);if(!p)throw new Error('MIDI input not discovered');p.onmidimessage=e=>listener(decodeMidiMessage(e.data));},
-  async connectOutput(id){if(!outputs.has(id))throw new Error('MIDI output not discovered');},
-  async send(id,bytes){const p=outputs.get(id);if(!p)throw new Error('MIDI output not discovered');p.send(Array.from(bytes));},
-  async disconnect(id){const p=inputs.get(id);if(p)p.onmidimessage=null;},
-  async dispose(){inputs.forEach(p=>p.onmidimessage=null);inputs.clear();outputs.clear();access=null;}
- };
+/**
+ * Adapts the existing Kloks MidiManager to the capability-based service contract.
+ * Device discovery, hot-plug handling and physical I/O remain owned by one canonical manager.
+ */
+export function createWebMidiBackend(manager: LegacyMidiManager = new LegacyMidiManager()): MidiBackend {
+  const inputSubscriptions = new Map<string, () => void>();
+  const supported = typeof navigator !== 'undefined' && typeof navigator.requestMIDIAccess === 'function';
+  const ensureInitialized = async () => {
+    if (!supported) return false;
+    if (!manager.getState().isInitialized) await manager.initialize({ sysex: false, software: true });
+    return true;
+  };
+  return {
+    capabilities: { physicalInput: supported, physicalOutput: supported, virtualDeviceCreation: false },
+    async discover() {
+      if (!(await ensureInitialized())) return [];
+      const state = manager.getState();
+      const devices = new Map<string, MidiDevice>();
+      state.inputs.forEach(port => devices.set(port.id, {
+        id: port.id, name: port.name, manufacturer: port.manufacturer,
+        direction: 'input', origin: 'physical',
+        state: port.state === 'connected' && port.connection === 'open' ? 'connected' : 'disconnected',
+        capabilities: { input: true, output: false, virtualDeviceCreation: false },
+      }));
+      state.outputs.forEach(port => {
+        const previous = devices.get(port.id);
+        devices.set(port.id, {
+          id: port.id, name: port.name, manufacturer: port.manufacturer ?? previous?.manufacturer,
+          direction: previous ? 'duplex' : 'output', origin: 'physical',
+          state: port.state === 'connected' && port.connection === 'open' ? 'connected' : 'disconnected',
+          capabilities: { input: Boolean(previous?.capabilities.input), output: true, virtualDeviceCreation: false },
+        });
+      });
+      return [...devices.values()];
+    },
+    async connectInput(id, listener) {
+      if (!(await ensureInitialized())) throw new Error('Web MIDI is unavailable in this runtime');
+      if (!manager.getState().inputs.some(port => port.id === id)) throw new Error('MIDI input not discovered: ' + id);
+      if (!inputSubscriptions.has(id)) {
+        inputSubscriptions.set(id, manager.subscribeEvents(event => {
+          if (event.sourceId === id) listener(decodeMidiMessage(event.rawBytes));
+        }));
+      }
+      await manager.connectInput(id);
+    },
+    async connectOutput(id) {
+      if (!(await ensureInitialized())) throw new Error('Web MIDI is unavailable in this runtime');
+      await manager.connectOutput(id);
+    },
+    async send(id, bytes) { manager.sendRawMidiBytes(bytes, id); },
+    async disconnect(id) {
+      inputSubscriptions.get(id)?.();
+      inputSubscriptions.delete(id);
+      await Promise.all([manager.disconnectInput(id), manager.disconnectOutput(id)]);
+    },
+    async dispose() {
+      inputSubscriptions.forEach(unsubscribe => unsubscribe());
+      inputSubscriptions.clear();
+      manager.dispose();
+    },
+  };
 }
