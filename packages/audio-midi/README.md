@@ -33,7 +33,7 @@ unsubscribe();
 await midi.dispose();
 ```
 
-Physical discovery and logical in-process endpoints are distinct. The Web MIDI backend adapts Kloks' existing MidiManager, so discovery, hot-plug events and physical port lifecycle remain owned by one canonical manager. It supports physical input/output only where the runtime exposes Web MIDI. It does not create OS-level virtual MIDI ports. System-exclusive access is opt-in with `createWebMidiBackend(manager, { sysex: true })` because browsers may require additional permission; the backend advertises that capability and rejects SysEx sends when it is disabled. Native, Node, WebContainer and desktop environments inject their own capability-appropriate backends.
+Physical discovery and logical in-process endpoints are distinct. The Web MIDI backend adapts Kloks' existing MidiManager, so discovery, hot-plug events and physical port lifecycle remain owned by one canonical manager. It supports physical input/output only where the runtime exposes Web MIDI. Kernel service startup does not request MIDI access; call `discover` from an explicit user gesture (the Floks MIDI panel exposes a Discover devices action) so browser permission prompts are not triggered during application boot. It does not create OS-level virtual MIDI ports. System-exclusive access is opt-in with `createWebMidiBackend(manager, { sysex: true })` because browsers may require additional permission; the backend advertises that capability and rejects SysEx sends when it is disabled. Native, Node, WebContainer and desktop environments inject their own capability-appropriate backends.
 
 ## OSC protocol and endpoints
 
