@@ -10,8 +10,9 @@ function writeString(out:number[],value:string){out.push(...encoder.encode(value
 function readString(bytes:Uint8Array,state:{offset:number}):string{
  const start=state.offset;while(state.offset<bytes.length&&bytes[state.offset]!==0)state.offset++;
  if(state.offset>=bytes.length)throw new TypeError('Unterminated OSC string');
- const value=decoder.decode(bytes.subarray(start,state.offset));state.offset++;while(state.offset%4)state.offset++;
- if(state.offset>bytes.length)throw new TypeError('Invalid OSC string padding');return value;
+ const value=decoder.decode(bytes.subarray(start,state.offset));state.offset++;
+ while(state.offset%4){if(state.offset>=bytes.length||bytes[state.offset]!==0)throw new TypeError('Invalid OSC string padding');state.offset++;}
+ return value;
 }
 function write32(out:number[],value:number){if(!Number.isInteger(value)||value< -2147483648||value>2147483647)throw new RangeError('OSC int32 out of range');const b=new ArrayBuffer(4);new DataView(b).setInt32(0,value,false);out.push(...new Uint8Array(b));}
 function writeInt64(out:number[],value:bigint){const b=new ArrayBuffer(8);new DataView(b).setBigInt64(0,value,false);out.push(...new Uint8Array(b));}
@@ -74,7 +75,7 @@ export function decodeOscPacket(packet:Uint8Array):OscPacket{
   else if(tag==='s')args.push(readString(packet,state));
   else if(tag==='h'){if(state.offset+8>packet.length)throw new TypeError('Truncated OSC int64');args.push(new DataView(packet.buffer,packet.byteOffset+state.offset,8).getBigInt64(0,false));state.offset+=8;}
   else if(tag==='t'){if(state.offset+8>packet.length)throw new TypeError('Truncated OSC timetag');args.push({type:'timetag',value:new DataView(packet.buffer,packet.byteOffset+state.offset,8).getBigUint64(0,false)});state.offset+=8;}
-  else if(tag==='b'){const length=read32(packet,state.offset);state.offset+=4;if(length<0||state.offset+length>packet.length)throw new TypeError('Invalid OSC blob length');args.push(packet.slice(state.offset,state.offset+length));state.offset+=length;while(state.offset%4)state.offset++;}
+  else if(tag==='b'){const length=read32(packet,state.offset);state.offset+=4;if(length<0||state.offset+length>packet.length)throw new TypeError('Invalid OSC blob length');args.push(packet.slice(state.offset,state.offset+length));state.offset+=length;while(state.offset%4){if(state.offset>=packet.length||packet[state.offset]!==0)throw new TypeError('Invalid OSC blob padding');state.offset++;}}
   else throw new TypeError('Unsupported OSC type tag: '+tag);
  }
  if(state.offset!==packet.length)throw new TypeError('Unexpected trailing OSC packet data');
