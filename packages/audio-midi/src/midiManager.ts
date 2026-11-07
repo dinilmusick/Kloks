@@ -335,15 +335,15 @@ export class MidiManager {
     };
   }
 
-  public dispose(): void {
-    if (this.midiAccess) {
-      this.midiAccess.onstatechange = null;
-      this.midiAccess.inputs.forEach(port => {
-        port.onmidimessage = null;
-        void port.close().catch(() => undefined);
-      });
-      this.midiAccess.outputs.forEach(port => { void port.close().catch(() => undefined); });
-      this.midiAccess = null;
+  public async dispose(): Promise<void> {
+    const access = this.midiAccess;
+    this.midiAccess = null;
+    if (access) {
+      access.onstatechange = null;
+      const closing: Promise<unknown>[] = [];
+      access.inputs.forEach(port => { port.onmidimessage = null; closing.push(port.close().catch(() => undefined)); });
+      access.outputs.forEach(port => { closing.push(port.close().catch(() => undefined)); });
+      await Promise.all(closing);
     }
     this.boundInputs.clear();
     this.eventListeners.clear();
