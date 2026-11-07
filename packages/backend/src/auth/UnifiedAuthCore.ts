@@ -32,6 +32,7 @@ function createClient(_env: AuthEnvironment | undefined, token = ''): LuthAuthCl
     ecosystemId: 'ultrst-armada',
     applicationId: 'kloks-backend',
     luthUrl: DEFAULT_LUTH_URL,
+    origin: process.env.APP_URL || DEFAULT_LUTH_URL,
     autoRegister: false,
     tokenStore: tokenStore(token),
   });

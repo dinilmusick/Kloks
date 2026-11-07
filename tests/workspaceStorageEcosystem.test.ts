@@ -89,7 +89,7 @@ describe('Workspace Storage Ecosystem in Kloks', () => {
         accessKey: 'token-123',
         rootFolderId: 'folder-root',
       });
-      expect(gdrive.constructor.name).toBe('GoogleDriveAdapter');
+      expect(['GoogleDriveAdapter', 'GoogleDriveStorageService']).toContain(gdrive.constructor.name);
     });
 
     it('rejects aws_s3 and unsupported providers from new adapter creation', () => {

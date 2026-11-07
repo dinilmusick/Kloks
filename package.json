@@ -1,6 +1,6 @@
 {
   "name": "@ultrst-armada/kloks",
-  "version": "1.25.1",
+  "version": "1.26.0",
   "private": false,
   "publishConfig": {
     "access": "public",
@@ -193,8 +193,7 @@
     "verify:npm-trusted-publishing": "node scripts/verify-npm-trusted-publishing.mjs"
   },
   "dependencies": {
-    "@dinilmusick/gutts": "^1.4.4",
-    "@aws-sdk/client-s3": "^3.600.0",
+    "@dinilmusick/gutts": "^1.6.0",
     "@webcontainer/api": "^1.6.4",
     "ws": "^8.18.0",
     "zod": "^3.24.1",
@@ -221,8 +220,6 @@
     }
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "^3.600.0",
-    "@aws-sdk/lib-storage": "^3.600.0",
     "@neondatabase/serverless": "^0.10.0",
     "@supabase/supabase-js": "^2.45.0",
     "@types/node": "^22.0.0",

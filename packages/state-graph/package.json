@@ -45,7 +45,7 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts src/state/index.ts src/domain/index.ts src/rules/index.ts src/spatial/index.ts src/store/index.ts --format esm --dts --clean --external zustand --external react --external ws",
+    "build": "tsup src/index.ts src/state/index.ts src/domain/index.ts src/rules/index.ts src/spatial/index.ts src/store/index.ts --format esm --clean --external zustand --external react --external ws && tsc --emitDeclarationOnly --declaration --project tsconfig.json",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },

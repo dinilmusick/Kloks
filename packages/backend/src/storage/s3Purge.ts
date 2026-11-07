@@ -5,7 +5,7 @@
 export async function ensureS3DirectoryMarker(s3: any, bucketName: string, folderPrefix: string): Promise<void> {
   const clean = folderPrefix.replace(/^\/+|\/+$/g, '');
   if (!clean) return;
-  const { PutObjectCommand } = await import('@aws-sdk/client-s3');
+  const { PutObjectCommand } = await import('@dinilmusick/gutts/storage');
   try {
     await s3.send(new PutObjectCommand({
       Bucket: bucketName,
@@ -20,36 +20,8 @@ export async function ensureS3DirectoryMarker(s3: any, bucketName: string, folde
 
 export async function permanentDeleteS3Object(s3: any, bucketName: string, fullKey: string): Promise<boolean> {
   try {
-    const { ListObjectVersionsCommand, DeleteObjectsCommand, DeleteObjectCommand } = await import('@aws-sdk/client-s3');
-    const versionsToDelete: { Key: string; VersionId?: string }[] = [];
-
-    try {
-      const res: any = await s3.send(new ListObjectVersionsCommand({ Bucket: bucketName, Prefix: fullKey }));
-      for (const v of res.Versions || []) {
-        if (v.Key === fullKey) versionsToDelete.push({ Key: v.Key, VersionId: v.VersionId });
-      }
-      for (const dm of res.DeleteMarkers || []) {
-        if (dm.Key === fullKey) versionsToDelete.push({ Key: dm.Key, VersionId: dm.VersionId });
-      }
-    } catch (verErr) {
-      console.warn('[s3Purge] ListObjectVersions fallback:', verErr);
-    }
-
-    if (versionsToDelete.length > 0) {
-      for (let i = 0; i < versionsToDelete.length; i += 1000) {
-        const batch = versionsToDelete.slice(i, i + 1000);
-        try {
-          await s3.send(new DeleteObjectsCommand({ Bucket: bucketName, Delete: { Objects: batch, Quiet: true } }));
-        } catch {
-          for (const item of batch) {
-            try {
-              await s3.send(new DeleteObjectCommand({ Bucket: bucketName, Key: item.Key, VersionId: item.VersionId }));
-            } catch {}
-          }
-        }
-      }
-      return true;
-    }
+    const { DeleteObjectCommand } = await import('@dinilmusick/gutts/storage');
+    await s3.send(new DeleteObjectCommand({ Bucket: bucketName, Key: fullKey }));
     return true;
   } catch (err) {
     console.warn(`[s3Purge] Error deleting object ${fullKey}:`, err);
@@ -67,55 +39,31 @@ export async function permanentDeleteS3Folder(
   const isMatch = (k: string) => k === bare || k === `${bare}/` || k.startsWith(`${bare}/`);
 
   try {
-    const { ListObjectVersionsCommand, DeleteObjectsCommand, DeleteObjectCommand, ListObjectsV2Command } = await import('@aws-sdk/client-s3');
-    let keyMarker: string | undefined;
-    let versionMarker: string | undefined;
-    let isTruncated = true;
-
-    while (isTruncated) {
-      try {
-        const input: any = { Bucket: bucketName, Prefix: bare };
-        if (keyMarker) input.KeyMarker = keyMarker;
-        if (versionMarker && keyMarker) input.VersionIdMarker = versionMarker;
-
-        const res: any = await s3.send(new ListObjectVersionsCommand(input));
-        const items: { Key: string; VersionId?: string }[] = [];
-
-        for (const v of res.Versions || []) if (v.Key && isMatch(v.Key)) items.push({ Key: v.Key, VersionId: v.VersionId });
-        for (const dm of res.DeleteMarkers || []) if (dm.Key && isMatch(dm.Key)) items.push({ Key: dm.Key, VersionId: dm.VersionId });
-
-        if (items.length > 0) {
-          for (let i = 0; i < items.length; i += 1000) {
-            const batch = items.slice(i, i + 1000);
-            try {
-              await s3.send(new DeleteObjectsCommand({ Bucket: bucketName, Delete: { Objects: batch, Quiet: true } }));
-              deletedCount += batch.length;
-            } catch {
-              for (const it of batch) {
-                try {
-                  await s3.send(new DeleteObjectCommand({ Bucket: bucketName, Key: it.Key, VersionId: it.VersionId }));
-                  deletedCount++;
-                } catch {}
-              }
-            }
-          }
-        }
-        isTruncated = Boolean(res.IsTruncated);
-        keyMarker = res.NextKeyMarker;
-        versionMarker = res.NextVersionIdMarker;
-      } catch {
-        break;
-      }
-    }
-
+    const { DeleteObjectsCommand, DeleteObjectCommand, ListObjectsV2Command } = await import('@dinilmusick/gutts/storage');
     let contToken: string | undefined;
     let more = true;
     while (more) {
       const v2Res: any = await s3.send(new ListObjectsV2Command({ Bucket: bucketName, Prefix: bare, ContinuationToken: contToken }));
+      const items: { Key: string }[] = [];
       for (const obj of v2Res.Contents || []) {
         if (obj.Key && isMatch(obj.Key)) {
-          await permanentDeleteS3Object(s3, bucketName, obj.Key);
-          deletedCount++;
+          items.push({ Key: obj.Key });
+        }
+      }
+      if (items.length > 0) {
+        for (let i = 0; i < items.length; i += 1000) {
+          const batch = items.slice(i, i + 1000);
+          try {
+            await s3.send(new DeleteObjectsCommand({ Bucket: bucketName, Delete: { Objects: batch, Quiet: true } }));
+            deletedCount += batch.length;
+          } catch {
+            for (const it of batch) {
+              try {
+                await s3.send(new DeleteObjectCommand({ Bucket: bucketName, Key: it.Key }));
+                deletedCount++;
+              } catch {}
+            }
+          }
         }
       }
       more = Boolean(v2Res.IsTruncated);
@@ -144,7 +92,7 @@ export async function renameS3Folder(
   let movedCount = 0;
 
   try {
-    const { ListObjectsV2Command, GetObjectCommand, PutObjectCommand } = await import('@aws-sdk/client-s3');
+    const { ListObjectsV2Command, GetObjectCommand, PutObjectCommand } = await import('@dinilmusick/gutts/storage');
     let contToken: string | undefined;
     let more = true;
     const items: { Key: string; isDir: boolean; subRel: string }[] = [];

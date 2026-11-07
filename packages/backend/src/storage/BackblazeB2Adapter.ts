@@ -32,7 +32,7 @@ export class BackblazeB2Adapter extends BaseStorageAdapter {
   private async ensureClient(): Promise<void> {
     if (this.client) return;
     try {
-      const aws = await import('@aws-sdk/client-s3');
+      const aws = await import('@dinilmusick/gutts/storage');
       S3Client = aws.S3Client;
       PutObjectCommand = aws.PutObjectCommand;
       GetObjectCommand = aws.GetObjectCommand;

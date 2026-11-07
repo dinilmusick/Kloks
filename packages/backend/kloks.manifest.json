@@ -37,7 +37,7 @@
       "id": "storage",
       "name": "Cloud & Workspace Storage",
       "version": "1.0.0",
-      "description": "Unified S3, Supabase, B2, and local filesystem presigned transfer service.",
+      "description": "Canonical workspace storage service supporting S3-compatible buckets, Google Drive, and existing local/provider adapters.",
       "backend": {
         "package": "@kloks/backend",
         "subpath": "krnl-services",

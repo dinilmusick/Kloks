@@ -5,7 +5,9 @@ export type StorageProviderType =
   | 'b2'
   | 'supabase'
   | 'firebase'
-  | 'google_drive';
+  | 'google_drive'
+  | 's3'
+  | 's3_compatible';
 
 export interface StorageConfig {
   provider: StorageProviderType;
