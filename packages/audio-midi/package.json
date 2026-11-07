@@ -37,10 +37,15 @@
       "types": "./dist/osc/node-udp.d.ts",
       "import": "./dist/osc/node-udp.js",
       "default": "./dist/osc/node-udp.js"
+    },
+    "./services": {
+      "types": "./dist/services/index.d.ts",
+      "import": "./dist/services/index.js",
+      "default": "./dist/services/index.js"
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram --clean && tsup src/clock/index.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram --outDir dist/clock && tsup src/midi/index.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram --outDir dist/midi && tsup src/osc/index.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram --outDir dist/osc && tsup src/osc/node-udp.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram --outDir dist/osc",
+    "build": "tsup src/index.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram --clean && tsup src/clock/index.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram --outDir dist/clock && tsup src/midi/index.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram --outDir dist/midi && tsup src/osc/index.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram --outDir dist/osc && tsup src/osc/node-udp.ts --format esm --dts --external @kloks/state-graph --external ws --external @ultrst-armada/krnl --external node:dgram --outDir dist/osc && tsup src/services/index.ts --format esm --dts --external @kloks/state-graph --external @ultrst-armada/krnl --outDir dist/services",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
