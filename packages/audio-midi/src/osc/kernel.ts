@@ -2,7 +2,7 @@ import { createService, createServiceDefinition, type IService } from '@ultrst-a
 import { OscService, type OscEndpoint } from './service.js';
 import type { OscMessage } from './codec.js';
 import type { OscTransport } from './service.js';
-interface OscState extends Record<string, unknown> { clients: OscEndpoint[]; servers: OscEndpoint[]; lastMessage: OscMessage | null; }
+export interface OscState extends Record<string, unknown> { clients: OscEndpoint[]; servers: OscEndpoint[]; lastMessage: OscMessage | null; }
 export function createOscKernelService(transport: OscTransport): IService<OscState> {
   const osc = new OscService(transport);
   let service: IService<OscState>;
