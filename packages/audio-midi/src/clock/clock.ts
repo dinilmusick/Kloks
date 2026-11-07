@@ -157,7 +157,7 @@ export class ClockService {
   subscribe(listener: ClockListener): () => void {
     this.assertActive();
     this.listeners.add(listener);
-    listener(this.getSnapshot());
+    try { listener(this.getSnapshot()); } catch { /* isolate subscriber failures */ }
     return () => this.listeners.delete(listener);
   }
 
@@ -212,17 +212,19 @@ export class ClockService {
     for (let tick = first; tick <= position.tick; tick += 1) {
       const scheduledBeat = tick / this.resolution;
       const missedTicks = tick === position.tick ? Math.max(0, due - count) : 0;
-      this.tickListeners.forEach((listener) => listener({
-        ...position, tick, subdivision: tick % this.resolution,
-        scheduledBeat, emittedAt: now, missedTicks,
-      }));
+      const event = { ...position, tick, subdivision: tick % this.resolution, scheduledBeat, emittedAt: now, missedTicks };
+      this.tickListeners.forEach((listener) => {
+        try { listener(event); } catch { /* isolate subscriber failures */ }
+      });
     }
     this.lastTick = position.tick;
   }
 
   private publish(): void {
     const snapshot = this.getSnapshot();
-    this.listeners.forEach((listener) => listener(snapshot));
+    this.listeners.forEach((listener) => {
+      try { listener(snapshot); } catch { /* isolate subscriber failures */ }
+    });
   }
 
   private cancelTimer(): void {
