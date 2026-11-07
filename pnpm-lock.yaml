@@ -85,6 +85,9 @@ importers:
       '@kloks/functions':
         specifier: workspace:*
         version: link:../functions
+      '@kloks/wasm-runtime':
+        specifier: workspace:*
+        version: link:../wasm-runtime
       '@kloks/state-graph':
         specifier: workspace:*
         version: link:../state-graph
@@ -226,6 +229,20 @@ importers:
       '@ultrst-armada/krnl':
         specifier: ^1.0.9
         version: 1.0.9(@types/node@22.20.5)
+  packages/wasm-runtime:
+    devDependencies:
+      tsup:
+        specifier: ^8.4.0
+        version: 8.5.1(postcss@8.5.29)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.7(@types/node@22.20.5)
+
+packages:
+
 
 packages:
 
