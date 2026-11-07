@@ -16,6 +16,7 @@ export function createMidiKernelService(backend: MidiBackend): IService<MidiStat
         stopMessages = midi.subscribe((lastMessage) => service.setState({ lastMessage }));
       },
       onStart: async () => { await midi.discover(); },
+      onStop: async () => { await Promise.all(midi.getDevices().filter(device => device.state === 'connected').map(device => midi.disconnect(device.id))); },
       onDispose: async () => { stopMessages?.(); stopDevices?.(); await midi.dispose(); },
     },
     operations: {
