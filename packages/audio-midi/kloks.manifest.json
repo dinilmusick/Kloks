@@ -61,7 +61,8 @@
       "backend": {
         "package": "@ultrst-armada/kloks",
         "export": "ClockServiceFacade",
-        "facade": "ClockServiceFacade"
+        "facade": "ClockServiceFacade",
+        "subpath": "services"
       },
       "modes": [
         "backend",
@@ -92,7 +93,8 @@
       "backend": {
         "package": "@ultrst-armada/kloks",
         "export": "CanonicalMidiServiceFacade",
-        "facade": "CanonicalMidiServiceFacade"
+        "facade": "CanonicalMidiServiceFacade",
+        "subpath": "services"
       },
       "modes": [
         "backend",
@@ -123,7 +125,8 @@
       "backend": {
         "package": "@ultrst-armada/kloks",
         "export": "OscServiceFacade",
-        "facade": "OscServiceFacade"
+        "facade": "OscServiceFacade",
+        "subpath": "services"
       },
       "modes": [
         "backend",
