@@ -75,12 +75,6 @@
           "App.main-content"
         ]
       },
-      "defaultFrontend": {
-        "component": "ClockServicePanel",
-        "package": "@ultrst-armada/floks/ui/services",
-        "export": "ClockServicePanel",
-        "relationship": "recommended"
-      },
       "dependencies": [],
       "capabilities": [
         "application-timing",
@@ -112,12 +106,6 @@
           "App.main-content"
         ]
       },
-      "defaultFrontend": {
-        "component": "MidiServicePanel",
-        "package": "@ultrst-armada/floks/ui/services",
-        "export": "MidiServicePanel",
-        "relationship": "recommended"
-      },
       "dependencies": [],
       "capabilities": [
         "midi-input",
@@ -148,12 +136,6 @@
         "frontend": [
           "App.main-content"
         ]
-      },
-      "defaultFrontend": {
-        "component": "OscServicePanel",
-        "package": "@ultrst-armada/floks/ui/services",
-        "export": "OscServicePanel",
-        "relationship": "recommended"
       },
       "dependencies": [],
       "capabilities": [
