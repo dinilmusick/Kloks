@@ -51,7 +51,7 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
     }
 
     this.client = google.drive({ version: 'v3', auth });
-    return this.client;
+    return this.client!;
   }
 
   private async findChild(parentId: string, name: string): Promise<DriveFile | null> {
