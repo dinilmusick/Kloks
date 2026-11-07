@@ -19,7 +19,8 @@
     "packages/*/kloks.manifest.json",
     ".krusbl-release-attestation.json",
     "packages/semantic-runtime/dist/**",
-    "packages/semantic-runtime/package.json"
+    "packages/semantic-runtime/package.json",
+    "packages/wasm-runtime/vendor/**"
   ],
   "exports": {
     ".": {
@@ -181,6 +182,11 @@
       "types": "./packages/client/dist/auth.d.ts",
       "import": "./packages/client/dist/auth.js",
       "default": "./packages/client/dist/auth.js"
+    },
+    "./wasm-runtime": {
+      "types": "./packages/wasm-runtime/dist/index.d.ts",
+      "import": "./packages/wasm-runtime/dist/index.js",
+      "default": "./packages/wasm-runtime/dist/index.js"
     }
   },
   "scripts": {
