@@ -2,10 +2,10 @@ import {createService,createServiceDefinition,type IService} from '@ultrst-armad
 import {ClockService,type ClockOptions,type ClockPosition} from './clock.js';
 type ClockState=ClockPosition&Record<string,unknown>;
 export function createClockKernelService(clock=new ClockService()):IService<ClockState>{
- let service:IService<ClockState>;let unsubscribe:(()=>void)|undefined;
+ let service:IService<ClockState>|undefined;let unsubscribe:(()=>void)|undefined;
  const definition=createServiceDefinition<ClockState>({
   id:'kloks.clock',name:'ClockService',version:'1.0.0',state:{initial:{...clock.getSnapshot()}},
-  lifecycle:{onInit:()=>{unsubscribe=clock.subscribe(position=>service.setState({...position}));},onStart:()=>clock.start(),onStop:()=>clock.stop(),onDispose:()=>{unsubscribe?.();clock.dispose();}},
+  lifecycle:{onInit:()=>{unsubscribe=clock.subscribe(position=>{if(service)service.setState({...position});});},onStart:()=>clock.start(),onStop:()=>clock.stop(),onDispose:()=>{unsubscribe?.();clock.dispose();}},
   operations:{
    getPosition:{id:'ClockService.getPosition',name:'getPosition',handler:async()=>clock.getSnapshot()},
    setTempo:{id:'ClockService.setTempo',name:'setTempo',handler:async(input:{tempo:number})=>{clock.setTempo(input.tempo);return clock.getSnapshot();}},
