@@ -2,7 +2,7 @@ import {decodeMidiMessage,encodeMidiMessage,type MidiMessage} from './message.js
 import {MidiManager as LegacyMidiManager} from '../midiManager.js';
 export interface MidiDevice{id:string;name:string;manufacturer?:string;direction:'input'|'output'|'duplex';origin:'physical'|'logical';state:'connected'|'disconnected';capabilities:{input:boolean;output:boolean;virtualDeviceCreation:boolean};}
 export interface MidiBackend{
- readonly capabilities:{physicalInput:boolean;physicalOutput:boolean;virtualDeviceCreation:boolean};
+ readonly capabilities:{physicalInput:boolean;physicalOutput:boolean;virtualDeviceCreation:boolean;systemExclusive?:boolean};
  discover():Promise<MidiDevice[]>;
  connectInput(id:string,listener:(message:MidiMessage)=>void):Promise<void>;
  connectOutput(id:string):Promise<void>;
@@ -26,7 +26,7 @@ export class MidiService{
   this.devices.set(id,device);this.logical.set(id,new Set());this.publishDevices();return device;}
  async connectInput(id:string){this.assertActive();const d=this.requireDevice(id);if(!d.capabilities.input)throw new Error('Device does not support MIDI input');if(d.origin==='logical')return;await this.backend.connectInput(id,m=>this.publishMessage(m,id));this.setState(id,'connected');}
  async connectOutput(id:string){this.assertActive();const d=this.requireDevice(id);if(!d.capabilities.output)throw new Error('Device does not support MIDI output');if(d.origin==='logical')return;await this.backend.connectOutput(id);this.setState(id,'connected');}
- async send(id:string,message:MidiMessage){this.assertActive();const d=this.requireDevice(id);if(!d.capabilities.output)throw new Error('Device does not support MIDI output');if(d.origin==='physical'&&d.state!=='connected')throw new Error('MIDI output is not connected');if(d.origin==='logical'){this.publishMessage(message,id);this.logical.get(id)?.forEach(fn=>{try{fn(message);}catch{/* isolate logical subscriber failures */}});return;}await this.backend.send(id,encodeMidiMessage(message));}
+ async send(id:string,message:MidiMessage){this.assertActive();const d=this.requireDevice(id);if(!d.capabilities.output)throw new Error('Device does not support MIDI output');if(d.origin==='physical'&&d.state!=='connected')throw new Error('MIDI output is not connected');if(message.type==='system'&&message.status===0xf0&&!this.backend.capabilities.systemExclusive)throw new Error('System exclusive output is not enabled by this backend');if(d.origin==='logical'){this.publishMessage(message,id);this.logical.get(id)?.forEach(fn=>{try{fn(message);}catch{/* isolate logical subscriber failures */}});return;}await this.backend.send(id,encodeMidiMessage(message));}
  subscribe(fn:(message:MidiMessage,deviceId:string)=>void){this.assertActive();this.listeners.add(fn);return()=>this.listeners.delete(fn);}
  subscribeDevices(fn:(devices:MidiDevice[])=>void){this.assertActive();this.deviceListeners.add(fn);fn(this.getDevices());return()=>this.deviceListeners.delete(fn);}
  subscribeLogicalInput(id:string,fn:(message:MidiMessage)=>void){this.assertActive();const set=this.logical.get(id);if(!set)throw new Error('Unknown logical MIDI device');set.add(fn);return()=>set.delete(fn);}
@@ -42,16 +42,16 @@ export class MidiService{
  * Adapts the existing Kloks MidiManager to the capability-based service contract.
  * Device discovery, hot-plug handling and physical I/O remain owned by one canonical manager.
  */
-export function createWebMidiBackend(manager: LegacyMidiManager = new LegacyMidiManager()): MidiBackend {
+export function createWebMidiBackend(manager: LegacyMidiManager = new LegacyMidiManager(), options:{sysex?:boolean}={}): MidiBackend {
   const inputSubscriptions = new Map<string, () => void>();
   const supported = typeof navigator !== 'undefined' && typeof navigator.requestMIDIAccess === 'function';
   const ensureInitialized = async () => {
     if (!supported) return false;
-    if (!manager.getState().isInitialized) await manager.initialize({ sysex: false, software: true });
+    if (!manager.getState().isInitialized) await manager.initialize({ sysex: options.sysex ?? false, software: true });
     return true;
   };
   return {
-    capabilities: { physicalInput: supported, physicalOutput: supported, virtualDeviceCreation: false },
+    capabilities: { physicalInput: supported, physicalOutput: supported, virtualDeviceCreation: false, systemExclusive: supported && Boolean(options.sysex) },
     async discover() {
       if (!(await ensureInitialized())) return [];
       const state = manager.getState();
@@ -96,7 +96,7 @@ export function createWebMidiBackend(manager: LegacyMidiManager = new LegacyMidi
     async dispose() {
       inputSubscriptions.forEach(unsubscribe => unsubscribe());
       inputSubscriptions.clear();
-      manager.dispose();
+      await manager.dispose();
     },
   };
 }
