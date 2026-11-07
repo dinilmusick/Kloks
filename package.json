@@ -1,6 +1,6 @@
 {
   "name": "@ultrst-armada/kloks",
-  "version": "1.26.0",
+  "version": "1.26.1",
   "private": false,
   "publishConfig": {
     "access": "public",
@@ -187,6 +187,31 @@
       "types": "./packages/wasm-runtime/dist/index.d.ts",
       "import": "./packages/wasm-runtime/dist/index.js",
       "default": "./packages/wasm-runtime/dist/index.js"
+    },
+    "./clock": {
+      "types": "./packages/audio-midi/dist/clock/index.d.ts",
+      "import": "./packages/audio-midi/dist/clock/index.js",
+      "default": "./packages/audio-midi/dist/clock/index.js"
+    },
+    "./midi": {
+      "types": "./packages/audio-midi/dist/midi/index.d.ts",
+      "import": "./packages/audio-midi/dist/midi/index.js",
+      "default": "./packages/audio-midi/dist/midi/index.js"
+    },
+    "./osc": {
+      "types": "./packages/audio-midi/dist/osc/index.d.ts",
+      "import": "./packages/audio-midi/dist/osc/index.js",
+      "default": "./packages/audio-midi/dist/osc/index.js"
+    },
+    "./osc/node": {
+      "types": "./packages/audio-midi/dist/osc/node-udp.d.ts",
+      "import": "./packages/audio-midi/dist/osc/node-udp.js",
+      "default": "./packages/audio-midi/dist/osc/node-udp.js"
+    },
+    "./audio-midi/services": {
+      "types": "./packages/audio-midi/dist/services/index.d.ts",
+      "import": "./packages/audio-midi/dist/services/index.js",
+      "default": "./packages/audio-midi/dist/services/index.js"
     }
   },
   "scripts": {

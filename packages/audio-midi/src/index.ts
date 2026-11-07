@@ -152,7 +152,7 @@ export function createAudioHardwareService(
 const defaultAudioService = createAudioHardwareService();
 export const AudioHardwareServiceDefinition: ServiceDefinition = defaultAudioService.getDefinition();
 
-export const AudioHardwareServiceFacade = {
+const AudioHardwareServiceFacade = {
   id: AudioHardwareServiceDefinition.id,
   name: AudioHardwareServiceDefinition.name,
   version: AudioHardwareServiceDefinition.version,
@@ -197,8 +197,8 @@ export function createMidiService(
           }
         });
       },
-      onDispose: () => {
-        manager.dispose();
+      onDispose: async () => {
+        await manager.dispose();
       },
     },
     operations: {
@@ -252,7 +252,7 @@ export function createMidiService(
         id: 'MidiService.dispose',
         name: 'dispose',
         handler: async () => {
-          manager.dispose();
+          await manager.dispose();
           const st = manager.getState();
           svcRef.setState({ ...st });
           return st;
@@ -268,7 +268,7 @@ export function createMidiService(
 const defaultMidiService = createMidiService();
 export const MidiServiceDefinition: ServiceDefinition = defaultMidiService.getDefinition();
 
-export const MidiServiceFacade = {
+const MidiServiceFacade = {
   id: MidiServiceDefinition.id,
   name: MidiServiceDefinition.name,
   version: MidiServiceDefinition.version,
@@ -285,7 +285,7 @@ export const MidiServiceFacade = {
 
 import type { OrchestrationDefinition } from '@ultrst-armada/krnl';
 
-export const AudioMidiOrchestratorDefinition: OrchestrationDefinition = {
+const AudioMidiOrchestratorDefinition: OrchestrationDefinition = {
   id: 'kloks.orchestrator.audioMidi',
   name: 'AudioMidiOrchestrator',
   version: '1.0.0',
@@ -324,3 +324,6 @@ export * from './engine/index.js';
 
 
 
+
+// Explicit public exports preserve the canonical facade names alongside engine re-exports.
+export { AudioHardwareServiceFacade, MidiServiceFacade, AudioMidiOrchestratorDefinition };

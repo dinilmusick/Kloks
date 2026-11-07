@@ -127,6 +127,49 @@ export class MidiManager {
     };
 
     this.boundInputs.add(port.id);
+    void port.open().catch((error) => this.handleMidiError(error));
+  }
+
+  /**
+   * Opens a discovered physical MIDI input using the manager's canonical access instance.
+   */
+  public async connectInput(id: string): Promise<void> {
+    if (!this.midiAccess) throw new Error('MIDI manager has not been initialized');
+    const port = this.midiAccess.inputs.get(id);
+    if (!port) throw new Error('MIDI input not found: ' + id);
+    this.bindMidiPort(port);
+    await port.open();
+  }
+
+  /** Opens a discovered physical MIDI output. */
+  public async connectOutput(id: string): Promise<void> {
+    if (!this.midiAccess) throw new Error('MIDI manager has not been initialized');
+    const port = this.midiAccess.outputs.get(id);
+    if (!port) throw new Error('MIDI output not found: ' + id);
+    await port.open();
+  }
+
+  /** Sends a complete MIDI message through an already-discovered output port. */
+  public sendRawMidiBytes(bytes: Uint8Array, outputId: string): void {
+    if (!this.midiAccess) throw new Error('MIDI manager has not been initialized');
+    const output = this.midiAccess.outputs.get(outputId);
+    if (!output) throw new Error('MIDI output not found: ' + outputId);
+    output.send(Array.from(bytes));
+  }
+
+  /** Releases an input subscription and closes its physical port. */
+  public async disconnectInput(id: string): Promise<void> {
+    const port = this.midiAccess?.inputs.get(id);
+    if (!port) return;
+    port.onmidimessage = null;
+    this.boundInputs.delete(id);
+    await port.close();
+  }
+
+  /** Closes an output port without claiming to remove the physical device. */
+  public async disconnectOutput(id: string): Promise<void> {
+    const port = this.midiAccess?.outputs.get(id);
+    if (port) await port.close();
   }
 
   /**
@@ -292,13 +335,15 @@ export class MidiManager {
     };
   }
 
-  public dispose(): void {
-    if (this.midiAccess) {
-      this.midiAccess.onstatechange = null;
-      this.midiAccess.inputs.forEach(port => {
-        port.onmidimessage = null;
-      });
-      this.midiAccess = null;
+  public async dispose(): Promise<void> {
+    const access = this.midiAccess;
+    this.midiAccess = null;
+    if (access) {
+      access.onstatechange = null;
+      const closing: Promise<unknown>[] = [];
+      access.inputs.forEach(port => { port.onmidimessage = null; closing.push(port.close().catch(() => undefined)); });
+      access.outputs.forEach(port => { closing.push(port.close().catch(() => undefined)); });
+      await Promise.all(closing);
     }
     this.boundInputs.clear();
     this.eventListeners.clear();

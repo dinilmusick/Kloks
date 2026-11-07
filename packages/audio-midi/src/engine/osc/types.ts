@@ -34,41 +34,4 @@ export interface OscDevice {
 export type OscListener = (message: OscMessage) => void;
 export type OscDeviceListener = (devices: OscDevice[]) => void;
 
-export const DEFAULT_OSC_DEVICES: OscDevice[] = [
-  {
-    id: 'osc-dev-touchosc',
-    name: 'TouchOSC Mobile Bridge',
-    type: 'touchosc',
-    host: '127.0.0.1',
-    port: 8000,
-    status: 'listening',
-    enabled: true,
-  },
-  {
-    id: 'osc-dev-maxmsp',
-    name: 'Max/MSP / PureData Conduits',
-    type: 'max_msp',
-    host: '127.0.0.1',
-    port: 9000,
-    status: 'listening',
-    enabled: true,
-  },
-  {
-    id: 'osc-dev-ws',
-    name: 'Local WebSocket OSC Relay',
-    type: 'websocket_bridge',
-    host: 'localhost',
-    port: 8080,
-    status: 'connected',
-    enabled: true,
-  },
-  {
-    id: 'osc-dev-vrchat',
-    name: 'VRChat / Avatar OSC Port',
-    type: 'vrchat',
-    host: '127.0.0.1',
-    port: 9001,
-    status: 'listening',
-    enabled: false,
-  },
-];
+export const DEFAULT_OSC_DEVICES: OscDevice[] = [];
