@@ -197,8 +197,8 @@ export function createMidiService(
           }
         });
       },
-      onDispose: () => {
-        manager.dispose();
+      onDispose: async () => {
+        await manager.dispose();
       },
     },
     operations: {
@@ -252,7 +252,7 @@ export function createMidiService(
         id: 'MidiService.dispose',
         name: 'dispose',
         handler: async () => {
-          manager.dispose();
+          await manager.dispose();
           const st = manager.getState();
           svcRef.setState({ ...st });
           return st;
