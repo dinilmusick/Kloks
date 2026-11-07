@@ -75,3 +75,19 @@ clock.onTick(({ tick }) => {
 | Future hardware | Generic clock | Runtime-specific driver | Runtime-specific transport |
 
 Applications own cross-service scheduling and composition. All services expose deterministic cleanup.
+
+## Skipo application consumption
+
+Skipo applications consume the public package subpaths independently; there is no unified transport service:
+
+```ts
+import { createClockKernelService } from '@ultrst-armada/kloks/clock';
+import { MidiService, createWebMidiBackend } from '@ultrst-armada/kloks/midi';
+import { OscService } from '@ultrst-armada/kloks/osc';
+import { createNodeUdpOscTransport } from '@ultrst-armada/kloks/osc/node';
+import {
+  ClockServicePanel, MidiServicePanel, OscServicePanel,
+} from '@ultrst-armada/floks/ui/services';
+```
+
+Create and own each service in the application composition layer, then pass snapshots and callbacks into the matching Floks panel. The UI package does not import or instantiate Kloks services. The Skipo repository currently declares compatible ranges (`@ultrst-armada/kloks ^1.26.0`, `@ultrst-armada/floks ^1.13.15`); these ranges accept the candidate repository versions 1.26.0 and 1.13.18. Actual Skipo workspace execution against unpublished PR package artifacts remains a separate integration gate before release.
