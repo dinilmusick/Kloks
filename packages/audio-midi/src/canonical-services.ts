@@ -1,10 +1,10 @@
-import { createClockKernelService } from './clock/index.js';
+import { createClockKernelService, type ClockState } from './clock/index.js';
 import { ClockService, type ClockOptions } from './clock/index.js';
-import { createMidiKernelService } from './midi/index.js';
+import { createMidiKernelService, type MidiState } from './midi/index.js';
 import { createWebMidiBackend, type MidiBackend } from './midi/index.js';
-import { createOscKernelService } from './osc/index.js';
+import { createOscKernelService, type OscState } from './osc/index.js';
 import type { OscTransport } from './osc/index.js';
-import type { ServiceDefinition } from '@ultrst-armada/krnl';
+import type { IService, ServiceDefinition } from '@ultrst-armada/krnl';
 
 /** Default timing facade; each Skipo app can create an isolated clock instance. */
 const defaultClockService = createClockKernelService();
@@ -16,7 +16,7 @@ export const ClockServiceFacade = {
   runtime: 'client' as const,
   deployment: 'local' as const,
   definition: ClockServiceDefinition,
-  createInstance: (options: ClockOptions = {}) => createClockKernelService(new ClockService(options)),
+  createInstance: (options: ClockOptions = {}): IService<ClockState> => createClockKernelService(new ClockService(options)),
   execute: async <TIn = unknown, TOut = unknown>(operation: string, input?: TIn) => {
     await defaultClockService.start();
     return defaultClockService.call<TIn, TOut>(operation, input);
@@ -33,7 +33,7 @@ export const CanonicalMidiServiceFacade = {
   runtime: 'client' as const,
   deployment: 'local' as const,
   definition: CanonicalMidiServiceDefinition,
-  createInstance: (backend: MidiBackend = createWebMidiBackend()) => createMidiKernelService(backend),
+  createInstance: (backend: MidiBackend = createWebMidiBackend()): IService<MidiState> => createMidiKernelService(backend),
   execute: async <TIn = unknown, TOut = unknown>(operation: string, input?: TIn) => {
     await defaultMidiService.start();
     return defaultMidiService.call<TIn, TOut>(operation, input);
@@ -54,7 +54,7 @@ export const OscServiceFacade = {
   runtime: 'client' as const,
   deployment: 'local' as const,
   definition: OscServiceDefinition,
-  createInstance: (transport: OscTransport = unconfiguredOscTransport) => createOscKernelService(transport),
+  createInstance: (transport: OscTransport = unconfiguredOscTransport): IService<OscState> => createOscKernelService(transport),
   execute: async <TIn = unknown, TOut = unknown>(operation: string, input?: TIn) => {
     await defaultOscService.start();
     return defaultOscService.call<TIn, TOut>(operation, input);
