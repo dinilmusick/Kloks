@@ -18,8 +18,8 @@ describe('OSC protocol and service',()=>{
  });
  it('matches patterns and models client/server state and packet subscriptions',async()=>{
   expect(matchesOscAddress('/synth/voice/12','/synth/voice/*')).toBe(true);expect(matchesOscAddress('/synth/voice/left','/synth/voice/{left,right}')).toBe(true);expect(matchesOscAddress('/note/7','/note/[0-9]')).toBe(true);expect(matchesOscAddress('/synth/a+b','/synth/a\\+b')).toBe(true);expect(matchesOscAddress('/synth/voice/left','/synth/voice/{right,other}')).toBe(false);
-  let receive:((packet:Uint8Array)=>void)|null=null;let sent:Uint8Array|null=null,stopped=0;
-  const transport:OscTransport={send:async(_e,packet)=>{sent=packet;},listen:async(_e,fn)=>{receive=fn;return async()=>{stopped++;};}};
+  let receive:((packet:Uint8Array)=>void)|null=null;let transportError:((error:Error)=>void)|null=null;let sent:Uint8Array|null=null,stopped=0;
+  const transport:OscTransport={send:async(_e,packet)=>{sent=packet;},listen:async(_e,fn,onError)=>{receive=fn;transportError=onError??null;return async()=>{stopped++;};}};
   const service=new OscService(transport);service.addClient({id:'out',host:'127.0.0.1',port:9000,transport:'udp'});
   expect(service.getClients()[0].state).toBe('configured');
   await service.send('out',{address:'/ping',args:[1]});expect(decodeOscMessage(sent!)).toEqual({address:'/ping',args:[1]});
@@ -29,7 +29,7 @@ describe('OSC protocol and service',()=>{
   service.subscribe('/ping',message=>messages.push(message.address));
   service.subscribePackets(packet=>packets.push('bundle'in packet?'bundle':packet.address));
   await service.startServer({id:'in',host:'0.0.0.0',port:9001,transport:'udp'});
-  expect(service.getServers()[0].state).toBe('listening');
+  expect(service.getServers()[0].state).toBe('listening');transportError?.(new Error('UDP socket failed'));expect(service.getServers()[0].state).toBe('error');
   receive?.(encodeOscBundle(bundle));expect(messages).toEqual(['/ping']);expect(packets).toEqual(['bundle','/ping']);
   await service.stopServer('in');expect(service.getServers()[0].state).toBe('stopped');
   await service.dispose();expect(stopped).toBe(1);expect(()=>service.addClient({id:'x',host:'localhost',port:9,transport:'udp'})).toThrow(/disposed/);
