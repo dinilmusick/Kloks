@@ -1,4 +1,4 @@
-import {decodeOscPacket,encodeOscMessage,encodeOscPacket,type OscMessage,type OscPacket} from './codec.js';
+import {decodeOscPacket,encodeOscPacket,type OscMessage,type OscPacket} from './codec.js';
 export interface OscEndpoint{
  id:string;host:string;port:number;transport:'udp'|'websocket'|'custom';
  state?:'configured'|'listening'|'stopped'|'error';
