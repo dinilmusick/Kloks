@@ -49,6 +49,7 @@ export class OscManager {
     });
   }
 
+  /** @deprecated This is local in-memory event publication, not network OSC transmission. Use OscService for OSC client/server I/O. */
   public sendOscMessage(
     address: string,
     args: Array<number | string | boolean> = [],
@@ -89,6 +90,7 @@ export class OscManager {
     const newDevice: OscDevice = {
       ...device,
       id: `osc-dev-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      status: 'simulated',
       isCustom: true,
     };
     this.devices = [...this.devices, newDevice];
@@ -112,7 +114,7 @@ export class OscManager {
         ? {
             ...dev,
             enabled: !dev.enabled,
-            status: !dev.enabled ? 'listening' : 'disconnected',
+            status: !dev.enabled ? 'simulated' : 'disconnected',
           }
         : dev
     );
