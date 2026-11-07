@@ -74,8 +74,10 @@ export class OscService{
   await this.transport.send(endpoint,encodeOscPacket(packet));
  }
  subscribe(pattern:string,listener:OscListener){
-  this.assertActive();if(!pattern.startsWith('/'))throw new TypeError('OSC address pattern must begin with /');
-  try{new RegExp('^'+patternExpression(pattern)+'
+  this.assertActive();
+  if(!pattern.startsWith('/'))throw new TypeError('OSC address pattern must begin with /');
+  try{new RegExp('^'+patternExpression(pattern)+'$');}catch{throw new TypeError('Invalid OSC address pattern');}
+  const set=this.listeners.get(pattern)??new Set<OscListener>();
   set.add(listener);this.listeners.set(pattern,set);
   return()=>{set.delete(listener);if(!set.size)this.listeners.delete(pattern);};
  }
