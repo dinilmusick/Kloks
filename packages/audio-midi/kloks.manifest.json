@@ -62,7 +62,7 @@
         "package": "@ultrst-armada/kloks",
         "export": "ClockServiceFacade",
         "facade": "ClockServiceFacade",
-        "subpath": "services"
+        "subpath": "audio-midi/services"
       },
       "modes": [
         "backend",
@@ -94,7 +94,7 @@
         "package": "@ultrst-armada/kloks",
         "export": "CanonicalMidiServiceFacade",
         "facade": "CanonicalMidiServiceFacade",
-        "subpath": "services"
+        "subpath": "audio-midi/services"
       },
       "modes": [
         "backend",
@@ -126,7 +126,7 @@
         "package": "@ultrst-armada/kloks",
         "export": "OscServiceFacade",
         "facade": "OscServiceFacade",
-        "subpath": "services"
+        "subpath": "audio-midi/services"
       },
       "modes": [
         "backend",
