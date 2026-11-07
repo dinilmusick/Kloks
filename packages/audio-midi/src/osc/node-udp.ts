@@ -5,12 +5,14 @@ export function createNodeUdpOscTransport():OscTransport{
  const sockets=new Set<Socket>();
  return {
   send(endpoint:OscEndpoint,packet:Uint8Array){
+   if(endpoint.transport!=='udp')return Promise.reject(new Error('Node UDP transport only supports udp endpoints'));
    return new Promise<void>((resolve,reject)=>{
     const socket=createSocket(endpoint.host.includes(':')?'udp6':'udp4');sockets.add(socket);
     socket.send(packet,endpoint.port,endpoint.host,error=>{socket.close();sockets.delete(socket);if(error)reject(error);else resolve();});
    });
   },
   listen(endpoint:OscEndpoint,listener:(packet:Uint8Array)=>void){
+   if(endpoint.transport!=='udp')return Promise.reject(new Error('Node UDP transport only supports udp endpoints'));
    return new Promise<()=>Promise<void>>((resolve,reject)=>{
     const socket=createSocket(endpoint.host.includes(':')?'udp6':'udp4');sockets.add(socket);
     const onError=(error:Error)=>{socket.close();sockets.delete(socket);reject(error);};
