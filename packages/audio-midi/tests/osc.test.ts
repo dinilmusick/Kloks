@@ -13,7 +13,7 @@ describe('OSC protocol and service',()=>{
   const bundle:OscBundle={bundle:true,timetag:0xf123456789abcdefn,elements:[{address:'/clock/tick',args:[1]},{bundle:true,timetag:1n,elements:[{address:'/nested',args:[true]}]}]};
   expect(decodeOscPacket(encodeOscBundle(bundle))).toEqual(bundle);
  });
- it('rejects malformed packets and invalid addresses',()=>{
+ it('rejects malformed packets and invalid addresses',()=>{const badString=encodeOscMessage({address:'/x',args:['hi']});badString[badString.length-1]=1;expect(()=>decodeOscPacket(badString)).toThrow(/padding/);const badBlob=encodeOscMessage({address:'/x',args:[new Uint8Array([1])]});badBlob[badBlob.length-1]=1;expect(()=>decodeOscPacket(badBlob)).toThrow(/padding/);
   expect(()=>encodeOscMessage({address:'missing-slash',args:[]})).toThrow();expect(()=>decodeOscPacket(new Uint8Array([47,0,0,0]))).toThrow();
  });
  it('matches patterns and models client/server state and packet subscriptions',async()=>{
