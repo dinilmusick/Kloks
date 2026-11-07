@@ -69,9 +69,9 @@
       "default": "./packages/audio-midi/dist/index.js"
     },
     "./services": {
-      "types": "./packages/services/dist/index.d.ts",
-      "import": "./packages/services/dist/index.js",
-      "default": "./packages/services/dist/index.js"
+      "types": "./packages/audio-midi/dist/services/index.d.ts",
+      "import": "./packages/audio-midi/dist/services/index.js",
+      "default": "./packages/audio-midi/dist/services/index.js"
     },
     "./backend": {
       "types": "./packages/backend/dist/index.d.ts",
