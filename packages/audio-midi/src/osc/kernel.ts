@@ -12,7 +12,7 @@ export function createOscKernelService(transport: OscTransport): IService<OscSta
     state: { initial: { clients: [], servers: [], lastMessage: null } },
     lifecycle: {
       onInit: () => { stopMessages = osc.subscribe('/**', message => service.setState({ lastMessage: message })); },
-      onStop: async () => { await Promise.all(osc.getServers().filter(server => server.state === 'listening').map(server => osc.stopServer(server.id))); },
+      onStop: async () => { await Promise.all(osc.getServers().filter(server => server.state === 'listening').map(server => osc.stopServer(server.id))); service.setState({ servers: osc.getServers() }); },
       onDispose: async () => { stopMessages?.(); await osc.dispose(); },
     },
     operations: {
