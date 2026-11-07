@@ -19,9 +19,7 @@
     "test": "vitest run",
     "clean": "rm -rf dist"
   },
-  "dependencies": {
-    "es-module-lexer": "2.3.1"
-  },
+  "dependencies": {},
   "devDependencies": {
     "tsup": "^8.4.0",
     "typescript": "^5.7.3",
