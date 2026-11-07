@@ -10,9 +10,23 @@ export interface OscTransport{
 }
 export type OscListener=(message:OscMessage,endpointId:string)=>void;
 export type OscPacketListener=(packet:OscPacket,endpointId:string)=>void;
+function escapePatternLiteral(value:string):string{return value.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&');}
+function patternExpression(pattern:string):string{
+ let result='';
+ for(let index=0;index<pattern.length;index+=1){
+  const char=pattern[index];
+  if(char==='\\\\'&&index+1<pattern.length){result+=escapePatternLiteral(pattern[++index]);continue;}
+  if(char==='*'){result+='.*';continue;}
+  if(char==='?'){result+='.';continue;}
+  if(char==='['){const end=pattern.indexOf(']',index+1);if(end>index+1){let content=pattern.slice(index+1,end);const negate=content.startsWith('!');if(negate)content=content.slice(1);result+='['+(negate?'^':'')+content.replace(/\\\\/g,'\\\\\\\\')+']';index=end;continue;}}
+  if(char==='{'){const end=pattern.indexOf('}',index+1);if(end>index+1){const alternatives=pattern.slice(index+1,end).split(',');if(alternatives.length>1){result+='(?:'+alternatives.map(patternExpression).join('|')+')';index=end;continue;}}}
+  result+=escapePatternLiteral(char);
+ }
+ return result;
+}
 export function matchesOscAddress(address:string,pattern:string):boolean{
- const escaped=pattern.replace(/[.+^$()|\\]/g,'\\$&').replace(/\*/g,'.*').replace(/\?/g,'.').replace(/\{([^}]+)\}/g,'($1)');
- return new RegExp('^'+escaped+'$').test(address);
+ if(!address.startsWith('/')||!pattern.startsWith('/'))return false;
+ return new RegExp('^'+patternExpression(pattern)+'$').test(address);
 }
 export class OscService{
  private readonly clients=new Map<string,OscEndpoint>();
