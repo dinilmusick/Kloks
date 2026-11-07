@@ -17,7 +17,7 @@ describe('OSC protocol and service',()=>{
   expect(()=>encodeOscMessage({address:'missing-slash',args:[]})).toThrow();expect(()=>decodeOscPacket(new Uint8Array([47,0,0,0]))).toThrow();
  });
  it('matches patterns and models client/server state and packet subscriptions',async()=>{
-  expect(matchesOscAddress('/synth/voice/12','/synth/voice/*')).toBe(true);
+  expect(matchesOscAddress('/synth/voice/12','/synth/voice/*')).toBe(true);expect(matchesOscAddress('/synth/voice/left','/synth/voice/{left,right}')).toBe(true);expect(matchesOscAddress('/note/7','/note/[0-9]')).toBe(true);expect(matchesOscAddress('/synth/a+b','/synth/a\\\\+b')).toBe(true);expect(matchesOscAddress('/synth/voice/left','/synth/voice/{right,other}')).toBe(false);
   let receive:((packet:Uint8Array)=>void)|null=null;let sent:Uint8Array|null=null,stopped=0;
   const transport:OscTransport={send:async(_e,packet)=>{sent=packet;},listen:async(_e,fn)=>{receive=fn;return async()=>{stopped++;};}};
   const service=new OscService(transport);service.addClient({id:'out',host:'127.0.0.1',port:9000,transport:'udp'});
