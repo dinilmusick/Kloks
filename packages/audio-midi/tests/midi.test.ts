@@ -2,9 +2,9 @@ import {describe,expect,it} from 'vitest';
 import {decodeMidiMessage,encodeMidiMessage} from '../src/midi/message.js';
 import {MidiService,type MidiBackend,type MidiDevice} from '../src/midi/service.js';
 const device:MidiDevice={id:'fake',name:'Fake MIDI',direction:'duplex',origin:'physical',state:'disconnected',capabilities:{input:true,output:true,virtualDeviceCreation:false}};
-function fakeBackend(){let input:((message:ReturnType<typeof decodeMidiMessage>)=>void)|null=null;let sent:Uint8Array|null=null;let deviceListener:((devices:MidiDevice[])=>void)|null=null;
+function fakeBackend(){let discoveries=0;let input:((message:ReturnType<typeof decodeMidiMessage>)=>void)|null=null;let sent:Uint8Array|null=null;let deviceListener:((devices:MidiDevice[])=>void)|null=null;
  const backend:MidiBackend={capabilities:{physicalInput:true,physicalOutput:true,virtualDeviceCreation:false},discover:async()=>[device],connectInput:async(_id,fn)=>{input=fn;},connectOutput:async()=>{},send:async(_id,bytes)=>{sent=bytes;},disconnect:async()=>{input=null;},dispose:async()=>{input=null;},subscribeDevices:fn=>{deviceListener=fn;return()=>{deviceListener=null;};}};
- return{backend,emit:(message:ReturnType<typeof decodeMidiMessage>)=>input?.(message),emitDevices:(devices:MidiDevice[])=>deviceListener?.(devices),sent:()=>sent};
+ return{backend,emit:(message:ReturnType<typeof decodeMidiMessage>)=>input?.(message),emitDevices:(devices:MidiDevice[])=>deviceListener?.(devices),discoveries:()=>discoveries,sent:()=>sent};
 }
 describe('MIDI protocol and service',()=>{
  it('round-trips channel voice messages',()=>{const messages=[{type:'noteOn',channel:2,noteOrController:60,value:100},{type:'noteOff',channel:2,noteOrController:60,value:0},{type:'polyPressure',channel:1,noteOrController:74,value:90},{type:'controlChange',channel:1,noteOrController:74,value:90},{type:'programChange',channel:0,value:12},{type:'channelPressure',channel:3,value:45},{type:'pitchBend',channel:3,value:-2048},{type:'system',status:0xf8,data:[]}] as const;for(const message of messages)expect(decodeMidiMessage(encodeMidiMessage(message as never))).toEqual(message);});
