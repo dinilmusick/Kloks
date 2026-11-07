@@ -1,6 +1,7 @@
 import { createForgeWasmExecutor, type ForgeWasmExecutor } from "./executor.js";
 import { resolveLanguage } from "./languageResolver.js";
 import type {
+  BrowserWasmRuntimeOptions,
   RuntimeEnvironment,
   RuntimeExecuteRequest,
   RuntimeResult,
@@ -29,16 +30,20 @@ export function supportedLanguages(): readonly SupportedLanguage[] {
 }
 
 export async function createBrowserWasmRuntime(
-  toolchainBaseUrl = DEFAULT_TOOLCHAIN_BASE_URL,
+  options?: BrowserWasmRuntimeOptions | string,
 ): Promise<WasmRuntime> {
+  const toolchainBaseUrl =
+    typeof options === "string"
+      ? options
+      : options?.toolchainBaseUrl ?? DEFAULT_TOOLCHAIN_BASE_URL;
   const executor = await createForgeWasmExecutor(toolchainBaseUrl);
   return createRuntime(executor);
 }
 
 export async function createWasmRuntime(
-  toolchainBaseUrl = DEFAULT_TOOLCHAIN_BASE_URL,
+  options?: BrowserWasmRuntimeOptions | string,
 ): Promise<WasmRuntime> {
-  return createBrowserWasmRuntime(toolchainBaseUrl);
+  return createBrowserWasmRuntime(options);
 }
 
 function createRuntime(executor: ForgeWasmExecutor): WasmRuntime {

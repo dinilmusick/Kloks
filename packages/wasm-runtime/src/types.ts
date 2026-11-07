@@ -20,6 +20,10 @@ export interface RuntimeOptions {
   outputLimitBytes?: number;
 }
 
+export interface BrowserWasmRuntimeOptions {
+  toolchainBaseUrl?: string;
+}
+
 export interface RuntimeDiagnostic {
   severity: "error" | "warning" | "info";
   message: string;
