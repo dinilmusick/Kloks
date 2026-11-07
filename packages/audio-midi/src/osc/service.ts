@@ -102,29 +102,3 @@ export class OscService{
  }
  private assertActive(){if(this.disposed)throw new Error('OscService has been disposed');}
 }
-);}catch{throw new TypeError('Invalid OSC address pattern');}
-  const set=this.listeners.get(pattern)??new Set<OscListener>();
-  set.add(listener);this.listeners.set(pattern,set);
-  return()=>{set.delete(listener);if(!set.size)this.listeners.delete(pattern);};
- }
- subscribePackets(listener:OscPacketListener){
-  this.assertActive();this.packetListeners.add(listener);return()=>this.packetListeners.delete(listener);
- }
- async dispose(){
-  if(this.disposed)return;
-  await Promise.all([...this.servers.values()].map(async server=>{await server.stop();this.serverStates.set(server.endpoint.id,{...server.endpoint,state:'stopped'});}));
-  this.servers.clear();this.clients.clear();this.listeners.clear();this.packetListeners.clear();
-  await this.transport.dispose?.();this.disposed=true;
- }
- private publishPacket(packet:OscPacket,id:string){
-  this.packetListeners.forEach(listener=>{try{listener(packet,id);}catch{/* isolate subscriber failures */}});
-  if('bundle'in packet){packet.elements.forEach(element=>this.publishPacket(element,id));return;}
-  this.listeners.forEach((set,pattern)=>{
-   if(matchesOscAddress(packet.address,pattern))set.forEach(listener=>{try{listener(packet,id);}catch{/* isolate subscriber failures */}});
-  });
- }
- private assertEndpoint(endpoint:OscEndpoint){
-  if(!endpoint.id||!endpoint.host||!Number.isInteger(endpoint.port)||endpoint.port<1||endpoint.port>65535)throw new TypeError('Invalid OSC endpoint configuration');
- }
- private assertActive(){if(this.disposed)throw new Error('OscService has been disposed');}
-}
