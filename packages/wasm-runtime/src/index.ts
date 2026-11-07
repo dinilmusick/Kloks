@@ -24,6 +24,10 @@ export function supportedRuntimeEnvironments(): Record<RuntimeEnvironment, boole
   };
 }
 
+export function supportedLanguages(): readonly SupportedLanguage[] {
+  return Object.freeze(["rust", "go"]);
+}
+
 export async function createBrowserWasmRuntime(
   toolchainBaseUrl = DEFAULT_TOOLCHAIN_BASE_URL,
 ): Promise<WasmRuntime> {
