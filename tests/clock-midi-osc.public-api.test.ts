@@ -3,7 +3,7 @@ import {ClockService,createClockKernelService} from '@ultrst-armada/kloks/clock'
 import {MidiService,createWebMidiBackend,createMidiKernelService,type MidiBackend} from '@ultrst-armada/kloks/midi';
 import {OscService,createOscKernelService,type OscTransport} from '@ultrst-armada/kloks/osc';
 import {createNodeUdpOscTransport} from '@ultrst-armada/kloks/osc/node';
-import {ClockServiceFacade,CanonicalMidiServiceFacade,OscServiceFacade} from '@ultrst-armada/kloks/services';
+import {ClockServiceFacade,CanonicalMidiServiceFacade,OscServiceFacade} from '@ultrst-armada/kloks/audio-midi/services';
 import {MidiServiceFacade} from '@kloks/audio-midi';
 import {readFileSync} from 'node:fs';
 
