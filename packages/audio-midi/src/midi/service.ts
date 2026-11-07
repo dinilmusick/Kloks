@@ -25,15 +25,15 @@ export class MidiService{
   this.devices.set(id,device);this.logical.set(id,new Set());this.publishDevices();return device;}
  async connectInput(id:string){this.assertActive();const d=this.requireDevice(id);if(!d.capabilities.input)throw new Error('Device does not support MIDI input');if(d.origin==='logical')return;await this.backend.connectInput(id,m=>this.publishMessage(m,id));this.setState(id,'connected');}
  async connectOutput(id:string){this.assertActive();const d=this.requireDevice(id);if(!d.capabilities.output)throw new Error('Device does not support MIDI output');if(d.origin==='logical')return;await this.backend.connectOutput(id);this.setState(id,'connected');}
- async send(id:string,message:MidiMessage){this.assertActive();const d=this.requireDevice(id);if(!d.capabilities.output)throw new Error('Device does not support MIDI output');if(d.origin==='physical'&&d.state!=='connected')throw new Error('MIDI output is not connected');if(d.origin==='logical'){this.publishMessage(message,id);this.logical.get(id)?.forEach(fn=>fn(message));return;}await this.backend.send(id,encodeMidiMessage(message));}
+ async send(id:string,message:MidiMessage){this.assertActive();const d=this.requireDevice(id);if(!d.capabilities.output)throw new Error('Device does not support MIDI output');if(d.origin==='physical'&&d.state!=='connected')throw new Error('MIDI output is not connected');if(d.origin==='logical'){this.publishMessage(message,id);this.logical.get(id)?.forEach(fn=>{try{fn(message);}catch{/* isolate logical subscriber failures */}});return;}await this.backend.send(id,encodeMidiMessage(message));}
  subscribe(fn:(message:MidiMessage,deviceId:string)=>void){this.assertActive();this.listeners.add(fn);return()=>this.listeners.delete(fn);}
  subscribeDevices(fn:(devices:MidiDevice[])=>void){this.assertActive();this.deviceListeners.add(fn);fn(this.getDevices());return()=>this.deviceListeners.delete(fn);}
  subscribeLogicalInput(id:string,fn:(message:MidiMessage)=>void){this.assertActive();const set=this.logical.get(id);if(!set)throw new Error('Unknown logical MIDI device');set.add(fn);return()=>set.delete(fn);}
  async disconnect(id:string){this.assertActive();const d=this.requireDevice(id);if(d.origin==='physical')await this.backend.disconnect(id);this.setState(id,'disconnected');}
  async dispose(){if(this.disposed)return;await this.backend.dispose();this.listeners.clear();this.deviceListeners.clear();this.logical.clear();this.devices.clear();this.disposed=true;}
- private publishMessage(message:MidiMessage,id:string){this.listeners.forEach(fn=>fn(message,id));}
+ private publishMessage(message:MidiMessage,id:string){this.listeners.forEach(fn=>{try{fn(message,id);}catch{/* isolate subscriber failures */}});}
  private setState(id:string,state:MidiDevice['state']){this.devices.set(id,{...this.requireDevice(id),state});this.publishDevices();}
- private publishDevices(){const snapshot=this.getDevices();this.deviceListeners.forEach(fn=>fn(snapshot));}
+ private publishDevices(){const snapshot=this.getDevices();this.deviceListeners.forEach(fn=>{try{fn(snapshot);}catch{/* isolate subscriber failures */}});}
  private requireDevice(id:string){const d=this.devices.get(id);if(!d)throw new Error('Unknown MIDI device: '+id);return d;}
  private assertActive(){if(this.disposed)throw new Error('MidiService has been disposed');}
 }
