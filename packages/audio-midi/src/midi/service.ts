@@ -33,7 +33,7 @@ export class MidiService{
   this.devices.set(id,device);this.logical.set(id,new Set());this.publishDevices();return device;}
  async connectInput(id:string){this.assertActive();const d=this.requireDevice(id);if(!d.capabilities.input)throw new Error('Device does not support MIDI input');if(d.origin==='logical'){this.setDirectionState(id,'input','connected');return;}await this.backend.connectInput(id,m=>this.publishMessage(m,id));this.setDirectionState(id,'input','connected');}
  async connectOutput(id:string){this.assertActive();const d=this.requireDevice(id);if(!d.capabilities.output)throw new Error('Device does not support MIDI output');if(d.origin==='logical'){this.setDirectionState(id,'output','connected');return;}await this.backend.connectOutput(id);this.setDirectionState(id,'output','connected');}
- async send(id:string,message:MidiMessage){this.assertActive();const d=this.requireDevice(id);if(!d.capabilities.output)throw new Error('Device does not support MIDI output');if(d.outputState!=='connected')throw new Error('MIDI output is not connected');if(d.origin==='physical'&&message.type==='system'&&message.status===0xf0&&!this.backend.capabilities.systemExclusive)throw new Error('System exclusive output is not enabled by this backend');if(d.origin==='logical'){this.publishMessage(message,id);this.logical.get(id)?.forEach(fn=>{try{fn(message);}catch{/* isolate logical subscriber failures */}});return;}await this.backend.send(id,encodeMidiMessage(message));}
+ async send(id:string,message:MidiMessage){this.assertActive();const d=this.requireDevice(id);if(!d.capabilities.output)throw new Error('Device does not support MIDI output');if(d.outputState!=='connected')throw new Error('MIDI output is not connected');if(d.origin==='physical'&&message.type==='system'&&message.status===0xf0&&!this.backend.capabilities.systemExclusive)throw new Error('System exclusive output is not enabled by this backend');const bytes=encodeMidiMessage(message);if(d.origin==='logical'){this.publishMessage(message,id);this.logical.get(id)?.forEach(fn=>{try{fn(message);}catch{/* isolate logical subscriber failures */}});return;}await this.backend.send(id,bytes);}
  subscribe(fn:(message:MidiMessage,deviceId:string)=>void){this.assertActive();this.listeners.add(fn);return()=>this.listeners.delete(fn);}
  subscribeDevices(fn:(devices:MidiDevice[])=>void){this.assertActive();this.deviceListeners.add(fn);fn(this.getDevices());return()=>this.deviceListeners.delete(fn);}
  subscribeLogicalInput(id:string,fn:(message:MidiMessage)=>void){this.assertActive();const set=this.logical.get(id);if(!set)throw new Error('Unknown logical MIDI device');set.add(fn);return()=>set.delete(fn);}
@@ -82,7 +82,7 @@ export function createWebMidiBackend(manager: LegacyMidiManager = new LegacyMidi
       if (!manager.getState().inputs.some(port => port.id === id)) throw new Error('MIDI input not discovered: ' + id);
       if (!inputSubscriptions.has(id)) {
         inputSubscriptions.set(id, manager.subscribeEvents(event => {
-          if (event.sourceId === id) listener(decodeMidiMessage(event.rawBytes));
+          if (event.sourceId === id) { try { listener(decodeMidiMessage(event.rawBytes)); } catch { /* malformed device packets are isolated */ } }
         }));
       }
       await manager.connectInput(id);
