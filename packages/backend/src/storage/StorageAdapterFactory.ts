@@ -2,6 +2,7 @@ import { BaseStorageAdapter } from './BaseStorageAdapter.js';
 import { StorageConfig } from './types.js';
 import { LocalFSAdapter } from './LocalFSAdapter.js';
 import { S3Adapter } from './S3Adapter.js';
+import { BucketStorageService } from './BucketStorageService.js';
 import { BackblazeB2Adapter } from './BackblazeB2Adapter.js';
 import { SupabaseStorageAdapter } from './SupabaseStorageAdapter.js';
 import { GoogleDriveAdapter } from './GoogleDriveAdapter.js';
@@ -20,7 +21,7 @@ export class StorageAdapterFactory {
         return new GoogleDriveAdapter(config);
       case 's3':
       case 's3_compatible':
-        return new S3Adapter(config);
+        return new BucketStorageService(config);
       default:
         throw new Error(`Unsupported storage provider: ${config.provider}`);
     }
