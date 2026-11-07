@@ -1,10 +1,10 @@
 import {describe,expect,it} from 'vitest';
-import {decodeOscMessage,decodeOscPacket,encodeOscBundle,encodeOscMessage,type OscBundle} from '../src/osc/codec.js';
+import {decodeOscMessage,decodeOscPacket,encodeOscBundle,encodeOscMessage,type OscBundle,type OscMessage} from '../src/osc/codec.js';
 import {matchesOscAddress,OscService,type OscTransport} from '../src/osc/service.js';
 import {DEFAULT_OSC_DEVICES} from '../src/engine/osc/types.js';
 describe('OSC protocol and service',()=>{
  it('round-trips standard scalar, blob, 64-bit and extended argument types',()=>{
-  const message={address:'/synth/voice',args:[42,0.25,'hello',true,false,null,1234567890123n,new Uint8Array([1,2,3]),{type:'double',value:0.123456789},{type:'timetag',value:0xf123456789abcdefn},{type:'impulse'}] as const};
+  const message:OscMessage={address:'/synth/voice',args:[42,0.25,'hello',true,false,null,1234567890123n,new Uint8Array([1,2,3]),{type:'double',value:0.123456789},{type:'timetag',value:0xf123456789abcdefn},{type:'impulse'}]};
   const decoded=decodeOscMessage(encodeOscMessage(message));expect(decoded.address).toBe(message.address);expect(decoded.args).toEqual(message.args);
  });
  it('round-trips nested OSC bundles with unsigned time tags',()=>{
