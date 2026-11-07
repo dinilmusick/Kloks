@@ -18,6 +18,9 @@ export class StorageAdapterFactory {
         return new SupabaseStorageAdapter(config);
       case 'google_drive':
         return new GoogleDriveAdapter(config);
+      case 's3':
+      case 's3_compatible':
+        return new S3Adapter(config);
       default:
         throw new Error(`Unsupported storage provider: ${config.provider}`);
     }
