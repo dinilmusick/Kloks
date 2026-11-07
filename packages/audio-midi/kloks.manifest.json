@@ -37,7 +37,7 @@
       "id": "midi",
       "name": "MIDI Hardware Service",
       "version": "1.0.0",
-      "description": "Web MIDI hardware access, clock sync, and message parser.",
+      "description": "Legacy compatibility facade for the historical MIDI subsystem. New applications should use the independent MIDI protocol/device service; clock timing is provided separately by the Clock Service.",
       "backend": {
         "package": "@kloks/audio-midi",
         "export": "MidiServiceFacade",
@@ -52,6 +52,117 @@
         ]
       },
       "dependencies": []
+    },
+    {
+      "id": "clock",
+      "name": "Application Clock Service",
+      "version": "1.0.0",
+      "description": "Generic monotonic application timing, musical position, tempo, subdivisions and deterministic lifecycle; independent from MIDI and OSC.",
+      "backend": {
+        "package": "@ultrst-armada/kloks",
+        "export": "ClockServiceFacade",
+        "facade": "ClockServiceFacade"
+      },
+      "modes": [
+        "backend",
+        "fullstack"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ],
+        "frontend": [
+          "App.main-content"
+        ]
+      },
+      "defaultFrontend": {
+        "component": "ClockServicePanel",
+        "package": "@ultrst-armada/floks/ui/services",
+        "export": "ClockServicePanel",
+        "relationship": "recommended"
+      },
+      "dependencies": [],
+      "capabilities": [
+        "application-timing",
+        "monotonic-clock",
+        "musical-position",
+        "tempo",
+        "subdivisions"
+      ]
+    },
+    {
+      "id": "midi-protocol",
+      "name": "MIDI Protocol and Device Service",
+      "version": "1.0.0",
+      "description": "Capability-gated physical MIDI discovery, independent input/output lifecycle, MIDI message encoding/decoding and logical in-process endpoints.",
+      "backend": {
+        "package": "@ultrst-armada/kloks",
+        "export": "CanonicalMidiServiceFacade",
+        "facade": "CanonicalMidiServiceFacade"
+      },
+      "modes": [
+        "backend",
+        "fullstack"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ],
+        "frontend": [
+          "App.main-content"
+        ]
+      },
+      "defaultFrontend": {
+        "component": "MidiServicePanel",
+        "package": "@ultrst-armada/floks/ui/services",
+        "export": "MidiServicePanel",
+        "relationship": "recommended"
+      },
+      "dependencies": [],
+      "capabilities": [
+        "midi-input",
+        "midi-output",
+        "device-discovery",
+        "logical-midi-endpoints",
+        "hot-plug"
+      ]
+    },
+    {
+      "id": "osc",
+      "name": "OSC Protocol and Endpoint Service",
+      "version": "1.0.0",
+      "description": "Independent OSC client/server, binary message and bundle codec, address patterns, endpoint lifecycle and injected runtime-specific transports.",
+      "backend": {
+        "package": "@ultrst-armada/kloks",
+        "export": "OscServiceFacade",
+        "facade": "OscServiceFacade"
+      },
+      "modes": [
+        "backend",
+        "fullstack"
+      ],
+      "targets": {
+        "backend": [
+          "BackendFacade.services"
+        ],
+        "frontend": [
+          "App.main-content"
+        ]
+      },
+      "defaultFrontend": {
+        "component": "OscServicePanel",
+        "package": "@ultrst-armada/floks/ui/services",
+        "export": "OscServicePanel",
+        "relationship": "recommended"
+      },
+      "dependencies": [],
+      "capabilities": [
+        "osc-client",
+        "osc-server",
+        "osc-bundles",
+        "address-patterns",
+        "runtime-transport-injection"
+      ]
     }
   ],
   "orchestrations": [
