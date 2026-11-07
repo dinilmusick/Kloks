@@ -16,7 +16,7 @@ export class MidiService{
  private deviceListeners=new Set<(devices:MidiDevice[])=>void>();private logical=new Map<string,Set<(message:MidiMessage)=>void>>();private disposed=false;private unsubscribeBackend?:()=>void;
  constructor(private readonly backend:MidiBackend){
   this.unsubscribeBackend=backend.subscribeDevices?.(devices=>{
-   const next=new Map(devices.map(device=>[device.id,device]));
+   const next=new Map(devices.map(device=>[device.id,this.normalizeDevice(device)]));
    for(const [id,device] of this.devices)if(device.origin==='logical')next.set(id,device);
    this.devices=next;this.publishDevices();
   });
@@ -25,7 +25,7 @@ export class MidiService{
  getDevices(){return [...this.devices.values()];}
  async discover(){this.assertActive();const found=await this.backend.discover();const ids=new Set(found.map(d=>d.id));
   for(const [id,device] of this.devices)if(device.origin==='physical'&&!ids.has(id))this.devices.delete(id);
-  for(const device of found)this.devices.set(device.id,device);this.publishDevices();return this.getDevices();}
+  for(const device of found)this.devices.set(device.id,this.normalizeDevice(device));this.publishDevices();return this.getDevices();}
  createLogicalDevice(name:string,direction:'input'|'output'|'duplex'='duplex'):MidiDevice{
   this.assertActive();if(!name.trim())throw new TypeError('Logical MIDI device name is required');
   const id='logical-midi-'+Math.random().toString(36).slice(2);
@@ -43,6 +43,11 @@ export class MidiService{
  private setDirectionState(id:string,direction:'input'|'output',state:'connected'|'disconnected'){const device=this.requireDevice(id);const next={...device,[direction==='input'?'inputState':'outputState']:state};next.state=next.inputState==='connected'||next.outputState==='connected'?'connected':'disconnected';this.devices.set(id,next);this.publishDevices();}
  private publishDevices(){const snapshot=this.getDevices();this.deviceListeners.forEach(fn=>{try{fn(snapshot);}catch{/* isolate subscriber failures */}});}
  private requireDevice(id:string){const d=this.devices.get(id);if(!d)throw new Error('Unknown MIDI device: '+id);return d;}
+ private normalizeDevice(device:MidiDevice):MidiDevice{
+  const inputState=device.inputState??(device.capabilities.input?device.state:'disconnected');
+  const outputState=device.outputState??(device.capabilities.output?device.state:'disconnected');
+  return {...device,inputState,outputState,state:inputState==='connected'||outputState==='connected'?'connected':'disconnected'};
+ }
  private assertActive(){if(this.disposed)throw new Error('MidiService has been disposed');}
 }
 /**
