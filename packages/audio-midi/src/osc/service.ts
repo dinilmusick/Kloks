@@ -11,7 +11,7 @@ export interface OscTransport{
 export type OscListener=(message:OscMessage,endpointId:string)=>void;
 export type OscPacketListener=(packet:OscPacket,endpointId:string)=>void;
 function escapePatternLiteral(value:string):string{return value.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&');}
-function patternExpression(pattern:string):string{
+function escapePatternLiteral(value:string):string{return value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
  let result='';
  for(let index=0;index<pattern.length;index+=1){
   const char=pattern[index];
