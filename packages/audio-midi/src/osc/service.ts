@@ -54,7 +54,7 @@ export class OscService{
  async startServer(endpoint:OscEndpoint){
   this.assertActive();this.assertEndpoint(endpoint);if(this.servers.has(endpoint.id))return;
   try{
-   const stop=await this.transport.listen(endpoint,packet=>{try{this.publishPacket(decodeOscPacket(packet),endpoint.id);}catch{/* malformed packets are isolated */}},error=>{this.serverStates.set(endpoint.id,{...endpoint,state:'error'});});
+   const stop=await this.transport.listen(endpoint,packet=>{try{this.publishPacket(decodeOscPacket(packet),endpoint.id);}catch{/* malformed packets are isolated */}},_error=>{this.serverStates.set(endpoint.id,{...endpoint,state:'error'});});
    const active={...endpoint,state:'listening' as const};
    this.servers.set(endpoint.id,{endpoint:active,stop});this.serverStates.set(endpoint.id,active);
   }catch(error){
