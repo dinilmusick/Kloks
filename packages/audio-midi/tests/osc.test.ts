@@ -3,6 +3,7 @@ import {decodeOscMessage,decodeOscPacket,encodeOscBundle,encodeOscMessage,type O
 import {matchesOscAddress,OscService,type OscTransport} from '../src/osc/service.js';
 import {DEFAULT_OSC_DEVICES} from '../src/engine/osc/types.js';
 import {OscManager} from '../src/engine/osc/oscManager.js';
+import {createNodeUdpOscTransport} from '../src/osc/node-udp.js';
 describe('OSC protocol and service',()=>{
  it('round-trips standard scalar, blob, 64-bit and extended argument types',()=>{
   const message:OscMessage={address:'/synth/voice',args:[42,0.25,'hello',true,false,null,1234567890123n,new Uint8Array([1,2,3]),{type:'double',value:0.123456789},{type:'timetag',value:0xf123456789abcdefn},{type:'impulse'}]};
@@ -33,5 +34,6 @@ describe('OSC protocol and service',()=>{
   await service.stopServer('in');expect(service.getServers()[0].state).toBe('stopped');
   await service.dispose();expect(stopped).toBe(1);expect(()=>service.addClient({id:'x',host:'localhost',port:9,transport:'udp'})).toThrow(/disposed/);
  });
+ it('rejects non-UDP endpoints in the Node UDP transport',async()=>{const transport=createNodeUdpOscTransport();const endpoint={id:'ws',host:'127.0.0.1',port:9000,transport:'websocket' as const};await expect(transport.send(endpoint,new Uint8Array())).rejects.toThrow(/only supports udp/);await expect(transport.listen(endpoint,()=>{})).rejects.toThrow(/only supports udp/);await transport.dispose();});
  it('does not advertise simulated legacy OSC endpoints as live devices',()=>{expect(DEFAULT_OSC_DEVICES).toEqual([]);const legacy=new OscManager();const device=legacy.addDevice({name:'local fake',type:'network_udp',host:'127.0.0.1',port:9000,status:'listening',enabled:true});expect(device.status).toBe('simulated');});
 });
