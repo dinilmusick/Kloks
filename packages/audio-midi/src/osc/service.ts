@@ -27,7 +27,7 @@ function patternExpression(pattern:string):string{
   }
   if(char==='{'){
    const end=pattern.indexOf('}',index+1);
-   if(end>index+1){const alternatives=pattern.slice(index+1,end).split(',');if(alternatives.length>1){result+='(?:'+alternatives.map(patternExpression).join('|')+')';index=end;continue;}
+   if(end>index+1){const alternatives=pattern.slice(index+1,end).split(',');if(alternatives.length>1){result+='(?:'+alternatives.map(patternExpression).join('|')+')';index=end;continue;}}
   }
   result+=escapePatternLiteral(char);
  }
