@@ -1,4 +1,4 @@
-import { S3Client, ListBucketsCommand, HeadBucketCommand } from '@aws-sdk/client-s3';
+import { S3Client, ListObjectsV2Command } from '@dinilmusick/gutts/storage';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -90,11 +90,9 @@ export class SrklStorageService {
 
     try {
       const client = this.createB2Client(account);
-      const res = await client.send(new ListBucketsCommand({}));
-      const names = (res.Buckets || []).map((b) => b.Name || '').filter(Boolean);
-      if (names.length > 0) {
-        if (account.bucketName && !names.includes(account.bucketName)) names.unshift(account.bucketName);
-        return names;
+      if (account.bucketName) {
+        await client.send(new ListObjectsV2Command({ Bucket: account.bucketName, MaxKeys: 1 }));
+        return [account.bucketName];
       }
     } catch (err: any) {
       console.warn(`[SrklStorageService] ListBuckets warning for ${accountId}:`, err.message);
@@ -113,7 +111,7 @@ export class SrklStorageService {
 
     try {
       const client = this.createB2Client(account);
-      await client.send(new HeadBucketCommand({ Bucket: bucketName }));
+      await client.send(new ListObjectsV2Command({ Bucket: bucketName, MaxKeys: 1 }));
       return true;
     } catch {
       return Boolean(account.bucketName && account.bucketName === bucketName);

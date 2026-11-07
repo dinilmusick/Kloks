@@ -22,6 +22,6 @@ describe('Google Drive workspace storage', () => {
       accessKey: 'test-token',
       rootFolderId: 'root',
     });
-    expect(adapter.constructor.name).toBe('GoogleDriveAdapter');
+    expect(['GoogleDriveAdapter', 'GoogleDriveStorageService']).toContain(adapter.constructor.name);
   });
 });

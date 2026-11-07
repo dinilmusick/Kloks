@@ -4,7 +4,7 @@ import { LocalFSAdapter } from './LocalFSAdapter.js';
 import { BucketStorageService } from './BucketStorageService.js';
 import { BackblazeB2Adapter } from './BackblazeB2Adapter.js';
 import { SupabaseStorageAdapter } from './SupabaseStorageAdapter.js';
-import { GoogleDriveAdapter } from './GoogleDriveAdapter.js';
+import { GoogleDriveStorageService } from './GoogleDriveStorageService.js';
 
 export class StorageAdapterFactory {
   static create(config: StorageConfig): BaseStorageAdapter {
@@ -17,7 +17,7 @@ export class StorageAdapterFactory {
       case 'supabase':
         return new SupabaseStorageAdapter(config);
       case 'google_drive':
-        return new GoogleDriveAdapter(config);
+        return new GoogleDriveStorageService(config);
       case 's3':
       case 's3_compatible':
         return new BucketStorageService(config);

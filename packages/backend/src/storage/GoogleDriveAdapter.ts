@@ -1,15 +1,15 @@
-import { google, drive_v3 } from '@dinilmusick/gutts/storage';
+import { google } from '@dinilmusick/gutts/storage';
 import { Readable } from 'node:stream';
 import { BaseStorageAdapter } from './BaseStorageAdapter.js';
 import { FileInfo, StorageConfig, ConnectionTestResult } from './types.js';
 
-type DriveFile = drive_v3.Schema$File;
+type DriveFile = any;
 
 export class GoogleDriveAdapter extends BaseStorageAdapter {
-  private client?: drive_v3.Drive;
-  private auth?: ReturnType<typeof google.auth.OAuth2>;
+  private client?: any;
+  private auth?: any;
 
-  private getAuth(): ReturnType<typeof google.auth.OAuth2> {
+  private getAuth(): any {
     if (this.auth) return this.auth;
 
     const client = new google.auth.OAuth2(
@@ -38,7 +38,7 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
     return client;
   }
 
-  private async getClient(): Promise<drive_v3.Drive> {
+  private async getClient(): Promise<any> {
     if (this.client) return this.client;
 
     const auth = this.getAuth();

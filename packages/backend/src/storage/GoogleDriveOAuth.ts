@@ -33,7 +33,7 @@ export function createGoogleDriveAuthorizationUrl(
     scope: config.scopes?.length ? config.scopes : [GOOGLE_DRIVE_FILE_SCOPE],
     state,
     ...(codeChallenge
-      ? { code_challenge: codeChallenge, code_challenge_method: 'S256' }
+      ? { code_challenge: codeChallenge, code_challenge_method: 'S256' as any }
       : {}),
   });
 
@@ -72,27 +72,26 @@ export async function refreshGoogleDriveAccessToken(
   clientId: string,
   refreshToken: string,
   clientSecret?: string,
-  redirectUri?: string,
+  _redirectUri?: string,
 ): Promise<GoogleDriveTokenSet> {
-  const client = new google.auth.OAuth2(
-    clientId,
-    clientSecret,
-    redirectUri,
-  );
-  client.setCredentials({ refresh_token: refreshToken });
-
-  const accessToken = await client.getAccessToken();
-  if (!accessToken.token) {
-    throw new Error('Google OAuth refresh returned no access token.');
+  const body = new URLSearchParams({
+    client_id: clientId,
+    refresh_token: refreshToken,
+    grant_type: 'refresh_token',
+  });
+  if (clientSecret) body.set('client_secret', clientSecret);
+  const response = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+  if (!response.ok) {
+    throw new Error(`Google OAuth refresh failed: ${response.status}`);
   }
-
+  const data = (await response.json()) as any;
   return {
-    accessToken: accessToken.token,
-    ...(client.credentials.expiry_date
-      ? { expiresAt: client.credentials.expiry_date }
-      : {}),
-    ...(client.credentials.token_type
-      ? { tokenType: client.credentials.token_type }
-      : {}),
+    accessToken: data.access_token,
+    expiresAt: data.expires_in ? Date.now() + Number(data.expires_in) * 1000 : undefined,
+    tokenType: data.token_type,
   };
 }
