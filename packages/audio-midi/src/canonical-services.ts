@@ -4,7 +4,7 @@ import { createMidiKernelService } from './midi/kernel.js';
 import { createWebMidiBackend, type MidiBackend } from './midi/service.js';
 import { createOscKernelService } from './osc/kernel.js';
 import type { OscTransport } from './osc/service.js';
-import type { IService, ServiceDefinition } from '@ultrst-armada/krnl';
+import type { ServiceDefinition } from '@ultrst-armada/krnl';
 
 /** Default timing facade; each Skipo app can create an isolated clock instance. */
 const defaultClockService = createClockKernelService();
@@ -54,7 +54,7 @@ export const OscServiceFacade = {
   runtime: 'client' as const,
   deployment: 'local' as const,
   definition: OscServiceDefinition,
-  createInstance: (transport: OscTransport = unconfiguredOscTransport): IService => createOscKernelService(transport),
+  createInstance: (transport: OscTransport = unconfiguredOscTransport) => createOscKernelService(transport),
   execute: async <TIn = unknown, TOut = unknown>(operation: string, input?: TIn) => {
     await defaultOscService.start();
     return defaultOscService.call<TIn, TOut>(operation, input);
