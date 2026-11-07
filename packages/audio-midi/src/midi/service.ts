@@ -9,11 +9,18 @@ export interface MidiBackend{
  send(id:string,bytes:Uint8Array):Promise<void>;
  disconnect(id:string):Promise<void>;
  dispose():Promise<void>;
+ subscribeDevices?(listener:(devices:MidiDevice[])=>void):()=>void;
 }
 export class MidiService{
  private devices=new Map<string,MidiDevice>();private listeners=new Set<(message:MidiMessage,deviceId:string)=>void>();
- private deviceListeners=new Set<(devices:MidiDevice[])=>void>();private logical=new Map<string,Set<(message:MidiMessage)=>void>>();private disposed=false;
- constructor(private readonly backend:MidiBackend){}
+ private deviceListeners=new Set<(devices:MidiDevice[])=>void>();private logical=new Map<string,Set<(message:MidiMessage)=>void>>();private disposed=false;private unsubscribeBackend?:()=>void;
+ constructor(private readonly backend:MidiBackend){
+  this.unsubscribeBackend=backend.subscribeDevices?.(devices=>{
+   const next=new Map(devices.map(device=>[device.id,device]));
+   for(const [id,device] of this.devices)if(device.origin==='logical')next.set(id,device);
+   this.devices=next;this.publishDevices();
+  });
+ }
  getCapabilities(){return {...this.backend.capabilities,logicalEndpoints:true};}
  getDevices(){return [...this.devices.values()];}
  async discover(){this.assertActive();const found=await this.backend.discover();const ids=new Set(found.map(d=>d.id));
@@ -31,7 +38,7 @@ export class MidiService{
  subscribeDevices(fn:(devices:MidiDevice[])=>void){this.assertActive();this.deviceListeners.add(fn);fn(this.getDevices());return()=>this.deviceListeners.delete(fn);}
  subscribeLogicalInput(id:string,fn:(message:MidiMessage)=>void){this.assertActive();const set=this.logical.get(id);if(!set)throw new Error('Unknown logical MIDI device');set.add(fn);return()=>set.delete(fn);}
  async disconnect(id:string){this.assertActive();const d=this.requireDevice(id);if(d.origin==='physical')await this.backend.disconnect(id);this.setState(id,'disconnected');}
- async dispose(){if(this.disposed)return;await this.backend.dispose();this.listeners.clear();this.deviceListeners.clear();this.logical.clear();this.devices.clear();this.disposed=true;}
+ async dispose(){if(this.disposed)return;this.unsubscribeBackend?.();this.unsubscribeBackend=undefined;await this.backend.dispose();this.listeners.clear();this.deviceListeners.clear();this.logical.clear();this.devices.clear();this.disposed=true;}
  private publishMessage(message:MidiMessage,id:string){this.listeners.forEach(fn=>{try{fn(message,id);}catch{/* isolate subscriber failures */}});}
  private setState(id:string,state:MidiDevice['state']){this.devices.set(id,{...this.requireDevice(id),state});this.publishDevices();}
  private publishDevices(){const snapshot=this.getDevices();this.deviceListeners.forEach(fn=>{try{fn(snapshot);}catch{/* isolate subscriber failures */}});}
@@ -44,6 +51,12 @@ export class MidiService{
  */
 export function createWebMidiBackend(manager: LegacyMidiManager = new LegacyMidiManager(), options:{sysex?:boolean}={}): MidiBackend {
   const inputSubscriptions = new Map<string, () => void>();
+  const mapDevices=(state:ReturnType<LegacyMidiManager['getState']>):MidiDevice[]=>{
+    const devices=new Map<string,MidiDevice>();
+    state.inputs.forEach(port=>devices.set(port.id,{id:port.id,name:port.name,manufacturer:port.manufacturer,direction:'input',origin:'physical',state:port.state==='connected'&&port.connection==='open'?'connected':'disconnected',capabilities:{input:true,output:false,virtualDeviceCreation:false}}));
+    state.outputs.forEach(port=>{const previous=devices.get(port.id);devices.set(port.id,{id:port.id,name:port.name,manufacturer:port.manufacturer??previous?.manufacturer,direction:previous?'duplex':'output',origin:'physical',state:port.state==='connected'&&port.connection==='open'?'connected':'disconnected',capabilities:{input:Boolean(previous?.capabilities.input),output:true,virtualDeviceCreation:false}});});
+    return [...devices.values()];
+  };
   const supported = typeof navigator !== 'undefined' && typeof navigator.requestMIDIAccess === 'function';
   const ensureInitialized = async () => {
     if (!supported) return false;
@@ -54,24 +67,10 @@ export function createWebMidiBackend(manager: LegacyMidiManager = new LegacyMidi
     capabilities: { physicalInput: supported, physicalOutput: supported, virtualDeviceCreation: false, systemExclusive: supported && Boolean(options.sysex) },
     async discover() {
       if (!(await ensureInitialized())) return [];
-      const state = manager.getState();
-      const devices = new Map<string, MidiDevice>();
-      state.inputs.forEach(port => devices.set(port.id, {
-        id: port.id, name: port.name, manufacturer: port.manufacturer,
-        direction: 'input', origin: 'physical',
-        state: port.state === 'connected' && port.connection === 'open' ? 'connected' : 'disconnected',
-        capabilities: { input: true, output: false, virtualDeviceCreation: false },
-      }));
-      state.outputs.forEach(port => {
-        const previous = devices.get(port.id);
-        devices.set(port.id, {
-          id: port.id, name: port.name, manufacturer: port.manufacturer ?? previous?.manufacturer,
-          direction: previous ? 'duplex' : 'output', origin: 'physical',
-          state: port.state === 'connected' && port.connection === 'open' ? 'connected' : 'disconnected',
-          capabilities: { input: Boolean(previous?.capabilities.input), output: true, virtualDeviceCreation: false },
-        });
-      });
-      return [...devices.values()];
+      return mapDevices(manager.getState());
+    },
+    subscribeDevices(listener) {
+      return manager.subscribeState(state=>{if(state.isInitialized)listener(mapDevices(state));});
     },
     async connectInput(id, listener) {
       if (!(await ensureInitialized())) throw new Error('Web MIDI is unavailable in this runtime');
