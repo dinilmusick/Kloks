@@ -1,7 +1,7 @@
 import { createService, createServiceDefinition, type IService } from '@ultrst-armada/krnl';
 import { MidiService, type MidiBackend, type MidiDevice } from './service.js';
 import type { MidiMessage } from './message.js';
-interface MidiState extends Record<string, unknown> { devices: MidiDevice[]; lastMessage: MidiMessage | null; }
+export interface MidiState extends Record<string, unknown> { devices: MidiDevice[]; lastMessage: MidiMessage | null; }
 export function createMidiKernelService(backend: MidiBackend): IService<MidiState> {
   const midi = new MidiService(backend);
   let service: IService<MidiState> | undefined;
