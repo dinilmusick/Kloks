@@ -1,4 +1,5 @@
 import {decodeMidiMessage,encodeMidiMessage,type MidiMessage} from './message.js';
+import {MidiManager as LegacyMidiManager} from '../midiManager.js';
 export interface MidiDevice{id:string;name:string;manufacturer?:string;direction:'input'|'output'|'duplex';origin:'physical'|'logical';state:'connected'|'disconnected';capabilities:{input:boolean;output:boolean;virtualDeviceCreation:boolean};}
 export interface MidiBackend{
  readonly capabilities:{physicalInput:boolean;physicalOutput:boolean;virtualDeviceCreation:boolean};
