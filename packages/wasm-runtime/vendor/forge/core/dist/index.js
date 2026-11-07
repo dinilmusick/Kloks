@@ -1,5 +1,5 @@
 import { DEPENDENCY_ECOSYSTEMS, LANGUAGES, WASM_OJ_CONTRACT_ID, WASM_OJ_CONTRACT_VERSION, WASM_OJ_CONTRACT_VERSION as WASM_OJ_CONTRACT_VERSION$1, WASM_OJ_ERROR_CODES, WASM_OJ_ERROR_STAGES, WASM_OJ_SCHEMAS, WASM_OJ_SCHEMAS as WASM_OJ_SCHEMAS$1, WASM_OJ_STORAGE, WASM_OJ_STORAGE as WASM_OJ_STORAGE$1, WasmOjError, WasmOjError as WasmOjError$1, asWasmOjError, asWasmOjError as asWasmOjError$1, assertLanguageIdentifier, assertLanguageIdentifier as assertLanguageIdentifier$1, isBuiltinLanguage, isBuiltinLanguage as isBuiltinLanguage$1 } from "../../contracts/dist/index.js";
-import { Gunzip, unzipSync } from "fflate";
+import { Gunzip, unzipSync } from "../fflate.js";
 //#region src/core/determinism.ts
 var DEFAULT_DETERMINISM = Object.freeze({
 	randomSeed: 1592594996,
