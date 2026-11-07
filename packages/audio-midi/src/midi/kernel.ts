@@ -4,7 +4,7 @@ import type { MidiMessage } from './message.js';
 interface MidiState extends Record<string, unknown> { devices: MidiDevice[]; lastMessage: MidiMessage | null; }
 export function createMidiKernelService(backend: MidiBackend): IService<MidiState> {
   const midi = new MidiService(backend);
-  let service: IService<MidiState>;
+  let service: IService<MidiState> | undefined;
   let stopMessages: (() => void) | undefined;
   let stopDevices: (() => void) | undefined;
   const definition = createServiceDefinition<MidiState>({
@@ -12,8 +12,8 @@ export function createMidiKernelService(backend: MidiBackend): IService<MidiStat
     state: { initial: { devices: [], lastMessage: null } },
     lifecycle: {
       onInit: () => {
-        stopDevices = midi.subscribeDevices(devices => service.setState({ devices }));
-        stopMessages = midi.subscribe((lastMessage) => service.setState({ lastMessage }));
+        stopDevices = midi.subscribeDevices(devices => { if (service) service.setState({ devices }); });
+        stopMessages = midi.subscribe((lastMessage) => { if (service) service.setState({ lastMessage }); });
       },
       onStart: async () => { await midi.discover(); },
       onStop: async () => { await Promise.all(midi.getDevices().filter(device => device.origin === 'physical' && device.state === 'connected').map(device => midi.disconnect(device.id))); },
