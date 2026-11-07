@@ -20,7 +20,7 @@ const channel = (value: number) => {
 export function encodeMidiMessage(message: MidiMessage): Uint8Array {
   if (message.type === 'system') {
     if (!Number.isInteger(message.status) || message.status < 0xf0 || message.status > 0xff) throw new RangeError('Invalid system status');
-    return new Uint8Array([message.status, ...message.data.map(value => byte(value, 'System data'))]);
+    return new Uint8Array([message.status, ...message.data.map(value => { if (!Number.isInteger(value) || value < 0 || value > 255) throw new RangeError('System data must be a byte'); return value; })]);
   }
   const ch = channel(message.channel);
   if (message.type === 'pitchBend') {
@@ -40,8 +40,15 @@ export function decodeMidiMessage(input: ArrayLike<number>): MidiMessage {
   if (input.length < 1) throw new TypeError('Empty MIDI message');
   const status = input[0];
   if (!Number.isInteger(status) || status < 0x80 || status > 0xff) throw new TypeError('Invalid MIDI status byte');
+  if (status >= 0xf0) {
+    const data = Array.from({ length: input.length - 1 }, (_, index) => {
+      const value = input[index + 1];
+      if (!Number.isInteger(value) || value < 0 || value > 255) throw new RangeError('System data must be a byte');
+      return value;
+    });
+    return { type: 'system', status, data };
+  }
   const data = Array.from({ length: input.length - 1 }, (_, index) => byte(input[index + 1], 'MIDI data'));
-  if (status >= 0xf0) return { type: 'system', status, data };
   const family = status & 0xf0;
   const ch = status & 0x0f;
   const expected = family === 0xc0 || family === 0xd0 ? 1 : 2;
