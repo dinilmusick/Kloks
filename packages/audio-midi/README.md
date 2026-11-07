@@ -33,7 +33,7 @@ unsubscribe();
 await midi.dispose();
 ```
 
-Physical discovery and logical in-process endpoints are distinct. The Web MIDI backend supports physical input/output only where the runtime exposes Web MIDI. It does not create OS-level virtual MIDI ports. Native, Node, WebContainer and desktop environments inject their own capability-appropriate backends.
+Physical discovery and logical in-process endpoints are distinct. The Web MIDI backend adapts Kloks' existing MidiManager, so discovery, hot-plug events and physical port lifecycle remain owned by one canonical manager. It supports physical input/output only where the runtime exposes Web MIDI. It does not create OS-level virtual MIDI ports. Native, Node, WebContainer and desktop environments inject their own capability-appropriate backends.
 
 ## OSC protocol and endpoints
 
@@ -49,7 +49,7 @@ unsubscribe();
 await osc.dispose();
 ```
 
-OSC supports scalar, string, blob and 64-bit arguments plus nested bundles. Node UDP binds real UDP sockets. Browser/WebContainer applications inject a WebSocket relay or another runtime transport; browsers cannot bind arbitrary UDP ports.
+OSC supports int32, float32, string, blob, int64, float64, timetag, boolean, nil and impulse arguments plus nested bundles. Packet subscriptions preserve bundles and their unsigned timetags; address-pattern subscriptions expose contained messages for application-level scheduling. Node UDP binds real UDP sockets. Browser/WebContainer applications inject a WebSocket relay or another runtime transport; browsers cannot bind arbitrary UDP ports. Legacy OscManager remains an in-memory event hub only and no longer advertises simulated endpoints as live devices.
 
 ## Application-level composition
 
