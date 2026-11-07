@@ -55,6 +55,7 @@ export class ClockService {
     this.scheduler = options.scheduler ?? systemClockScheduler;
     this.missedTickPolicy = options.missedTickPolicy ?? 'catch-up';
     this.maxCatchUpTicks = options.maxCatchUpTicks ?? 1024;
+    if (!Number.isInteger(this.maxCatchUpTicks) || this.maxCatchUpTicks < 1) throw new RangeError('maxCatchUpTicks must be a positive integer');
     this.tempo = this.validateTempo(options.tempo ?? 120);
     this.resolution = this.validateResolution(options.resolution ?? 24);
     this.signature = options.timeSignature ?? [4, 4];
