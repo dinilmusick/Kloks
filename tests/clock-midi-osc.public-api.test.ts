@@ -14,7 +14,7 @@ describe('canonical timing and protocol public entry points',()=>{
   const manifest=JSON.parse(readFileSync(new URL('../packages/audio-midi/kloks.manifest.json',import.meta.url),'utf8')) as {services:Array<{id:string;backend:{export:string;subpath?:string}}>};
   expect(manifest.services.find(service=>service.id==='clock')?.backend.export).toBe('ClockServiceFacade');
   expect(manifest.services.find(service=>service.id==='midi-protocol')?.backend.export).toBe('CanonicalMidiServiceFacade');
-  expect(manifest.services.find(service=>service.id==='osc')?.backend.export).toBe('OscServiceFacade');expect(manifest.services.filter(service=>['clock','midi-protocol','osc'].includes(service.id)).every(service=>service.backend.subpath==='audio-midi/services')).toBe(true);
+  expect(manifest.services.find(service=>service.id==='osc')?.backend.export).toBe('OscServiceFacade');expect(manifest.services.filter(service=>['clock','midi-protocol','osc'].includes(service.id)).every(service=>service.backend.subpath==='audio-midi/services')).toBe(true);const rootPackage=JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8')) as {exports:Record<string,{import:string}>};expect(rootPackage.exports['./audio-midi/services'].import).toBe('./packages/audio-midi/dist/services/index.js');expect(rootPackage.exports['./services'].import).toBe('./packages/services/dist/index.js');
  });
  it('exposes three independent service APIs and the Node-only OSC adapter',async()=>{
   expect(typeof ClockService).toBe('function');expect(typeof MidiService).toBe('function');expect(typeof OscService).toBe('function');
