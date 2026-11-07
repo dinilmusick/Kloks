@@ -11,14 +11,14 @@ export interface OscTransport{
 export type OscListener=(message:OscMessage,endpointId:string)=>void;
 export type OscPacketListener=(packet:OscPacket,endpointId:string)=>void;
 function escapePatternLiteral(value:string):string{
- const meta=new Set(['.','+','^','$','{','}','(',')','|','[',']','\\\\']);
- return [...value].map(char=>meta.has(char)?'\\\\'+char:char).join('');
+ const meta=new Set(['.','+','^','$','{','}','(',')','|','[',']','\\']);
+ return [...value].map(char=>meta.has(char)?'\\'+char:char).join('');
 }
 function patternExpression(pattern:string):string{
  let result='';
  for(let index=0;index<pattern.length;index+=1){
   const char=pattern[index];
-  if(char==='\\\\'&&index+1<pattern.length){result+=escapePatternLiteral(pattern[++index]);continue;}
+  if(char==='\\'&&index+1<pattern.length){result+=escapePatternLiteral(pattern[++index]);continue;}
   if(char==='*'){result+='.*';continue;}
   if(char==='?'){result+='.';continue;}
   if(char==='['){
