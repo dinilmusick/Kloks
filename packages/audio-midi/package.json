@@ -17,6 +17,26 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./clock": {
+      "types": "./dist/clock/index.d.ts",
+      "import": "./dist/clock/index.js",
+      "default": "./dist/clock/index.js"
+    },
+    "./midi": {
+      "types": "./dist/midi/index.d.ts",
+      "import": "./dist/midi/index.js",
+      "default": "./dist/midi/index.js"
+    },
+    "./osc": {
+      "types": "./dist/osc/index.d.ts",
+      "import": "./dist/osc/index.js",
+      "default": "./dist/osc/index.js"
+    },
+    "./osc/node": {
+      "types": "./dist/osc/node-udp.d.ts",
+      "import": "./dist/osc/node-udp.js",
+      "default": "./dist/osc/node-udp.js"
     }
   },
   "scripts": {
