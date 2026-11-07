@@ -1,6 +1,6 @@
 import {createService,createServiceDefinition,type IService} from '@ultrst-armada/krnl';
 import {ClockService,type ClockOptions,type ClockPosition} from './clock.js';
-type ClockState=ClockPosition&Record<string,unknown>;
+export type ClockState=ClockPosition&Record<string,unknown>;
 export function createClockKernelService(clock=new ClockService()):IService<ClockState>{
  let service:IService<ClockState>|undefined;let unsubscribe:(()=>void)|undefined;
  const definition=createServiceDefinition<ClockState>({
