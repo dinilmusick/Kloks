@@ -20,7 +20,6 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "fflate": "0.8.3",
     "es-module-lexer": "2.3.1"
   },
   "devDependencies": {
