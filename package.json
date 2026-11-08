@@ -1,6 +1,6 @@
 {
   "name": "@ultrst-armada/kloks",
-  "version": "1.26.2",
+  "version": "1.26.3",
   "private": false,
   "publishConfig": {
     "access": "public",
@@ -214,6 +214,11 @@
       "types": "./packages/audio-midi/dist/services/index.d.ts",
       "import": "./packages/audio-midi/dist/services/index.js",
       "default": "./packages/audio-midi/dist/services/index.js"
+    },
+    "./backend/storage-workspace": {
+      "types": "./packages/backend/dist/storage-workspace.d.ts",
+      "import": "./packages/backend/dist/storage-workspace.js",
+      "default": "./packages/backend/dist/storage-workspace.js"
     }
   },
   "scripts": {
