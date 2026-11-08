@@ -15,6 +15,16 @@ export interface GoogleDriveTokenSet {
 }
 
 /**
+ * Server-only runtime dependencies. Keep this object out of persisted
+ * provider connection records and never pass it to browser code.
+ */
+export interface GoogleDriveRuntimeAuthOptions {
+  clientSecret?: string;
+  getCredentials?: () => Promise<GoogleDriveTokenSet>;
+  persistCredentials?: (tokens: GoogleDriveTokenSet) => Promise<void> | void;
+}
+
+/**
  * A storage root must be able to enumerate, read, create, update and delete
  * files below a user-selected existing folder. drive.file is deliberately
  * insufficient for this contract: it only covers files explicitly opened
