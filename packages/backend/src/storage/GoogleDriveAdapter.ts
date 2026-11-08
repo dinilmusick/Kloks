@@ -36,6 +36,8 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
   private client?: any;
   private auth?: any;
   private authPromise?: Promise<any>;
+  private pendingCredentialPersistence?: Promise<void>;
+  private credentialPersistenceError?: Error;
   private readonly runtimeAuth: GoogleDriveRuntimeAuthOptions;
 
   constructor(config: StorageConfig, runtimeAuth: GoogleDriveRuntimeAuthOptions = {}) {
@@ -75,10 +77,13 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
       });
 
       client.on('tokens', (tokens: Record<string, any>) => {
-        const next = toTokenSet({ ...client.credentials, ...tokens }, credentials);
+        const next = toTokenSet({ ...(client.credentials as Record<string, any>), ...tokens }, credentials);
         if (!next || !this.runtimeAuth.persistCredentials) return;
-        // Persistence is intentionally server-side and never logged or returned to consumers.
-        void Promise.resolve(this.runtimeAuth.persistCredentials(next)).catch(() => undefined);
+        // Track persistence so storage operations do not silently outlive a failed credential write.
+        this.pendingCredentialPersistence = Promise.resolve(this.runtimeAuth.persistCredentials(next)).then(
+          () => undefined,
+          () => { this.credentialPersistenceError = new Error('Google Drive credentials could not be persisted securely.'); },
+        );
       });
 
       this.auth = client;
@@ -94,10 +99,16 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
   }
 
   private async getClient(): Promise<any> {
-    if (this.client) return this.client;
+    if (this.client) {
+      if (this.pendingCredentialPersistence) await this.pendingCredentialPersistence;
+      if (this.credentialPersistenceError) throw this.credentialPersistenceError;
+      return this.client;
+    }
 
     const auth = await this.getAuth();
     const token = await auth.getAccessToken();
+    if (this.pendingCredentialPersistence) await this.pendingCredentialPersistence;
+    if (this.credentialPersistenceError) throw this.credentialPersistenceError;
     if (!token.token) {
       throw new Error('Google Drive authorization returned no access token. Reauthorize the Google account.');
     }
@@ -108,11 +119,6 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
     }
     if (auth.credentials.refresh_token) {
       this.config.googleRefreshToken = auth.credentials.refresh_token;
-    }
-
-    const refreshed = toTokenSet(auth.credentials);
-    if (refreshed && this.runtimeAuth.persistCredentials) {
-      await this.runtimeAuth.persistCredentials(refreshed);
     }
 
     this.client = google.drive({ version: 'v3', auth });
