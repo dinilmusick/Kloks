@@ -28,6 +28,8 @@ export interface StorageConfig {
   accountId?: string;
   googleClientId?: string;
   googleRedirectUri?: string;
+  /** Stable Google account subject/email identifier for server-side ownership association. */
+  googleAccountId?: string;
   googleAccessToken?: string;
   googleAccessTokenExpiresAt?: number;
   googleRefreshToken?: string;
@@ -39,6 +41,18 @@ export interface FileInfo {
   size: number;
   modifiedAt: number;
   contentHash?: string;
+  /** Provider-native identifier; populated by providers that expose stable IDs. */
+  id?: string;
+  mimeType?: string;
+  isFolder?: boolean;
+}
+
+export interface GoogleDriveFolder {
+  id: string;
+  name: string;
+  mimeType: 'application/vnd.google-apps.folder';
+  parentIds: string[];
+  modifiedAt: number;
 }
 
 export interface UploadResult {
