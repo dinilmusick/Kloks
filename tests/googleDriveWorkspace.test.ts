@@ -158,6 +158,53 @@ describe('canonical Google Drive storage', () => {
     }));
   });
 
+  it('keeps OAuth client secrets out of serializable provider connection metadata', () => {
+    const connection = {
+      provider: 'google_drive',
+      googleClientId: 'client-id',
+      googleAccountId: 'google-account',
+      googleRootFolderId: 'root-folder',
+    };
+    const serialized = JSON.stringify(connection);
+    expect(serialized).toContain('google-account');
+    expect(serialized).not.toContain('clientSecret');
+    expect(serialized).not.toContain('refreshToken');
+    expect(serialized).not.toContain('accessToken');
+  });
+
+  it('binds the provider connection to the stable authenticated Google account identity', async () => {
+    drive.about.get.mockResolvedValue({
+      data: { user: { permissionId: 'google-permission-id', emailAddress: 'user@example.com' } },
+    });
+    const adapter = StorageAdapterFactory.create({
+      provider: 'google_drive',
+      googleClientId: 'client-id',
+    }, {
+      googleDrive: { getCredentials: async () => ({ accessToken: 'access-token' }) },
+    }) as any;
+
+    await expect(adapter.getAccountIdentity()).resolves.toEqual({
+      accountId: 'google-permission-id',
+      email: 'user@example.com',
+    });
+    expect(adapter['config'].googleAccountId).toBe('google-permission-id');
+  });
+
+  it('rejects a Google account identity that differs from the saved connection owner', async () => {
+    drive.about.get.mockResolvedValue({
+      data: { user: { permissionId: 'another-google-account' } },
+    });
+    const adapter = StorageAdapterFactory.create({
+      provider: 'google_drive',
+      googleClientId: 'client-id',
+      googleAccountId: 'saved-google-account',
+    }, {
+      googleDrive: { getCredentials: async () => ({ accessToken: 'access-token' }) },
+    }) as any;
+
+    await expect(adapter.getAccountIdentity()).rejects.toThrow(/does not match/i);
+  });
+
   it('lists folders, validates selected folder IDs and uses the selected folder as the storage root', async () => {
     drive.files.list.mockResolvedValue({
       data: {
