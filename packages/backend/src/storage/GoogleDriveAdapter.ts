@@ -1,57 +1,122 @@
 import { google } from '@dinilmusick/gutts/storage';
 import { Readable } from 'node:stream';
 import { BaseStorageAdapter } from './BaseStorageAdapter.js';
-import { FileInfo, StorageConfig, ConnectionTestResult } from './types.js';
+import type { GoogleDriveFolder, FileInfo, StorageConfig, ConnectionTestResult } from './types.js';
+import type { GoogleDriveRuntimeAuthOptions, GoogleDriveTokenSet } from './GoogleDriveOAuth.js';
 
-type DriveFile = any;
+type DriveFile = {
+  id?: string;
+  name?: string;
+  mimeType?: string;
+  size?: string | number;
+  modifiedTime?: string;
+  parents?: string[];
+};
+
+const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
+
+function toTokenSet(credentials: Record<string, any>, fallback?: GoogleDriveTokenSet): GoogleDriveTokenSet | undefined {
+  const accessToken = credentials.access_token || fallback?.accessToken;
+  if (!accessToken) return undefined;
+  return {
+    accessToken,
+    ...(credentials.refresh_token || fallback?.refreshToken
+      ? { refreshToken: credentials.refresh_token || fallback?.refreshToken }
+      : {}),
+    ...(credentials.expiry_date || fallback?.expiresAt
+      ? { expiresAt: credentials.expiry_date || fallback?.expiresAt }
+      : {}),
+    ...(credentials.token_type || fallback?.tokenType
+      ? { tokenType: credentials.token_type || fallback?.tokenType }
+      : {}),
+  };
+}
 
 export class GoogleDriveAdapter extends BaseStorageAdapter {
   private client?: any;
   private auth?: any;
+  private authPromise?: Promise<any>;
+  private readonly runtimeAuth: GoogleDriveRuntimeAuthOptions;
 
-  private getAuth(): any {
+  constructor(config: StorageConfig, runtimeAuth: GoogleDriveRuntimeAuthOptions = {}) {
+    super({ ...config, provider: 'google_drive' });
+    this.runtimeAuth = runtimeAuth;
+  }
+
+  private async getAuth(): Promise<any> {
     if (this.auth) return this.auth;
+    if (this.authPromise) return this.authPromise;
 
-    const client = new google.auth.OAuth2(
-      this.config.googleClientId,
-      undefined,
-      this.config.googleRedirectUri,
-    );
+    this.authPromise = (async () => {
+      const client = new google.auth.OAuth2(
+        this.config.googleClientId,
+        this.runtimeAuth.clientSecret,
+        this.config.googleRedirectUri,
+      );
 
-    const accessToken = this.config.googleAccessToken;
-    const refreshToken = this.config.googleRefreshToken;
-    const expiresAt = Number(this.config.googleAccessTokenExpiresAt || 0);
+      const supplied = this.runtimeAuth.getCredentials
+        ? await this.runtimeAuth.getCredentials()
+        : undefined;
+      const credentials = supplied ?? {
+        accessToken: this.config.googleAccessToken,
+        refreshToken: this.config.googleRefreshToken,
+        expiresAt: this.config.googleAccessTokenExpiresAt,
+      };
 
-    if (accessToken) {
+      if (!credentials.accessToken && !credentials.refreshToken) {
+        throw new Error('Google Drive OAuth credentials are incomplete. Reauthorize the Google account.');
+      }
+
       client.setCredentials({
-        access_token: accessToken,
-        ...(expiresAt ? { expiry_date: expiresAt } : {}),
-        ...(refreshToken ? { refresh_token: refreshToken } : {}),
+        ...(credentials.accessToken ? { access_token: credentials.accessToken } : {}),
+        ...(credentials.refreshToken ? { refresh_token: credentials.refreshToken } : {}),
+        ...(credentials.expiresAt ? { expiry_date: credentials.expiresAt } : {}),
+        ...(credentials.tokenType ? { token_type: credentials.tokenType } : {}),
       });
-    } else if (refreshToken) {
-      client.setCredentials({ refresh_token: refreshToken });
-    } else {
-      throw new Error('Google Drive OAuth credentials are incomplete.');
-    }
 
-    this.auth = client;
-    return client;
+      client.on('tokens', (tokens: Record<string, any>) => {
+        const next = toTokenSet({ ...client.credentials, ...tokens }, credentials);
+        if (!next || !this.runtimeAuth.persistCredentials) return;
+        // Persistence is intentionally server-side and never logged or returned to consumers.
+        void Promise.resolve(this.runtimeAuth.persistCredentials(next)).catch(() => undefined);
+      });
+
+      this.auth = client;
+      return client;
+    })();
+
+    try {
+      return await this.authPromise;
+    } catch (error) {
+      this.authPromise = undefined;
+      throw error;
+    }
   }
 
   private async getClient(): Promise<any> {
     if (this.client) return this.client;
 
-    const auth = this.getAuth();
+    const auth = await this.getAuth();
     const token = await auth.getAccessToken();
-    if (!token.token) throw new Error('Google Drive authorization returned no access token.');
+    if (!token.token) {
+      throw new Error('Google Drive authorization returned no access token. Reauthorize the Google account.');
+    }
 
     this.config.googleAccessToken = token.token;
     if (auth.credentials.expiry_date) {
       this.config.googleAccessTokenExpiresAt = auth.credentials.expiry_date;
     }
+    if (auth.credentials.refresh_token) {
+      this.config.googleRefreshToken = auth.credentials.refresh_token;
+    }
+
+    const refreshed = toTokenSet(auth.credentials);
+    if (refreshed && this.runtimeAuth.persistCredentials) {
+      await this.runtimeAuth.persistCredentials(refreshed);
+    }
 
     this.client = google.drive({ version: 'v3', auth });
-    return this.client!;
+    return this.client;
   }
 
   private async findChild(parentId: string, name: string): Promise<DriveFile | null> {
@@ -59,8 +124,10 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
     const escapedName = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     const response = await drive.files.list({
       q: `'${parentId}' in parents and name = '${escapedName}' and trashed = false`,
-      fields: 'files(id,name,size,modifiedTime,mimeType)',
+      fields: 'files(id,name,size,modifiedTime,mimeType,parents)',
       pageSize: 10,
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
     });
     return response.data.files?.[0] || null;
   }
@@ -76,15 +143,16 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
         const response = await drive.files.create({
           requestBody: {
             name: part,
-            mimeType: 'application/vnd.google-apps.folder',
+            mimeType: FOLDER_MIME_TYPE,
             parents: [parent],
           },
-          fields: 'id,name,mimeType',
+          fields: 'id,name,mimeType,parents,modifiedTime',
+          supportsAllDrives: true,
         });
         child = response.data;
       }
 
-      if (!child?.id) {
+      if (!child?.id || child.mimeType !== FOLDER_MIME_TYPE) {
         throw new Error(`Google Drive directory not found: ${part}`);
       }
 
@@ -100,15 +168,77 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
     return i < 0 ? { dir: '', name: key } : { dir: key.slice(0, i), name: key.slice(i + 1) };
   }
 
+  /** Browse only folders directly below the supplied parent (or selected storage root). */
+  async listFolders(parentFolderId = this.config.googleRootFolderId || 'root'): Promise<GoogleDriveFolder[]> {
+    const drive = await this.getClient();
+    const folders: GoogleDriveFolder[] = [];
+    let pageToken: string | undefined;
+
+    do {
+      const response = await drive.files.list({
+        q: `'${parentFolderId}' in parents and mimeType = '${FOLDER_MIME_TYPE}' and trashed = false`,
+        fields: 'nextPageToken,files(id,name,mimeType,parents,modifiedTime)',
+        pageSize: 1000,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
+        ...(pageToken ? { pageToken } : {}),
+      });
+
+      for (const folder of (response.data.files || []) as DriveFile[]) {
+        if (!folder.id || !folder.name) continue;
+        folders.push({
+          id: folder.id,
+          name: folder.name,
+          mimeType: FOLDER_MIME_TYPE,
+          parentIds: folder.parents || [],
+          modifiedAt: folder.modifiedTime ? Date.parse(folder.modifiedTime) : 0,
+        });
+      }
+      pageToken = response.data.nextPageToken || undefined;
+    } while (pageToken);
+
+    return folders;
+  }
+
+  /** Resolve and validate a provider-native folder ID before it is saved as a root. */
+  async resolveFolder(folderId: string): Promise<GoogleDriveFolder> {
+    if (!folderId?.trim()) throw new Error('A Google Drive folder ID is required.');
+    const drive = await this.getClient();
+    const response = await drive.files.get({
+      fileId: folderId,
+      fields: 'id,name,mimeType,parents,modifiedTime',
+      supportsAllDrives: true,
+    });
+    const folder = response.data as DriveFile;
+    if (!folder.id || !folder.name || folder.mimeType !== FOLDER_MIME_TYPE) {
+      throw new Error('The selected Google Drive item is not a folder.');
+    }
+    return {
+      id: folder.id,
+      name: folder.name,
+      mimeType: FOLDER_MIME_TYPE,
+      parentIds: folder.parents || [],
+      modifiedAt: folder.modifiedTime ? Date.parse(folder.modifiedTime) : 0,
+    };
+  }
+
+  /** Select a validated folder as this connection's storage/workspace root. */
+  async selectRootFolder(folderId: string): Promise<GoogleDriveFolder> {
+    const folder = await this.resolveFolder(folderId);
+    this.config.googleRootFolderId = folder.id;
+    return folder;
+  }
+
   async read(pathStr: string): Promise<Uint8Array> {
     const { dir, name } = this.split(pathStr);
     const parent = await this.resolveParent(dir);
     const file = await this.findChild(parent, name);
     if (!file?.id) throw new Error(`Google Drive file not found: ${pathStr}`);
+    if (file.mimeType === FOLDER_MIME_TYPE) throw new Error(`Google Drive path is a folder, not a file: ${pathStr}`);
 
     const drive = await this.getClient();
     const response = await drive.files.get(
-      { fileId: file.id, alt: 'media' },
+      { fileId: file.id, alt: 'media', supportsAllDrives: true },
       { responseType: 'arraybuffer' },
     );
     return new Uint8Array(response.data as ArrayBuffer);
@@ -120,17 +250,20 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
     contentType = 'application/octet-stream',
   ): Promise<void> {
     const { dir, name } = this.split(pathStr);
+    if (!name) throw new Error('A Google Drive file name is required.');
     const parent = await this.resolveParent(dir, true);
     const existing = await this.findChild(parent, name);
     const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
     const drive = await this.getClient();
 
     if (existing?.id) {
+      if (existing.mimeType === FOLDER_MIME_TYPE) throw new Error(`Google Drive path is a folder: ${pathStr}`);
       await drive.files.update({
         fileId: existing.id,
         requestBody: { name, mimeType: contentType },
         media: { mimeType: contentType, body: Readable.from(bytes) },
         fields: 'id',
+        supportsAllDrives: true,
       });
       return;
     }
@@ -139,6 +272,7 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
       requestBody: { name, mimeType: contentType, parents: [parent] },
       media: { mimeType: contentType, body: Readable.from(bytes) },
       fields: 'id',
+      supportsAllDrives: true,
     });
   }
 
@@ -150,7 +284,7 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
 
     const drive = await this.getClient();
     try {
-      await drive.files.delete({ fileId: file.id });
+      await drive.files.delete({ fileId: file.id, supportsAllDrives: true });
     } catch (error: any) {
       if (error?.response?.status !== 404) throw error;
     }
@@ -161,7 +295,7 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
       await this.stat(pathStr);
       return true;
     } catch (error: any) {
-      if (error?.response?.status === 404) return false;
+      if (error?.response?.status === 404 || error?.code === 404) return false;
       throw error;
     }
   }
@@ -177,15 +311,20 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
         q: `'${parent}' in parents and trashed = false`,
         fields: 'nextPageToken,files(id,name,size,modifiedTime,mimeType)',
         pageSize: 1000,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
         ...(pageToken ? { pageToken } : {}),
       });
 
-      for (const file of response.data.files || []) {
+      for (const file of (response.data.files || []) as DriveFile[]) {
         if (!file.name) continue;
         results.push({
           path: this.normalizePath(pathStr ? `${pathStr}/${file.name}` : file.name),
           size: Number(file.size || 0),
           modifiedAt: file.modifiedTime ? Date.parse(file.modifiedTime) : 0,
+          ...(file.id ? { id: file.id } : {}),
+          ...(file.mimeType ? { mimeType: file.mimeType } : {}),
+          isFolder: file.mimeType === FOLDER_MIME_TYPE,
         });
       }
 
@@ -205,6 +344,9 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
       path: pathStr,
       size: Number(file.size || 0),
       modifiedAt: file.modifiedTime ? Date.parse(file.modifiedTime) : 0,
+      id: file.id,
+      ...(file.mimeType ? { mimeType: file.mimeType } : {}),
+      isFolder: file.mimeType === FOLDER_MIME_TYPE,
     };
   }
 
@@ -221,7 +363,11 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
       return {
         ok: true,
         latencyMs: Math.round(performance.now() - start),
-        details: { email: response.data.user?.emailAddress },
+        details: {
+          ...(response.data.user?.emailAddress ? { email: response.data.user.emailAddress } : {}),
+          ...(this.config.googleAccountId ? { accountId: this.config.googleAccountId } : {}),
+          rootFolderId: this.config.googleRootFolderId || 'root',
+        },
       };
     } catch (error: any) {
       return {
