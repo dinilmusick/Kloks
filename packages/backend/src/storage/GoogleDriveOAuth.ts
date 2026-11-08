@@ -14,84 +14,109 @@ export interface GoogleDriveTokenSet {
   tokenType?: string;
 }
 
+/**
+ * A storage root must be able to enumerate, read, create, update and delete
+ * files below a user-selected existing folder. drive.file is deliberately
+ * insufficient for this contract: it only covers files explicitly opened
+ * or created by the application. The full Drive scope is therefore the
+ * narrowest single scope that supports the complete storage abstraction.
+ */
+export const GOOGLE_DRIVE_STORAGE_SCOPE = 'https://www.googleapis.com/auth/drive';
+/** @deprecated Use GOOGLE_DRIVE_STORAGE_SCOPE for complete storage roots. */
 export const GOOGLE_DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+
+function createOAuthClient(config: GoogleDriveOAuthConfig): InstanceType<typeof google.auth.OAuth2> {
+  if (!config.clientId?.trim()) throw new Error('Google OAuth client ID is required.');
+  if (!config.redirectUri?.trim()) throw new Error('Google OAuth redirect URI is required.');
+  return new google.auth.OAuth2(config.clientId, config.clientSecret, config.redirectUri);
+}
 
 export function createGoogleDriveAuthorizationUrl(
   config: GoogleDriveOAuthConfig,
   state: string,
   codeChallenge?: string,
 ): string {
-  const client = new google.auth.OAuth2(
-    config.clientId,
-    config.clientSecret,
-    config.redirectUri,
-  );
+  if (!state?.trim()) throw new Error('A non-empty OAuth state value is required.');
+  if (codeChallenge !== undefined && !codeChallenge.trim()) {
+    throw new Error('PKCE code challenge cannot be empty.');
+  }
 
-  const url = client.generateAuthUrl({
+  const client = createOAuthClient(config);
+  return client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
-    scope: config.scopes?.length ? config.scopes : [GOOGLE_DRIVE_FILE_SCOPE],
+    include_granted_scopes: true,
+    response_type: 'code',
+    scope: config.scopes?.length ? config.scopes : [GOOGLE_DRIVE_STORAGE_SCOPE],
     state,
     ...(codeChallenge
       ? { code_challenge: codeChallenge, code_challenge_method: 'S256' as any }
       : {}),
   });
-
-  return url;
 }
 
 export async function exchangeGoogleDriveCode(
   config: GoogleDriveOAuthConfig,
   code: string,
   codeVerifier?: string,
+  existingRefreshToken?: string,
 ): Promise<GoogleDriveTokenSet> {
-  const client = new google.auth.OAuth2(
-    config.clientId,
-    config.clientSecret,
-    config.redirectUri,
-  );
+  if (!code?.trim()) throw new Error('Google OAuth authorization code is required.');
+  const client = createOAuthClient(config);
 
-  const { tokens } = await client.getToken({
-    code,
-    ...(codeVerifier ? { codeVerifier } : {}),
-  });
+  try {
+    const { tokens } = await client.getToken({
+      code,
+      ...(codeVerifier ? { codeVerifier } : {}),
+    });
 
-  if (!tokens.access_token) {
-    throw new Error('Google OAuth token exchange returned no access token.');
+    if (!tokens.access_token) {
+      throw new Error('Google OAuth token exchange returned no access token.');
+    }
+
+    return {
+      accessToken: tokens.access_token,
+      ...(tokens.refresh_token || existingRefreshToken
+        ? { refreshToken: tokens.refresh_token || existingRefreshToken }
+        : {}),
+      ...(tokens.expiry_date ? { expiresAt: tokens.expiry_date } : {}),
+      ...(tokens.token_type ? { tokenType: tokens.token_type } : {}),
+    };
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Google OAuth token exchange returned no access token.') {
+      throw error;
+    }
+    // Do not propagate provider request details that may contain credentials.
+    throw new Error('Google OAuth authorization-code exchange failed.');
   }
-
-  return {
-    accessToken: tokens.access_token,
-    ...(tokens.refresh_token ? { refreshToken: tokens.refresh_token } : {}),
-    ...(tokens.expiry_date ? { expiresAt: tokens.expiry_date } : {}),
-    ...(tokens.token_type ? { tokenType: tokens.token_type } : {}),
-  };
 }
 
 export async function refreshGoogleDriveAccessToken(
   clientId: string,
   refreshToken: string,
   clientSecret?: string,
-  _redirectUri?: string,
+  redirectUri = 'http://localhost',
 ): Promise<GoogleDriveTokenSet> {
-  const body = new URLSearchParams({
-    client_id: clientId,
-    refresh_token: refreshToken,
-    grant_type: 'refresh_token',
-  });
-  if (clientSecret) body.set('client_secret', clientSecret);
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  });
-  if (!response.ok) {
-    throw new Error(`Google OAuth refresh failed: ${response.status}`);
+  if (!clientId?.trim() || !refreshToken?.trim()) {
+    throw new Error('Google Drive refresh credentials are incomplete.');
   }
-  const data = (await response.json()) as any;
-  return {
-    accessToken: data.access_token,
-    expiresAt: data.expires_in ? Date.now() + Number(data.expires_in) * 1000 : undefined,
-    tokenType: data.token_type,
-  };
+
+  const client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+  client.setCredentials({ refresh_token: refreshToken });
+
+  try {
+    const { token } = await client.getAccessToken();
+    const credentials = client.credentials;
+    if (!token) throw new Error('Google OAuth refresh returned no access token.');
+
+    return {
+      accessToken: token,
+      refreshToken: credentials.refresh_token || refreshToken,
+      ...(credentials.expiry_date ? { expiresAt: credentials.expiry_date } : {}),
+      ...(credentials.token_type ? { tokenType: credentials.token_type } : {}),
+    };
+  } catch {
+    // Keep provider response bodies and request metadata out of application logs.
+    throw new Error('Google Drive access-token refresh failed. Reauthorize the Google account if the refresh credential is invalid or revoked.');
+  }
 }
