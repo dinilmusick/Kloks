@@ -257,6 +257,57 @@ describe('canonical Google Drive storage', () => {
     expect(drive.files.list.mock.calls[0][0].q).toContain("'selected-folder' in parents");
   });
 
+  it('reads and updates existing files through the selected storage root', async () => {
+    drive.files.list.mockResolvedValue({
+      data: {
+        files: [{
+          id: 'existing-file',
+          name: 'document.txt',
+          mimeType: 'text/plain',
+          size: '3',
+          modifiedTime: '2026-01-01T00:00:00.000Z',
+        }],
+      },
+    });
+    drive.files.get.mockResolvedValue({ data: new Uint8Array([1, 2, 3]).buffer });
+    drive.files.update.mockResolvedValue({ data: { id: 'existing-file' } });
+
+    const adapter = StorageAdapterFactory.create({
+      provider: 'google_drive',
+      googleClientId: 'client-id',
+      googleRootFolderId: 'selected-root',
+    }, {
+      googleDrive: { getCredentials: async () => ({ accessToken: 'access-token' }) },
+    });
+
+    await expect(adapter.read('document.txt')).resolves.toEqual(new Uint8Array([1, 2, 3]));
+    await adapter.write('document.txt', new Uint8Array([4, 5]), 'text/plain');
+    expect(drive.files.update).toHaveBeenCalledWith(expect.objectContaining({
+      fileId: 'existing-file',
+      requestBody: expect.objectContaining({ name: 'document.txt', mimeType: 'text/plain' }),
+    }));
+  });
+
+  it('creates new files under the selected storage root', async () => {
+    drive.files.list.mockResolvedValue({ data: { files: [] } });
+    drive.files.create.mockResolvedValue({ data: { id: 'new-file' } });
+    const adapter = StorageAdapterFactory.create({
+      provider: 'google_drive',
+      googleClientId: 'client-id',
+      googleRootFolderId: 'selected-root',
+    }, {
+      googleDrive: { getCredentials: async () => ({ accessToken: 'access-token' }) },
+    });
+
+    await adapter.write('new-document.txt', 'hello', 'text/plain');
+    expect(drive.files.create).toHaveBeenCalledWith(expect.objectContaining({
+      requestBody: expect.objectContaining({
+        name: 'new-document.txt',
+        parents: ['selected-root'],
+      }),
+    }));
+  });
+
   it('propagates Drive API authorization and service errors instead of reporting false absence', async () => {
     drive.files.list.mockRejectedValueOnce({ response: { status: 403 }, message: 'forbidden' });
     const adapter = StorageAdapterFactory.create({
