@@ -38,6 +38,7 @@
       "types": "./dist/spatial/index.d.ts",
       "default": "./dist/spatial/index.js"
     },
+    "./browser": {"import": "./dist/browser.js","types": "./dist/browser.d.ts","default": "./dist/browser.js"},
     "./store": {
       "import": "./dist/store/index.js",
       "types": "./dist/store/index.d.ts",
