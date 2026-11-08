@@ -178,6 +178,22 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
     return i < 0 ? { dir: '', name: key } : { dir: key.slice(0, i), name: key.slice(i + 1) };
   }
 
+  /**
+   * Return only non-secret connection metadata for persistence alongside the
+   * authenticated application user's storage connection record.
+   */
+  getConnectionMetadata(): Pick<StorageConfig,
+    'provider' | 'googleClientId' | 'googleRedirectUri' | 'googleAccountId' | 'googleRootFolderId'
+  > {
+    return {
+      provider: 'google_drive',
+      ...(this.config.googleClientId ? { googleClientId: this.config.googleClientId } : {}),
+      ...(this.config.googleRedirectUri ? { googleRedirectUri: this.config.googleRedirectUri } : {}),
+      ...(this.config.googleAccountId ? { googleAccountId: this.config.googleAccountId } : {}),
+      ...(this.config.googleRootFolderId ? { googleRootFolderId: this.config.googleRootFolderId } : {}),
+    };
+  }
+
   /** Browse only folders directly below the supplied parent (or selected storage root). */
   async listFolders(parentFolderId = this.config.googleRootFolderId || 'root'): Promise<GoogleDriveFolder[]> {
     const drive = await this.getClient();
