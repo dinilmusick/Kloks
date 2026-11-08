@@ -183,7 +183,7 @@ export class GoogleDriveWorkspaceService {
   private async api(path: string, init: RequestInit = {}, retry = true): Promise<Response> {
     const token = await this.getAccessToken();
     const response = await this.fetcher(
-      path.startsWith('https://') ? path : `${GOOGLE_API_URL}/${path.replace(/^\\/+/, '')}`,
+      path.startsWith('https://') ? path : `${GOOGLE_API_URL}/${path.replace(/^\/+/, '')}`,
       {
         ...init,
         headers: {
