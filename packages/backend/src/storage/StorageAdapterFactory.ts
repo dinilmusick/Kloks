@@ -5,9 +5,15 @@ import { BucketStorageService } from './BucketStorageService.js';
 import { BackblazeB2Adapter } from './BackblazeB2Adapter.js';
 import { SupabaseStorageAdapter } from './SupabaseStorageAdapter.js';
 import { GoogleDriveStorageService } from './GoogleDriveStorageService.js';
+import type { GoogleDriveRuntimeAuthOptions } from './GoogleDriveOAuth.js';
+
+export interface StorageAdapterRuntimeOptions {
+  /** Server-only OAuth dependencies; never include these in persisted connection JSON. */
+  googleDrive?: GoogleDriveRuntimeAuthOptions;
+}
 
 export class StorageAdapterFactory {
-  static create(config: StorageConfig): BaseStorageAdapter {
+  static create(config: StorageConfig, runtimeOptions: StorageAdapterRuntimeOptions = {}): BaseStorageAdapter {
     switch (config.provider) {
       case 'local_fs':
         return new LocalFSAdapter(config);
@@ -17,7 +23,7 @@ export class StorageAdapterFactory {
       case 'supabase':
         return new SupabaseStorageAdapter(config);
       case 'google_drive':
-        return new GoogleDriveStorageService(config);
+        return new GoogleDriveStorageService(config, runtimeOptions.googleDrive);
       case 's3':
       case 's3_compatible':
         return new BucketStorageService(config);

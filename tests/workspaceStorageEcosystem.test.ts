@@ -15,6 +15,37 @@ import os from 'node:os';
 import { WorkingWorkspaceService } from '../packages/backend/src/workspace/WorkingWorkspaceService.js';
 import { StorageAdapterFactory } from '../packages/backend/src/storage/StorageAdapterFactory.js';
 import { refreshGoogleDriveAccessToken } from '../packages/backend/src/storage/GoogleDriveOAuth.js';
+
+const googleOAuthMocks = vi.hoisted(() => {
+  let refreshError: Error | null = null;
+  let lastClient: any;
+  class MockOAuth2 {
+    credentials: Record<string, any> = {};
+    constructor(..._args: any[]) { lastClient = this; }
+    setCredentials(credentials: Record<string, any>) { this.credentials = { ...credentials }; }
+    async getAccessToken() {
+      if (refreshError) throw refreshError;
+      this.credentials = {
+        ...this.credentials,
+        access_token: 'new-google-access-token-999',
+        expiry_date: Date.now() + 3_600_000,
+      };
+      return { token: 'new-google-access-token-999' };
+    }
+  }
+  return {
+    MockOAuth2,
+    setRefreshError: (error: Error | null) => { refreshError = error; },
+    getLastClient: () => lastClient,
+  };
+});
+
+vi.mock('@dinilmusick/gutts/storage', () => ({
+  google: {
+    auth: { OAuth2: googleOAuthMocks.MockOAuth2 },
+    drive: vi.fn(() => ({})),
+  },
+}));
 import { WorkspaceAutosaveController } from '../packages/client/src/WorkspaceAutosaveController.js';
 
 describe('Workspace Storage Ecosystem in Kloks', () => {
@@ -104,46 +135,24 @@ describe('Workspace Storage Ecosystem in Kloks', () => {
   });
 
   describe('3. Google Drive Token Refresh', () => {
-    it('calls token endpoint with refresh_token grant and returns updated tokens', async () => {
-      const originalFetch = globalThis.fetch;
-      try {
-        globalThis.fetch = vi.fn().mockResolvedValue({
-          ok: true,
-          json: async () => ({
-            access_token: 'new-google-access-token-999',
-            expires_in: 3600,
-          }),
-        }) as any;
+    it('refreshes through the Google OAuth client and retains the refresh credential', async () => {
+      googleOAuthMocks.setRefreshError(null);
+      const res = await refreshGoogleDriveAccessToken(
+        'google-client-id-123',
+        'google-refresh-token-456',
+      );
 
-        const res = await refreshGoogleDriveAccessToken('google-client-id-123', 'google-refresh-token-456');
-        expect(res.accessToken).toBe('new-google-access-token-999');
-        expect(res.expiresAt).toBeGreaterThan(Date.now() + 3000 * 1000);
-
-        expect(globalThis.fetch).toHaveBeenCalledWith(
-          'https://oauth2.googleapis.com/token',
-          expect.objectContaining({
-            method: 'POST',
-          })
-        );
-      } finally {
-        globalThis.fetch = originalFetch;
-      }
+      expect(res.accessToken).toBe('new-google-access-token-999');
+      expect(res.refreshToken).toBe('google-refresh-token-456');
+      expect(res.expiresAt).toBeGreaterThan(Date.now() + 3000 * 1000);
+      expect(googleOAuthMocks.getLastClient().credentials.refresh_token).toBe('google-refresh-token-456');
     });
 
-    it('throws error when token refresh fails', async () => {
-      const originalFetch = globalThis.fetch;
-      try {
-        globalThis.fetch = vi.fn().mockResolvedValue({
-          ok: false,
-          status: 401,
-        }) as any;
-
-        await expect(refreshGoogleDriveAccessToken('cid', 'bad-rt')).rejects.toThrow(
-          /Google OAuth refresh failed: 401/
-        );
-      } finally {
-        globalThis.fetch = originalFetch;
-      }
+    it('returns a safe reauthorization error when token refresh fails', async () => {
+      googleOAuthMocks.setRefreshError(new Error('invalid_grant: refresh token revoked'));
+      await expect(
+        refreshGoogleDriveAccessToken('cid', 'bad-rt'),
+      ).rejects.toThrow(/reauthorize the Google account/i);
     });
   });
 

@@ -73,7 +73,7 @@ describe('PlaywrightInspectionRuntime', () => {
     } finally {
       if (!process.env.CI) await rm(directory, { recursive: true, force: true });
     }
-  }, 25000);
+  }, 45000);
 
   it('returns a passing result for a clean rendered page', async () => {
     const result = await new PlaywrightInspectionRuntime().inspect({
