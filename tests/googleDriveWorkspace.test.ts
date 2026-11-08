@@ -245,6 +245,11 @@ describe('canonical Google Drive storage', () => {
 
     const selected = await adapter.selectRootFolder('selected-folder');
     expect(selected.id).toBe('selected-folder');
+    expect(adapter.getConnectionMetadata()).toMatchObject({
+      provider: 'google_drive',
+      googleRootFolderId: 'selected-folder',
+    });
+    expect(JSON.stringify(adapter.getConnectionMetadata())).not.toMatch(/accessToken|refreshToken|clientSecret/);
 
     drive.files.list.mockClear();
     drive.files.list.mockResolvedValue({ data: { files: [] } });
