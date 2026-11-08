@@ -1,4 +1,4 @@
-import type { FileInfo } from './storage/types.js';
+import type { FileInfo } from './types.js';
 
 export const GOOGLE_DRIVE_WORKSPACE_SCOPE = 'https://www.googleapis.com/auth/drive';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -354,7 +354,7 @@ export class GoogleDriveWorkspaceService {
     await this.api(endpoint, {
       method: existing?.id ? 'PATCH' : 'POST',
       headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
-      body,
+      body: body.buffer as ArrayBuffer,
     });
   }
 
