@@ -76,7 +76,7 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
         ...(credentials.tokenType ? { token_type: credentials.tokenType } : {}),
       });
 
-      client.on('tokens', (tokens: Record<string, any>) => {
+      client.on('tokens', (tokens: any) => {
         const next = toTokenSet({ ...(client.credentials as Record<string, any>), ...tokens }, credentials);
         if (!next) return;
         this.config.googleAccessToken = next.accessToken;
@@ -312,7 +312,7 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
     try {
       await drive.files.delete({ fileId: file.id, supportsAllDrives: true });
     } catch (error: any) {
-      if (error?.response?.status !== 404) throw error;
+      if (error?.response?.status !== 404 && error?.code !== 404) throw error;
     }
   }
 
