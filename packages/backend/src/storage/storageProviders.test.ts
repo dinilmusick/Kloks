@@ -4,7 +4,7 @@ import {
   GoogleDriveStorageService,
   StorageAdapterFactory,
   createGoogleDriveAuthorizationUrl,
-  GOOGLE_DRIVE_FILE_SCOPE,
+  GOOGLE_DRIVE_STORAGE_SCOPE,
 } from './index.js';
 
 describe('canonical storage providers', () => {
@@ -42,7 +42,7 @@ describe('canonical storage providers', () => {
     })).toBeInstanceOf(GoogleDriveStorageService);
   });
 
-  it('requests only the narrow Drive file scope by default', () => {
+  it('requests the minimum scope required for an arbitrary read/write storage root', () => {
     const url = createGoogleDriveAuthorizationUrl(
       {
         clientId: 'client-id',
@@ -52,7 +52,7 @@ describe('canonical storage providers', () => {
     );
 
     const params = new URL(url).searchParams;
-    expect(params.get('scope')).toBe(GOOGLE_DRIVE_FILE_SCOPE);
+    expect(params.get('scope')).toBe(GOOGLE_DRIVE_STORAGE_SCOPE);
     expect(params.get('state')).toBe('workspace-state');
     expect(params.get('access_type')).toBe('offline');
   });
