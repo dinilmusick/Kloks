@@ -258,7 +258,7 @@ export class GoogleDriveWorkspaceService {
   }
 
   private splitPath(value: string): { parent: string; name: string } {
-    const normalized = value.replace(/\\/g, '/').replace(/^\\/+|\\/+$/g, '');
+    const normalized = value.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
     const index = normalized.lastIndexOf('/');
     return index < 0
       ? { parent: '', name: normalized }
@@ -378,7 +378,7 @@ export class GoogleDriveWorkspaceService {
     const parentId = await this.resolveParent(path);
     const files = await this.listFiles(parentId);
     return files.flatMap((file) => file.name ? [{
-      path: path ? `${path.replace(/\\/+$/, '')}/${file.name}` : file.name,
+      path: path ? `${path.replace(/\/+$/, '')}/${file.name}` : file.name,
       size: Number(file.size || 0),
       modifiedAt: file.modifiedTime ? Date.parse(file.modifiedTime) : 0,
     }] : []);
