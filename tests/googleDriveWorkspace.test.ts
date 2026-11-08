@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => {
+  let refreshError: Error | null = null;
   const drive = {
     files: {
       list: vi.fn(),
@@ -34,6 +35,7 @@ const mocks = vi.hoisted(() => {
       return { tokens: { access_token: 'access-token', expiry_date: 1_900_000_000_000 } };
     }
     async getAccessToken() {
+      if (refreshError) throw refreshError;
       this.credentials = {
         ...this.credentials,
         access_token: 'fresh-access-token',
@@ -43,7 +45,7 @@ const mocks = vi.hoisted(() => {
     }
   }
 
-  return { drive, MockOAuth2 };
+  return { drive, MockOAuth2, setRefreshError: (error: Error | null) => { refreshError = error; } };
 });
 
 vi.mock('@dinilmusick/gutts/storage', () => ({
@@ -67,6 +69,7 @@ import {
 describe('canonical Google Drive storage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.setRefreshError(null);
   });
 
   it('requests the complete storage scope and carries OAuth state, redirect URI and PKCE', () => {
@@ -119,6 +122,16 @@ describe('canonical Google Drive storage', () => {
     expect(tokens.expiresAt).toBe(1_900_000_000_000);
   });
 
+  it('surfaces invalid or revoked refresh credentials as a reauthorization error', async () => {
+    mocks.setRefreshError(new Error('invalid_grant: refresh token revoked'));
+    await expect(refreshGoogleDriveAccessToken(
+      'client-id',
+      'revoked-refresh-token',
+      'server-only-secret',
+      'https://app.example/callback',
+    )).rejects.toThrow(/reauthorize/i);
+  });
+
   it('constructs the canonical provider through StorageAdapterFactory with server-only credentials', async () => {
     drive.files.list.mockResolvedValue({ data: { files: [] } });
     const persistCredentials = vi.fn();
@@ -139,6 +152,10 @@ describe('canonical Google Drive storage', () => {
     expect(adapter.constructor.name).toBe('GoogleDriveStorageService');
     await adapter.list('');
     expect(google.drive).toHaveBeenCalledWith(expect.objectContaining({ version: 'v3' }));
+    expect(persistCredentials).toHaveBeenCalledWith(expect.objectContaining({
+      accessToken: 'fresh-access-token',
+      refreshToken: 'refresh-token',
+    }));
   });
 
   it('lists folders, validates selected folder IDs and uses the selected folder as the storage root', async () => {
@@ -184,6 +201,17 @@ describe('canonical Google Drive storage', () => {
     drive.files.list.mockResolvedValue({ data: { files: [] } });
     await adapter.list('');
     expect(drive.files.list.mock.calls[0][0].q).toContain("'selected-folder' in parents");
+  });
+
+  it('propagates Drive API authorization and service errors instead of reporting false absence', async () => {
+    drive.files.list.mockRejectedValueOnce({ response: { status: 403 }, message: 'forbidden' });
+    const adapter = StorageAdapterFactory.create({
+      provider: 'google_drive',
+      googleClientId: 'client-id',
+    }, {
+      googleDrive: { getCredentials: async () => ({ accessToken: 'access-token' }) },
+    });
+    await expect(adapter.list('')).rejects.toMatchObject({ response: { status: 403 } });
   });
 
   it('rejects non-folder selections', async () => {
