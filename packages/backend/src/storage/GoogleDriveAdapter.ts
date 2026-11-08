@@ -78,7 +78,11 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
 
       client.on('tokens', (tokens: Record<string, any>) => {
         const next = toTokenSet({ ...(client.credentials as Record<string, any>), ...tokens }, credentials);
-        if (!next || !this.runtimeAuth.persistCredentials) return;
+        if (!next) return;
+        this.config.googleAccessToken = next.accessToken;
+        if (next.refreshToken) this.config.googleRefreshToken = next.refreshToken;
+        if (next.expiresAt) this.config.googleAccessTokenExpiresAt = next.expiresAt;
+        if (!this.runtimeAuth.persistCredentials) return;
         // Track persistence so storage operations do not silently outlive a failed credential write.
         this.pendingCredentialPersistence = Promise.resolve(this.runtimeAuth.persistCredentials(next)).then(
           () => undefined,
@@ -360,18 +364,33 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
     await this.resolveParent(pathStr, true);
   }
 
+  /** Resolve the stable Google account identity for association with the app user's server-side connection record. */
+  async getAccountIdentity(): Promise<{ accountId: string; email?: string }> {
+    const drive = await this.getClient();
+    const response = await drive.about.get({ fields: 'user(permissionId,emailAddress)' });
+    const accountId = response.data.user?.permissionId || response.data.user?.emailAddress;
+    if (!accountId) throw new Error('Google Drive did not return an account identity.');
+    if (this.config.googleAccountId && this.config.googleAccountId !== accountId) {
+      throw new Error('Google Drive account identity does not match the saved storage connection.');
+    }
+    this.config.googleAccountId = accountId;
+    return {
+      accountId,
+      ...(response.data.user?.emailAddress ? { email: response.data.user.emailAddress } : {}),
+    };
+  }
+
   async testConnection(): Promise<ConnectionTestResult> {
     const start = performance.now();
 
     try {
-      const drive = await this.getClient();
-      const response = await drive.about.get({ fields: 'user(emailAddress)' });
+      const identity = await this.getAccountIdentity();
       return {
         ok: true,
         latencyMs: Math.round(performance.now() - start),
         details: {
-          ...(response.data.user?.emailAddress ? { email: response.data.user.emailAddress } : {}),
-          ...(this.config.googleAccountId ? { accountId: this.config.googleAccountId } : {}),
+          accountId: identity.accountId,
+          ...(identity.email ? { email: identity.email } : {}),
           rootFolderId: this.config.googleRootFolderId || 'root',
         },
       };
