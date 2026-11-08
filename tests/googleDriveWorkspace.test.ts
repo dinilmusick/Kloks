@@ -1,53 +1,59 @@
-import { EventEmitter } from 'node:events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const drive = {
-  files: {
-    list: vi.fn(),
-    get: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
-  about: { get: vi.fn() },
-};
+const mocks = vi.hoisted(() => {
+  const drive = {
+    files: {
+      list: vi.fn(),
+      get: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    about: { get: vi.fn() },
+  };
 
-class MockOAuth2 extends EventEmitter {
-  credentials: Record<string, any> = {};
-  constructor(
-    readonly clientId?: string,
-    readonly clientSecret?: string,
-    readonly redirectUri?: string,
-  ) { super(); }
-  setCredentials(credentials: Record<string, any>) { this.credentials = { ...credentials }; }
-  generateAuthUrl(params: Record<string, any>) {
-    const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined) url.searchParams.set(key, Array.isArray(value) ? value.join(' ') : String(value));
+  class MockOAuth2 {
+    credentials: Record<string, any> = {};
+    constructor(
+      readonly clientId?: string,
+      readonly clientSecret?: string,
+      readonly redirectUri?: string,
+    ) {}
+    on() { return this; }
+    setCredentials(credentials: Record<string, any>) { this.credentials = { ...credentials }; }
+    generateAuthUrl(params: Record<string, any>) {
+      const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined) url.searchParams.set(key, Array.isArray(value) ? value.join(' ') : String(value));
+      }
+      url.searchParams.set('client_id', this.clientId || '');
+      url.searchParams.set('redirect_uri', this.redirectUri || '');
+      return url.toString();
     }
-    url.searchParams.set('client_id', this.clientId || '');
-    url.searchParams.set('redirect_uri', this.redirectUri || '');
-    return url.toString();
+    async getToken() {
+      return { tokens: { access_token: 'access-token', expiry_date: 1_900_000_000_000 } };
+    }
+    async getAccessToken() {
+      this.credentials = {
+        ...this.credentials,
+        access_token: 'fresh-access-token',
+        expiry_date: 1_900_000_000_000,
+      };
+      return { token: 'fresh-access-token' };
+    }
   }
-  async getToken() {
-    return { tokens: { access_token: 'access-token', expiry_date: 1_900_000_000_000 } };
-  }
-  async getAccessToken() {
-    this.credentials = {
-      ...this.credentials,
-      access_token: 'fresh-access-token',
-      expiry_date: 1_900_000_000_000,
-    };
-    return { token: 'fresh-access-token' };
-  }
-}
+
+  return { drive, MockOAuth2 };
+});
 
 vi.mock('@dinilmusick/gutts/storage', () => ({
   google: {
-    auth: { OAuth2: MockOAuth2 },
-    drive: vi.fn(() => drive),
+    auth: { OAuth2: mocks.MockOAuth2 },
+    drive: vi.fn(() => mocks.drive),
   },
 }));
+
+const drive = mocks.drive;
 
 import { google } from '@dinilmusick/gutts/storage';
 import { StorageAdapterFactory } from '../packages/backend/src/storage/StorageAdapterFactory.js';
