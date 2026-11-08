@@ -35,7 +35,7 @@ export const GOOGLE_DRIVE_STORAGE_SCOPE = 'https://www.googleapis.com/auth/drive
 /** @deprecated Use GOOGLE_DRIVE_STORAGE_SCOPE for complete storage roots. */
 export const GOOGLE_DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 
-function createOAuthClient(config: GoogleDriveOAuthConfig): InstanceType<typeof google.auth.OAuth2> {
+function createOAuthClient(config: GoogleDriveOAuthConfig): any {
   if (!config.clientId?.trim()) throw new Error('Google OAuth client ID is required.');
   if (!config.redirectUri?.trim()) throw new Error('Google OAuth redirect URI is required.');
   return new google.auth.OAuth2(config.clientId, config.clientSecret, config.redirectUri);
