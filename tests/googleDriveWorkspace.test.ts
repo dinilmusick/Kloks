@@ -15,12 +15,13 @@ const mocks = vi.hoisted(() => {
 
   class MockOAuth2 {
     credentials: Record<string, any> = {};
+    listeners: Record<string, (tokens: Record<string, any>) => void> = {};
     constructor(
       readonly clientId?: string,
       readonly clientSecret?: string,
       readonly redirectUri?: string,
     ) {}
-    on() { return this; }
+    on(event: string, listener: (tokens: Record<string, any>) => void) { this.listeners[event] = listener; return this; }
     setCredentials(credentials: Record<string, any>) { this.credentials = { ...credentials }; }
     generateAuthUrl(params: Record<string, any>) {
       const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
@@ -41,6 +42,7 @@ const mocks = vi.hoisted(() => {
         access_token: 'fresh-access-token',
         expiry_date: 1_900_000_000_000,
       };
+      this.listeners.tokens?.({ access_token: 'fresh-access-token', expiry_date: 1_900_000_000_000 });
       return { token: 'fresh-access-token' };
     }
   }
