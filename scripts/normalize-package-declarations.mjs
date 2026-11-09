@@ -45,11 +45,16 @@ for (const packageName of await readdir(packagesDirectory)) {
 
     if (filePath.endsWith(".d.ts")) {
       normalized = normalized.replace(
-        /(\bfrom\s+|\bimport\s*\(\s*)(["'])(\.{1,2}\/[^"']+)\2/g,
+        /(from[ ]+|import[ ]*[(][ ]*)(["'])([.]{1,2}[/][^"']+)\2/g,
         (match, prefix, quote, specifier) => {
           if (path.extname(specifier)) return match;
           return prefix + quote + specifier + ".js" + quote;
         }
+      );
+      normalized = normalized
+        .replace(/from '([.]{1,2}[/][^']+[.]json)'(?![ ]+with)/g, 'from "$1" with { type: "json" }')
+        .replace(/from "([.]{1,2}[/][^"]+[.]json)"(?![ ]+with)/g, 'from "$1" with { type: "json" }');
+    }
       );
       normalized = normalized
         .replace(/from '([.][.][/][^']+[.]json)'(?![ ]+with)/g, 'from "$1" with { type: "json" }')
