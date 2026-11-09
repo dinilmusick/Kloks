@@ -2,6 +2,15 @@ import { defineConfig } from 'vitest/config';
 import path from 'path';
 
 export default defineConfig({
+  test: {
+    server: {
+      deps: {
+        // Keep the published GutTS ESM entry in Vite's module graph so vi.mock
+        // in the storage tests intercepts its Google SDK export deterministically.
+        inline: ['@dinilmusick/gutts'],
+      },
+    },
+  },
   resolve: {
     alias: {
       '@kloks/functions': path.resolve(__dirname, 'packages/functions/dist/index.js'),
