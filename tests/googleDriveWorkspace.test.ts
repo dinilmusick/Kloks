@@ -50,7 +50,7 @@ const mocks = vi.hoisted(() => {
   return { drive, MockOAuth2, setRefreshError: (error: Error | null) => { refreshError = error; } };
 });
 
-vi.mock('@dinilmusick/gutts/storage', () => ({
+vi.mock('../packages/backend/src/storage/googleDriveSdk.js', () => ({
   google: {
     auth: { OAuth2: mocks.MockOAuth2 },
     drive: vi.fn(() => mocks.drive),
@@ -59,7 +59,7 @@ vi.mock('@dinilmusick/gutts/storage', () => ({
 
 const drive = mocks.drive;
 
-import { google } from '@dinilmusick/gutts/storage';
+import { google } from '../packages/backend/src/storage/googleDriveSdk.js';
 import { StorageAdapterFactory } from '../packages/backend/src/storage/StorageAdapterFactory.js';
 import {
   createGoogleDriveAuthorizationUrl,
