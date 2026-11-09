@@ -229,7 +229,7 @@
     "boundary:relative": "node scripts/relative-package-boundary.mjs"
   },
   "dependencies": {
-    "@dinilmusick/gutts": "^1.6.0",
+    "@dinilmusick/gutts": "^2.0.2",
     "@webcontainer/api": "^1.6.4",
     "ws": "^8.18.0",
     "zod": "^3.24.1",
