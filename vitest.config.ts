@@ -7,7 +7,7 @@ export default defineConfig({
       deps: {
         // Keep the published GutTS ESM entry in Vite's module graph so vi.mock
         // in the storage tests intercepts its Google SDK export deterministically.
-        inline: [/@dinilmusick\\+gutts@/, /@dinilmusick[\\/]gutts[\\/]/],
+        inline: [/@dinilmusick\+gutts@/, /@dinilmusick[\\/]gutts[\\/]/],
       },
     },
   },
