@@ -40,7 +40,7 @@ const googleOAuthMocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('@dinilmusick/gutts/storage', () => ({
+vi.mock('../packages/backend/src/storage/googleDriveSdk.js', () => ({
   google: {
     auth: { OAuth2: googleOAuthMocks.MockOAuth2 },
     drive: vi.fn(() => ({})),
