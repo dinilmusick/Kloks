@@ -55,11 +55,6 @@ for (const packageName of await readdir(packagesDirectory)) {
         .replace(/from '([.]{1,2}[/][^']+[.]json)'(?![ ]+with)/g, 'from "$1" with { type: "json" }')
         .replace(/from "([.]{1,2}[/][^"]+[.]json)"(?![ ]+with)/g, 'from "$1" with { type: "json" }');
     }
-      );
-      normalized = normalized
-        .replace(/from '([.][.][/][^']+[.]json)'(?![ ]+with)/g, 'from "$1" with { type: "json" }')
-        .replace(/from "([.][.][/][^"]+[.]json)"(?![ ]+with)/g, 'from "$1" with { type: "json" }');
-    }
 
     if (normalized !== original) await writeFile(filePath, normalized);
   }
