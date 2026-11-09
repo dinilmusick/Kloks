@@ -22,7 +22,8 @@
     "packages/semantic-runtime/package.json",
     "packages/wasm-runtime/vendor/**",
     "!packages/wasm-runtime/vendor/**/*.bin",
-    "!packages/wasm-runtime/vendor/forge/toolchain-assets/**"
+    "!packages/wasm-runtime/vendor/forge/toolchain-assets/**",
+    "scripts/normalize-package-declarations.mjs"
   ],
   "exports": {
     ".": {
@@ -223,8 +224,8 @@
     }
   },
   "scripts": {
-    "build": "pnpm -r run build",
-    "postbuild": "node -e \"import('fs').then(fs => { for (const pkg of fs.readdirSync('packages')) { const d = 'packages/' + pkg + '/dist'; if (!fs.existsSync(d)) continue; for (const f of fs.readdirSync(d, { recursive: true })) { const p = d + '/' + f; if (fs.statSync(p).isFile() && (p.endsWith('.js') || p.endsWith('.d.ts'))) { const c = fs.readFileSync(p, 'utf8'); const n = c.replaceAll('@kloks/', '@ultrst-armada/kloks/').replaceAll('@ultrst/kloks/', '@ultrst-armada/kloks/').replaceAll('\\\"kloks/', '\\\"@ultrst-armada/kloks/').replaceAll('\\'kloks/', '\\'@ultrst-armada/kloks/'); if (c !== n) fs.writeFileSync(p, n); } } } })\"",
+    "build": "pnpm -r run build && node scripts/normalize-package-declarations.mjs",
+    "postbuild": "node scripts/normalize-package-declarations.mjs",
     "prepublishOnly": "npm run postbuild",
     "test": "vitest run && pnpm run verify:npm-trusted-publishing",
     "typecheck": "pnpm -r run typecheck",
@@ -245,7 +246,9 @@
     "@neondatabase/serverless": "^0.10.0 || ^1.0.0",
     "@supabase/supabase-js": "^2.45.0",
     "@ultrst-armada/krnl": "^1.0.11",
-    "react": "^18.0.0 || ^19.0.0"
+    "react": "^18.0.0 || ^19.0.0",
+    "@types/node": ">=20.0.0",
+    "@types/react": "^18.0.0 || ^19.0.0"
   },
   "peerDependenciesMeta": {
     "@neondatabase/serverless": {
@@ -257,7 +260,7 @@
     "react": {
       "optional": true
     },
-    "@ultrst-armada/krnl": {
+    "@types/react": {
       "optional": true
     }
   },
