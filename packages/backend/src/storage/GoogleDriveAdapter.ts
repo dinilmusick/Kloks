@@ -1,4 +1,4 @@
-import { google } from '@dinilmusick/gutts/storage';
+import { google } from './googleDriveSdk.js';
 import { Readable } from 'node:stream';
 import { BaseStorageAdapter } from './BaseStorageAdapter.js';
 import type { GoogleDriveFolder, FileInfo, StorageConfig, ConnectionTestResult } from './types.js';

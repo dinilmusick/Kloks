@@ -1,4 +1,4 @@
-import { google } from '@dinilmusick/gutts/storage';
+import { google } from './googleDriveSdk.js';
 
 export interface GoogleDriveOAuthConfig {
   clientId: string;

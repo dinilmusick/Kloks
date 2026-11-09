@@ -40,7 +40,7 @@ const googleOAuthMocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('@dinilmusick/gutts/storage', () => ({
+vi.mock('../packages/backend/src/storage/googleDriveSdk.js', () => ({
   google: {
     auth: { OAuth2: googleOAuthMocks.MockOAuth2 },
     drive: vi.fn(() => ({})),
@@ -145,6 +145,7 @@ describe('Workspace Storage Ecosystem in Kloks', () => {
       expect(res.accessToken).toBe('new-google-access-token-999');
       expect(res.refreshToken).toBe('google-refresh-token-456');
       expect(res.expiresAt).toBeGreaterThan(Date.now() + 3000 * 1000);
+      expect(googleOAuthMocks.getLastClient()).toBeInstanceOf(googleOAuthMocks.MockOAuth2);
       expect(googleOAuthMocks.getLastClient().credentials.refresh_token).toBe('google-refresh-token-456');
     });
 
