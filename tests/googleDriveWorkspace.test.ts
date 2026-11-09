@@ -331,6 +331,8 @@ describe('canonical Google Drive storage', () => {
     }) as any;
 
     await expect(adapter.resolveFolder('file-id')).rejects.toThrow(/not a folder/i);
+    expect(google.drive).toHaveBeenCalledWith(expect.objectContaining({ version: 'v3' }));
+    expect(drive.files.get).toHaveBeenCalledWith(expect.objectContaining({ fileId: 'file-id' }));
   });
 
   it('keeps existing local, B2 and S3 provider routing intact', () => {
