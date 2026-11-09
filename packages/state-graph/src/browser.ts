@@ -5,6 +5,9 @@
  * for server/runtime use. Browser consumers such as Floks need only the pure
  * graph/state/rules/spatial and graph-engine primitives below.
  */
+export * from './types.js';
+export * from './Viewport.js';
+export * from './BoxSelection.js';
 export * from './state/index.js';
 export * from './domain/index.js';
 export * from './rules/index.js';
@@ -27,4 +30,8 @@ export * from './engine/core/nodeAssetRegistry.js';
 export * from './engine/functions/canonicalSignalTable.js';
 export * from './engine/functions/rotaryGeometry.js';
 export * from './engine/GraphConcepts.js';
+export * from './engine/AudioConcepts.js';
+export * from './engine/BufferConcepts.js';
+export * from './engine/UIConcepts.js';
+export * from './engine/core/types.js';
 export * from './engine/predictive/index.js';
