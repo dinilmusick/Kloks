@@ -36,6 +36,7 @@
       "default": "./packages/functions/dist/index.js"
     },
     "./state-graph": {
+      "browser": "./packages/state-graph/dist/browser.js",
       "types": "./packages/state-graph/dist/index.d.ts",
       "import": "./packages/state-graph/dist/index.js",
       "default": "./packages/state-graph/dist/index.js"

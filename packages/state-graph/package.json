@@ -38,6 +38,7 @@
       "types": "./dist/spatial/index.d.ts",
       "default": "./dist/spatial/index.js"
     },
+    "./browser": {"import": "./dist/browser.js","types": "./dist/browser.d.ts","default": "./dist/browser.js"},
     "./store": {
       "import": "./dist/store/index.js",
       "types": "./dist/store/index.d.ts",
@@ -45,7 +46,7 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts src/state/index.ts src/domain/index.ts src/rules/index.ts src/spatial/index.ts src/store/index.ts --format esm --clean --external zustand --external react --external ws && tsc --emitDeclarationOnly --declaration --project tsconfig.json",
+    "build": "tsup src/index.ts src/browser.ts src/state/index.ts src/domain/index.ts src/rules/index.ts src/spatial/index.ts src/store/index.ts --format esm --clean --external zustand --external react --external ws && tsc --emitDeclarationOnly --declaration --project tsconfig.json",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
