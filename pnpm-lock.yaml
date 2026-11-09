@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@dinilmusick/gutts':
-        specifier: ^1.6.0
-        version: 1.6.0(@types/node@22.20.5)
+        specifier: ^2.0.2
+        version: 2.0.3(@aws-sdk/client-s3@3.1164.0)(@huggingface/transformers@4.3.2(@types/node@22.20.5))(cactus-needle@0.3.0)(googleapis@189.0.0)
       '@webcontainer/api':
         specifier: ^1.6.4
         version: 1.6.4
@@ -55,22 +55,6 @@ importers:
         specifier: ^3.1.0
         version: 3.2.7(@types/node@22.20.5)
 
-  packages/client:
-    dependencies:
-      '@dinilmusick/gutts':
-        specifier: ^1.4.4
-        version: 1.4.4(@types/node@22.20.5)
-      react:
-        specifier: ^18.0.0 || ^19.0.0
-        version: 19.3.0
-      zod:
-        specifier: ^3.24.1
-        version: 3.25.76
-    devDependencies:
-      '@ultrst-armada/krnl':
-        specifier: ^1.0.9
-        version: 1.0.9(@types/node@22.20.5)
-
   packages/aiko:
     devDependencies:
       tsup:
@@ -101,12 +85,12 @@ importers:
       '@kloks/functions':
         specifier: workspace:*
         version: link:../functions
-      '@kloks/wasm-runtime':
-        specifier: workspace:*
-        version: link:../wasm-runtime
       '@kloks/state-graph':
         specifier: workspace:*
         version: link:../state-graph
+      '@kloks/wasm-runtime':
+        specifier: workspace:*
+        version: link:../wasm-runtime
       '@neondatabase/serverless':
         specifier: ^0.10.0
         version: 0.10.4
@@ -121,6 +105,22 @@ importers:
         version: 19.3.0
       zod:
         specifier: ^3.22.0
+        version: 3.25.76
+    devDependencies:
+      '@ultrst-armada/krnl':
+        specifier: ^1.0.9
+        version: 1.0.9(@types/node@22.20.5)
+
+  packages/client:
+    dependencies:
+      '@dinilmusick/gutts':
+        specifier: ^1.4.4
+        version: 1.4.4(@types/node@22.20.5)
+      react:
+        specifier: ^18.0.0 || ^19.0.0
+        version: 19.3.0
+      zod:
+        specifier: ^3.24.1
         version: 3.25.76
     devDependencies:
       '@ultrst-armada/krnl':
@@ -229,6 +229,7 @@ importers:
       '@ultrst-armada/krnl':
         specifier: ^1.0.9
         version: 1.0.9(@types/node@22.20.5)
+
   packages/wasm-runtime:
     devDependencies:
       tsup:
@@ -242,8 +243,6 @@ importers:
         version: 3.2.7(@types/node@22.20.5)
 
 packages:
-
-
 
   '@ai-sdk/provider@3.0.19':
     resolution: {integrity: sha512-5lWq7zSfRaU5ylDESn3sDQjgGl2AI1vjZKO/6JY3aFW70ct4zcP1kN+ZUYOuTXr28fVsYbyu2YFhddLdIgQFZQ==}
@@ -326,6 +325,23 @@ packages:
 
   '@dinilmusick/gutts@1.6.0':
     resolution: {integrity: sha512-HE5dL/CZUNiB7wF5xhzJ6UL6jLMv3Tp9BgcSgaUEKd2dZGRPEbCkB8XfCdSpdJKrmks/KB75U/GAunOREikfgg==}
+
+  '@dinilmusick/gutts@2.0.3':
+    resolution: {integrity: sha512-nOzfztCls6GfhIqJGA/hjVIbd7tGrezXWM5sMYrb8KJo/H1fmXQINO6ZK4i22hSEyXjKKn7A//qb6tdbeZ8rIg==}
+    peerDependencies:
+      '@aws-sdk/client-s3': ^3.1164.0
+      '@huggingface/transformers': ^4.3.2
+      cactus-needle: ^0.3.0
+      googleapis: ^189.0.0
+    peerDependenciesMeta:
+      '@aws-sdk/client-s3':
+        optional: true
+      '@huggingface/transformers':
+        optional: true
+      cactus-needle:
+        optional: true
+      googleapis:
+        optional: true
 
   '@emnapi/runtime@1.11.3':
     resolution: {integrity: sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA==}
@@ -2137,6 +2153,16 @@ snapshots:
       - '@types/node'
       - ai
       - supports-color
+
+  '@dinilmusick/gutts@2.0.3(@aws-sdk/client-s3@3.1164.0)(@huggingface/transformers@4.3.2(@types/node@22.20.5))(cactus-needle@0.3.0)(googleapis@189.0.0)':
+    dependencies:
+      lodash-es: 4.18.1
+      validator: 13.15.35
+    optionalDependencies:
+      '@aws-sdk/client-s3': 3.1164.0
+      '@huggingface/transformers': 4.3.2(@types/node@22.20.5)
+      cactus-needle: 0.3.0
+      googleapis: 189.0.0
 
   '@emnapi/runtime@1.11.3':
     dependencies:
