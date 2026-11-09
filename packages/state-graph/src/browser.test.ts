@@ -21,5 +21,7 @@ describe('state-graph browser surface', () => {
     expect(built).not.toContain('node:dgram');
     expect(built).not.toContain('node:fs');
     expect(built).not.toContain('node:path');
+    expect(built).not.toContain('StateLifecycleServiceDefinition');
+    expect(built).not.toContain('createServiceDefinition');
   });
 });
