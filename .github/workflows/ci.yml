@@ -32,6 +32,12 @@ jobs:
           set -o pipefail
           mkdir -p artifacts/diagnostics
           pnpm build 2>&1 | tee artifacts/diagnostics/build.log
+      - name: Enforce package architecture boundaries
+        if: always()
+        run: pnpm boundary
+      - name: Verify clean-room package boundary
+        if: always()
+        run: pnpm boundary:clean-room
       - name: Typecheck all packages
         if: always()
         run: |
