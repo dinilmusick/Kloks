@@ -10,3 +10,7 @@ export * from './packages/aiko/dist/index.js';
 export * from './packages/semantic-runtime/dist/index.js';
 
 export * from './packages/wasm-runtime/dist/index.js';
+
+// Explicitly resolve ambiguous aggregate exports to their canonical owners.
+export { createWorkspace, deleteWorkspace, updateWorkspace } from './packages/backend/dist/index.js';
+export { AudioMidiOrchestratorDefinition, krnlAudioMidiOrchestratorDefinition } from './packages/orchestrations/dist/index.js';
