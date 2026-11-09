@@ -217,7 +217,7 @@
     }
   },
   "scripts": {
-    "build": "pnpm -r run build",
+    "build": "pnpm -r run build && node scripts/normalize-package-declarations.mjs",
     "postbuild": "node scripts/normalize-package-declarations.mjs",
     "prepublishOnly": "npm run postbuild",
     "test": "vitest run && pnpm run verify:npm-trusted-publishing",
