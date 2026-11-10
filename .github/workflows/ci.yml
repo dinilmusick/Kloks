@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --force --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - name: Install isolated Playwright host runtime
         run: |
           npm install --prefix /tmp/kloks-playwright --no-save --package-lock=false playwright
