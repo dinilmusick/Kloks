@@ -2,7 +2,7 @@
 // UIElementBase: Root Template / Base Class for all UI Elements in Qwnsr
 // ══════════════════════════════════════════════════════════════════════════════════════════
 // @role skeleton
-import React from 'react';
+import type { ReactNode } from 'react';
 import { GraphEntityParent, QwnsrMetadata } from '../core/GraphEntityParent';
 
 export type ColorPalette = Record<string, any>;
@@ -39,7 +39,7 @@ export interface QwnsrUIBaseProps {
   tooltip?: string;
   tooltipDirection?: QwnsrTooltipDirection;
   shortcutHint?: string;
-  children?: React.ReactNode;
+  children?: ReactNode;
 }
 
 /**
