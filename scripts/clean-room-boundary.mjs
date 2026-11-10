@@ -22,7 +22,10 @@ try {
   const tarball = fs.readdirSync(packDir).find((name) => name.endsWith(".tgz"));
   if (!tarball) throw new Error("npm pack produced no tarball");
   execFileSync("npm", ["init", "-y"], {cwd: consumer, stdio: "ignore"});
-  execFileSync("npm", ["install", path.join(packDir, tarball)], {cwd: consumer, stdio: "pipe"});
+  const optionalPeers = Object.entries(pkg.peerDependenciesMeta || {})
+    .filter(([name, meta]) => meta?.optional && pkg.peerDependencies?.[name])
+    .map(([name]) => `${name}@${pkg.peerDependencies[name]}`);
+  execFileSync("npm", ["install", path.join(packDir, tarball), ...optionalPeers], {cwd: consumer, stdio: "pipe"});
 
   const importProbe = path.join(consumer, "probe.mjs");
   fs.writeFileSync(importProbe, "await import(" + JSON.stringify(pkg.name) + ");\n");

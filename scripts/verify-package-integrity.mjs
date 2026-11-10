@@ -79,7 +79,7 @@ try {
   await writeFile(path.join(typedConsumer, "consumer-smoke.ts"), allPublicTypeSmoke);
   run(path.join(typedConsumer, "node_modules", ".bin", "tsc"), ["--noEmit", "--module", "NodeNext", "--moduleResolution", "NodeNext", "--target", "ES2022", "--resolveJsonModule", "--esModuleInterop", "consumer-smoke.ts"], typedConsumer);
   const rootImport = `import(${JSON.stringify(packedManifest.name)}).then(() => console.log("root import ok"))`;
-  run("node", ["--input-type=module", "-e", rootImport], consumer);
+  run("node", ["--input-type=module", "-e", rootImport], typedConsumer);
   if (packedManifest.exports) {
     const packageJsonResolution = `import.meta.resolve(${JSON.stringify(packedManifest.name + "/package.json")})`;
     const result = spawnSync("node", ["--input-type=module", "-e", packageJsonResolution], { cwd: consumer, encoding: "utf8" });
