@@ -61,5 +61,12 @@ describe('Kloks portable and Node dependency graphs', () => {
     expect(pkg.exports['./storage/node'].import).toBe('./dist/storage/node.js');
     expect(pkg.exports['./services/node'].import).toBe('./dist/services/node.js');
     expect(pkg.exports['./workspace/node'].import).toBe('./dist/workspace/node.js');
+
+    const rootPkg = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'));
+    expect(rootPkg.exports['./backend'].import).toBe('./packages/backend/dist/index.js');
+    expect(rootPkg.exports['./backend/node'].import).toBe('./packages/backend/dist/node.js');
+    expect(rootPkg.exports['./backend/storage/node'].import).toBe('./packages/backend/dist/storage/node.js');
+    expect(rootPkg.exports['./backend/services/node'].import).toBe('./packages/backend/dist/services/node.js');
+    expect(rootPkg.exports['./backend/workspace/node'].import).toBe('./packages/backend/dist/workspace/node.js');
   });
 });
