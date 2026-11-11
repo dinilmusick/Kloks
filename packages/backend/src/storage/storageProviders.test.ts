@@ -5,7 +5,7 @@ import {
   StorageAdapterFactory,
   createGoogleDriveAuthorizationUrl,
   GOOGLE_DRIVE_STORAGE_SCOPE,
-} from './index.js';
+} from './node.js';
 
 describe('canonical storage providers', () => {
   it('exposes S3-compatible bucket storage through the canonical service', () => {

@@ -221,6 +221,26 @@
       "types": "./packages/backend/dist/storage-workspace.d.ts",
       "import": "./packages/backend/dist/storage-workspace.js",
       "default": "./packages/backend/dist/storage-workspace.js"
+    },
+    "./backend/node": {
+      "types": "./packages/backend/dist/node.d.ts",
+      "import": "./packages/backend/dist/node.js",
+      "default": "./packages/backend/dist/node.js"
+    },
+    "./backend/storage/node": {
+      "types": "./packages/backend/dist/storage/node.d.ts",
+      "import": "./packages/backend/dist/storage/node.js",
+      "default": "./packages/backend/dist/storage/node.js"
+    },
+    "./backend/services/node": {
+      "types": "./packages/backend/dist/services/node.d.ts",
+      "import": "./packages/backend/dist/services/node.js",
+      "default": "./packages/backend/dist/services/node.js"
+    },
+    "./backend/workspace/node": {
+      "types": "./packages/backend/dist/workspace/node.d.ts",
+      "import": "./packages/backend/dist/workspace/node.js",
+      "default": "./packages/backend/dist/workspace/node.js"
     }
   },
   "scripts": {
