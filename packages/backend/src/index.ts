@@ -4,7 +4,6 @@ export * from './auth/CanonicalAuthClient.js';
 export * from './storage/index.js';
 export * from './workspace/index.js';
 export * from './connectivity/index.js';
-export * from './client/index.js';
 export * from './services/index.js';
 export type {
   Runtime, Deployment, FunctionSet, ServiceFacade, OrchestrationFn,
