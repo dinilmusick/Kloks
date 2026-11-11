@@ -7,7 +7,7 @@ const dist = resolve(process.cwd(), 'packages/backend/dist');
 const builtins = new Set(builtinModules.flatMap((name) => [name, 'node:' + name]));
 const blocked = ['LocalFSAdapter', 'GoogleDriveAdapter', 'GoogleDriveOAuth',
   'WorkingWorkspaceService', 'nodeGraphPersistence', '/server/', '/core/',
-  'unifiedDb', 'workspaceSyncEngine'];
+  'unifiedDb', 'workspaceSyncEngine', '/client/'];
 
 function graph(entry: string) {
   const files = new Set<string>();
@@ -42,6 +42,7 @@ describe('Kloks portable and Node dependency graphs', () => {
     const result = graph('index.js');
     expect(result.files.length).toBeGreaterThan(0);
     expect(result.builtins).toEqual([]);
+    expect(result.files.some((file) => file.includes('client/'))).toBe(false);
     for (const file of result.files) {
       for (const name of blocked) expect(file).not.toContain(name);
     }
