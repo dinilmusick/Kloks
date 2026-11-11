@@ -22,7 +22,7 @@ import {
   AIProviderServiceFacade,
   AIModelCatalogServiceFacade,
   AIKeyServiceFacade,
-} from '../packages/backend/src/index.js';
+} from '../packages/backend/src/node.js';
 
 describe('Kloks AI Submodules', () => {
   it('ai-provider lists canonical providers with correct metadata', () => {

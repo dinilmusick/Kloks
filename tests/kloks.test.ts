@@ -36,7 +36,7 @@ import {
   WorkspaceServiceFacade,
   ControlPlaneServiceFacade,
   SrklServiceFacade,
-} from '@kloks/backend';
+} from '@kloks/backend/node';
 import {
   StateLifecycleServiceFacade,
   NodeGraphEngineServiceFacade,

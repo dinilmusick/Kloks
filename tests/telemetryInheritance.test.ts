@@ -14,7 +14,7 @@ import {
   StorageServiceFacade,
   WorkspaceServiceFacade,
   ControlPlaneServiceFacade,
-} from '@kloks/backend';
+} from '@kloks/backend/node';
 import { createService } from '@ultrst-armada/krnl';
 
 describe('Kloks Telemetry Inheritance via KrnlTS', () => {

@@ -13,5 +13,4 @@ export * from './packages/semantic-runtime/dist/index.js';
 export type { AssetChannelType, AssetDataType, AssetFolderInfo, AssetPoolItem, AssetPoolScope, WorkspaceSecondaryClone, GraphEntityMetadata, NodeDimensions2D, NodeHeaderStyle, NodeScreenRect2D, SocketDirection, SocketGeometryConfig, SocketPosition2D, SocketStyleConfig, WireAnimationConfig, WireCurveStyle, WireEndpoint2D, WireVisualConfig } from './packages/state-graph/dist/index.js';
 export type { AudioBusConfig, AudioHardwareState, MidiCommandType, MidiEventPayload } from './packages/audio-midi/dist/index.js';
 export type { EcosystemServiceCategory, ServiceFacade } from './packages/services/dist/index.js';
-export { createWorkspace, deleteWorkspace, updateWorkspace } from './packages/backend/dist/index.js';
 export { AudioMidiOrchestratorDefinition, krnlAudioMidiOrchestratorDefinition } from './packages/orchestrations/dist/index.js';

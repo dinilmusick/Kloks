@@ -8,6 +8,7 @@ export default defineConfig({
       '@kloks/state-graph': path.resolve(__dirname, 'packages/state-graph/dist/index.js'),
       '@kloks/audio-midi': path.resolve(__dirname, 'packages/audio-midi/dist/index.js'),
       '@kloks/services': path.resolve(__dirname, 'packages/services/dist/index.js'),
+      '@kloks/backend/node': path.resolve(__dirname, 'packages/backend/dist/node.js'),
       '@kloks/backend': path.resolve(__dirname, 'packages/backend/dist/index.js'),
       '@kloks/orchestrations': path.resolve(__dirname, 'packages/orchestrations/dist/index.js'),
       '@kloks/contracts': path.resolve(__dirname, 'packages/contracts/dist/index.js'),
