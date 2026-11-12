@@ -241,6 +241,16 @@
       "types": "./packages/backend/dist/workspace/node.d.ts",
       "import": "./packages/backend/dist/workspace/node.js",
       "default": "./packages/backend/dist/workspace/node.js"
+    },
+    "./functions/base": {
+      "types": "./packages/functions/dist/base.d.ts",
+      "import": "./packages/functions/dist/base.js",
+      "default": "./packages/functions/dist/base.js"
+    },
+    "./functions/node": {
+      "types": "./packages/functions/dist/node.d.ts",
+      "import": "./packages/functions/dist/node.js",
+      "default": "./packages/functions/dist/node.js"
     }
   },
   "scripts": {
