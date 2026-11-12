@@ -40,5 +40,13 @@
   "devDependencies": {
     "@ultrst-armada/krnl": "^1.0.9",
     "@types/node": "^22.0.0"
+  },
+  "peerDependencies": {
+    "@ultrst-armada/krnl": "^1.0.9"
+  },
+  "peerDependenciesMeta": {
+    "@ultrst-armada/krnl": {
+      "optional": true
+    }
   }
 }
