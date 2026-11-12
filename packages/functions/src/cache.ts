@@ -3,9 +3,6 @@
  * @description Portable LRU cache, TTL cache, and Stale-While-Revalidate utilities.
  */
 
-import fs from "fs";
-import path from "path";
-
 export class LRUCache<K, V> {
   private maxSize: number;
   private cache: Map<K, V>;
