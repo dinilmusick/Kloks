@@ -5,21 +5,40 @@ const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_API_URL = 'https://www.googleapis.com/drive/v3';
 const GOOGLE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3';
 const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
+const PKCE_VERIFIER_PATTERN = /^[A-Za-z0-9._~-]{43,128}$/;
+const PKCE_CHALLENGE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+const SAFE_OAUTH_ERROR_CODES = new Set([
+  'access_denied',
+  'invalid_client',
+  'invalid_grant',
+  'invalid_request',
+  'invalid_scope',
+  'server_error',
+  'temporarily_unavailable',
+  'unauthorized_client',
+  'unsupported_grant_type',
+]);
 
 export interface GoogleDriveWorkspaceTokens {
   accessToken: string;
   refreshToken?: string;
+  /** Unix epoch milliseconds. */
   expiresAt?: number;
   tokenType?: string;
 }
 
 export interface GoogleDriveWorkspaceOptions {
   clientId: string;
+  /** Server-side OAuth client secret. Never include it in persisted connection metadata. */
   clientSecret?: string;
   redirectUri: string;
+  /** Credentials loaded by the server-side connection owner. */
   tokens?: GoogleDriveWorkspaceTokens;
   rootFolderId?: string;
+  /** Previously associated Google account ID; a different identity is rejected. */
+  googleAccountId?: string;
   fetcher?: typeof fetch;
+  /** Persists an exchanged or rotated credential set before it becomes current in this instance. */
   persistTokens?: (tokens: GoogleDriveWorkspaceTokens) => Promise<void> | void;
 }
 
@@ -52,6 +71,18 @@ function encodeBytes(parts: Array<string | Uint8Array>): Uint8Array {
   return output;
 }
 
+function encodeBase64Url(bytes: Uint8Array): string {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function validatePkceVerifier(verifier: string): void {
+  if (!PKCE_VERIFIER_PATTERN.test(verifier)) {
+    throw new Error('Google Drive PKCE verifier must contain 43 to 128 URL-safe characters.');
+  }
+}
+
 function quoteDriveQuery(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
@@ -60,13 +91,26 @@ async function parseJson(response: Response): Promise<any> {
   return response.json().catch(() => ({}));
 }
 
+async function persistTokensSafely(
+  persistTokens: GoogleDriveWorkspaceOptions['persistTokens'],
+  tokens: GoogleDriveWorkspaceTokens,
+): Promise<void> {
+  if (!persistTokens) return;
+  try {
+    await persistTokens({ ...tokens });
+  } catch {
+    // Persistence callback errors can contain serialized credentials or provider request details.
+    throw new Error('Google Drive credentials could not be persisted securely.');
+  }
+}
+
 /**
  * Fetch-native Google Drive implementation for Worker/edge runtimes.
  *
- * This class deliberately uses only the Web Fetch, URL, TextEncoder and
- * Uint8Array APIs. It does not import googleapis, Node streams or filesystem
- * modules, so it can be bundled into Cloudflare Workers and serverless APIs.
- * OAuth credentials are supplied and persisted only by server-side callers.
+ * This class deliberately uses only Web Fetch, URL, TextEncoder, Uint8Array,
+ * Web Crypto and standard response/header APIs. It does not import googleapis,
+ * Node streams, Buffer, filesystem or Node-only modules. OAuth credentials are
+ * supplied and persisted only by server-side callers.
  */
 export class GoogleDriveWorkspaceService {
   private readonly options: GoogleDriveWorkspaceOptions;
@@ -82,15 +126,51 @@ export class GoogleDriveWorkspaceService {
     this.tokens = { ...(options.tokens || { accessToken: '' }) };
   }
 
+  /** Generate a cryptographically random RFC 7636 verifier using Web Crypto. */
+  static createPkceCodeVerifier(): string {
+    const bytes = new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    return encodeBase64Url(bytes);
+  }
+
+  /** Create the S256 challenge corresponding to a previously stored verifier. */
+  static async createPkceCodeChallenge(codeVerifier: string): Promise<string> {
+    validatePkceVerifier(codeVerifier);
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(codeVerifier));
+    return encodeBase64Url(new Uint8Array(digest));
+  }
+
+  /**
+   * Validate callback state against the value stored by the initiating server-side session.
+   * Call this at the callback boundary before exchanging the returned authorization code.
+   */
+  static validateOAuthState(expectedState: string, returnedState: string): void {
+    if (!expectedState?.trim() || !returnedState?.trim() || expectedState !== returnedState) {
+      throw new Error('Google Drive OAuth state validation failed. Restart the authorization flow.');
+    }
+  }
+
   static createAuthorizationUrl(
     options: Pick<GoogleDriveWorkspaceOptions, 'clientId' | 'redirectUri'>,
     state: string,
     scopes: string[] = [GOOGLE_DRIVE_WORKSPACE_SCOPE],
+    codeChallenge?: string,
   ): string {
     if (!options.clientId?.trim() || !options.redirectUri?.trim()) {
       throw new Error('Google Drive OAuth client ID and redirect URI are required.');
     }
     if (!state?.trim()) throw new Error('A non-empty Google Drive OAuth state is required.');
+    const requestedScopes = scopes.length ? scopes : [GOOGLE_DRIVE_WORKSPACE_SCOPE];
+    if (
+      !requestedScopes.includes(GOOGLE_DRIVE_WORKSPACE_SCOPE)
+      || requestedScopes.some((scope) => !(scope === GOOGLE_DRIVE_WORKSPACE_SCOPE || scope.startsWith(`${GOOGLE_DRIVE_WORKSPACE_SCOPE}.`)))
+    ) {
+      throw new Error('Google Drive workspace authorization requires Drive storage scopes only.');
+    }
+    if (codeChallenge !== undefined && !PKCE_CHALLENGE_PATTERN.test(codeChallenge)) {
+      throw new Error('Google Drive PKCE S256 challenge must be a 43-character base64url value.');
+    }
+
     const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     url.searchParams.set('client_id', options.clientId);
     url.searchParams.set('redirect_uri', options.redirectUri);
@@ -98,23 +178,32 @@ export class GoogleDriveWorkspaceService {
     url.searchParams.set('access_type', 'offline');
     url.searchParams.set('prompt', 'consent');
     url.searchParams.set('include_granted_scopes', 'true');
-    url.searchParams.set('scope', scopes.join(' '));
+    url.searchParams.set('scope', requestedScopes.join(' '));
     url.searchParams.set('state', state);
+    if (codeChallenge) {
+      url.searchParams.set('code_challenge', codeChallenge);
+      url.searchParams.set('code_challenge_method', 'S256');
+    }
     return url.toString();
   }
 
   static async exchangeAuthorizationCode(
-    options: Pick<GoogleDriveWorkspaceOptions, 'clientId' | 'clientSecret' | 'redirectUri' | 'fetcher'>,
+    options: Pick<GoogleDriveWorkspaceOptions, 'clientId' | 'clientSecret' | 'redirectUri' | 'fetcher' | 'persistTokens'>,
     code: string,
     existingRefreshToken?: string,
     codeVerifier?: string,
   ): Promise<GoogleDriveWorkspaceTokens> {
+    if (!options.clientId?.trim() || !options.redirectUri?.trim()) {
+      throw new Error('Google Drive OAuth client ID and redirect URI are required.');
+    }
     if (!code?.trim()) throw new Error('Google Drive authorization code is required.');
-    return GoogleDriveWorkspaceService.requestTokens(
+    if (codeVerifier !== undefined) validatePkceVerifier(codeVerifier);
+
+    const tokens = await GoogleDriveWorkspaceService.requestTokens(
       options.fetcher || fetch,
       {
         client_id: options.clientId,
-        client_secret: options.clientSecret || '',
+        ...(options.clientSecret ? { client_secret: options.clientSecret } : {}),
         redirect_uri: options.redirectUri,
         grant_type: 'authorization_code',
         code,
@@ -122,6 +211,8 @@ export class GoogleDriveWorkspaceService {
       },
       existingRefreshToken,
     );
+    await persistTokensSafely(options.persistTokens, tokens);
+    return tokens;
   }
 
   private static async requestTokens(
@@ -129,80 +220,108 @@ export class GoogleDriveWorkspaceService {
     fields: Record<string, string>,
     existingRefreshToken?: string,
   ): Promise<GoogleDriveWorkspaceTokens> {
-    const response = await fetcher(GOOGLE_TOKEN_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams(fields),
-      cache: 'no-store',
-    });
+    let response: Response;
+    try {
+      response = await fetcher(GOOGLE_TOKEN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(fields),
+        cache: 'no-store',
+      });
+    } catch {
+      throw new Error('Google Drive OAuth token request failed before receiving a response.');
+    }
+
     const data = await parseJson(response);
     if (!response.ok || typeof data.access_token !== 'string' || !data.access_token) {
-      const reason = typeof data.error === 'string' ? data.error : 'token_exchange_failed';
-      throw new Error(`Google Drive OAuth token request failed (${reason}).`);
+      const safeCode = typeof data.error === 'string' && SAFE_OAUTH_ERROR_CODES.has(data.error)
+        ? ` (${data.error})`
+        : '';
+      throw new Error(`Google Drive OAuth token request failed${safeCode}.`);
     }
+
+    const refreshToken = typeof data.refresh_token === 'string' && data.refresh_token
+      ? data.refresh_token
+      : existingRefreshToken;
+    const expiresIn = Number(data.expires_in);
     return {
       accessToken: data.access_token,
-      ...(data.refresh_token || existingRefreshToken
-        ? { refreshToken: data.refresh_token || existingRefreshToken }
-        : {}),
-      ...(Number.isFinite(Number(data.expires_in))
-        ? { expiresAt: Date.now() + Number(data.expires_in) * 1000 }
+      ...(refreshToken ? { refreshToken } : {}),
+      ...(Number.isFinite(expiresIn) && expiresIn > 0
+        ? { expiresAt: Date.now() + expiresIn * 1000 }
         : {}),
       ...(typeof data.token_type === 'string' ? { tokenType: data.token_type } : {}),
     };
   }
 
-  private async getAccessToken(forceRefresh = false): Promise<string> {
-    const expiresSoon = Boolean(this.tokens.expiresAt && this.tokens.expiresAt <= Date.now() + 60_000);
-    if (!forceRefresh && this.tokens.accessToken && !expiresSoon) return this.tokens.accessToken;
-    if (!this.tokens.refreshToken || !this.options.clientSecret) {
+  /** Force a refresh through this instance's shared refresh/persistence lifecycle. */
+  async refreshTokens(): Promise<GoogleDriveWorkspaceTokens> {
+    await this.getAccessToken(true);
+    return { ...this.tokens };
+  }
+
+  private async getAccessToken(forceRefresh = false, rejectedAccessToken?: string): Promise<string> {
+    const expiresSoon = typeof this.tokens.expiresAt === 'number' && this.tokens.expiresAt <= Date.now() + 60_000;
+    const hasUsableToken = Boolean(this.tokens.accessToken) && !expiresSoon;
+    if (!forceRefresh && hasUsableToken) return this.tokens.accessToken;
+    // A parallel request may have already refreshed the token that this request rejected.
+    if (forceRefresh && hasUsableToken && rejectedAccessToken && this.tokens.accessToken !== rejectedAccessToken) {
+      return this.tokens.accessToken;
+    }
+    if (!this.tokens.refreshToken) {
       throw new Error('Google Drive credentials are missing or expired. Reconnect the Google account.');
     }
+
     if (!this.refreshPromise) {
+      const refreshToken = this.tokens.refreshToken;
       this.refreshPromise = GoogleDriveWorkspaceService.requestTokens(
         this.fetcher,
         {
           client_id: this.options.clientId,
-          client_secret: this.options.clientSecret,
-          refresh_token: this.tokens.refreshToken,
+          ...(this.options.clientSecret ? { client_secret: this.options.clientSecret } : {}),
+          refresh_token: refreshToken,
           grant_type: 'refresh_token',
         },
-        this.tokens.refreshToken,
+        refreshToken,
       ).then(async (tokens) => {
-        this.tokens = tokens;
-        await this.options.persistTokens?.(tokens);
-        return tokens;
+        await persistTokensSafely(this.options.persistTokens, tokens);
+        this.tokens = { ...tokens };
+        return { ...this.tokens };
       }).finally(() => {
         this.refreshPromise = undefined;
       });
     }
+
     const refreshed = await this.refreshPromise;
     return refreshed.accessToken;
   }
 
   private async api(path: string, init: RequestInit = {}, retry = true): Promise<Response> {
     const token = await this.getAccessToken();
-    const response = await this.fetcher(
-      path.startsWith('https://') ? path : `${GOOGLE_API_URL}/${path.replace(/^\/+/, '')}`,
-      {
-        ...init,
-        headers: {
-          ...(init.headers || {}),
-          Authorization: `Bearer ${token}`,
+    const headers = new Headers(init.headers);
+    headers.set('Authorization', `Bearer ${token}`);
+    let response: Response;
+    try {
+      response = await this.fetcher(
+        path.startsWith('https://') ? path : `${GOOGLE_API_URL}/${path.replace(/^\/+/, '')}`,
+        {
+          ...init,
+          headers,
+          cache: 'no-store',
         },
-        cache: 'no-store',
-      },
-    );
+      );
+    } catch {
+      // Never forward fetch errors because some implementations include request headers.
+      throw new Error('Google Drive request failed before receiving a response.');
+    }
+
     if (response.status === 401 && retry && this.tokens.refreshToken) {
-      await this.getAccessToken(true);
+      await this.getAccessToken(true, token);
       return this.api(path, init, false);
     }
     if (!response.ok) {
-      const data = await parseJson(response);
-      const message = typeof data.error?.message === 'string'
-        ? data.error.message
-        : `Google Drive request failed with HTTP ${response.status}.`;
-      throw new Error(message);
+      // Provider response bodies can echo credentials or include request metadata; expose status only.
+      throw new Error(`Google Drive request failed with HTTP ${response.status}.`);
     }
     return response;
   }
@@ -273,6 +392,10 @@ export class GoogleDriveWorkspaceService {
     if (typeof accountId !== 'string' || !accountId) {
       throw new Error('Google Drive did not return a stable account identity.');
     }
+    if (this.options.googleAccountId && this.options.googleAccountId !== accountId) {
+      throw new Error('Google Drive account identity does not match the saved storage connection.');
+    }
+    this.options.googleAccountId = accountId;
     return {
       accountId,
       ...(typeof data.user?.emailAddress === 'string' ? { email: data.user.emailAddress } : {}),
@@ -331,6 +454,9 @@ export class GoogleDriveWorkspaceService {
   async write(path: string, bytes: Uint8Array | string, contentType = 'application/octet-stream'): Promise<void> {
     const { parent, name } = this.splitPath(path);
     if (!name) throw new Error('A Google Drive file name is required.');
+    if (!contentType.trim() || /[\r\n]/.test(contentType)) {
+      throw new Error('A valid Google Drive file content type is required.');
+    }
     const parentId = await this.resolveParent(parent, true);
     const existing = await this.findChild(parentId, name);
     if (existing?.mimeType === FOLDER_MIME_TYPE) throw new Error(`Google Drive path is a folder: ${path}`);
@@ -338,15 +464,15 @@ export class GoogleDriveWorkspaceService {
     const data = typeof bytes === 'string' ? new TextEncoder().encode(bytes) : bytes;
     const boundary = `kloks-drive-${crypto.randomUUID()}`;
     const body = encodeBytes([
-      `--${boundary}\\r\\nContent-Type: application/json; charset=UTF-8\\r\\n\\r\\n`,
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`,
       JSON.stringify({
         name,
         mimeType: contentType,
         ...(!existing?.id ? { parents: [parentId] } : {}),
       }),
-      `\\r\\n--${boundary}\\r\\nContent-Type: ${contentType}\\r\\n\\r\\n`,
+      `\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n`,
       data,
-      `\\r\\n--${boundary}--`,
+      `\r\n--${boundary}--\r\n`,
     ]);
     const endpoint = existing?.id
       ? `${GOOGLE_UPLOAD_URL}/files/${encodeURIComponent(existing.id)}?uploadType=multipart&supportsAllDrives=true`
@@ -369,7 +495,7 @@ export class GoogleDriveWorkspaceService {
   async exists(path: string): Promise<boolean> {
     try { await this.stat(path); return true; }
     catch (error) {
-      if (error instanceof Error && /not found|404/i.test(error.message)) return false;
+      if (error instanceof Error && /not found|HTTP 404/i.test(error.message)) return false;
       throw error;
     }
   }
@@ -381,6 +507,9 @@ export class GoogleDriveWorkspaceService {
       path: path ? `${path.replace(/\/+$/, '')}/${file.name}` : file.name,
       size: Number(file.size || 0),
       modifiedAt: file.modifiedTime ? Date.parse(file.modifiedTime) : 0,
+      ...(file.id ? { id: file.id } : {}),
+      ...(file.mimeType ? { mimeType: file.mimeType } : {}),
+      isFolder: file.mimeType === FOLDER_MIME_TYPE,
     }] : []);
   }
 
@@ -393,6 +522,9 @@ export class GoogleDriveWorkspaceService {
       path,
       size: Number(file.size || 0),
       modifiedAt: file.modifiedTime ? Date.parse(file.modifiedTime) : 0,
+      ...(file.id ? { id: file.id } : {}),
+      ...(file.mimeType ? { mimeType: file.mimeType } : {}),
+      isFolder: file.mimeType === FOLDER_MIME_TYPE,
     };
   }
 
@@ -421,6 +553,7 @@ export class GoogleDriveWorkspaceService {
   getConnectionMetadata(): Record<string, string> {
     return {
       provider: 'google_drive',
+      ...(this.options.googleAccountId ? { googleAccountId: this.options.googleAccountId } : {}),
       ...(this.options.rootFolderId ? { googleRootFolderId: this.options.rootFolderId } : {}),
     };
   }
