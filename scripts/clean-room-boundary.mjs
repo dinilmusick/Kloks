@@ -70,11 +70,12 @@ try {
     "import { BaseApiRoute } from " + JSON.stringify(pkg.name + "/backend") + ";",
     "import { LocalFSAdapter } from " + JSON.stringify(pkg.name + "/backend/storage/node") + ";",
     "import { SkipoBase } from " + JSON.stringify(pkg.name + "/functions/base") + ";",
-    "import { readFile } from " + JSON.stringify(pkg.name + "/functions/node") + ";",
+    "import { readFile, FileCache } from " + JSON.stringify(pkg.name + "/functions/node") + ";",
     "declare const route: BaseApiRoute;",
     "declare const nodeAdapter: LocalFSAdapter;",
     "declare const portableBase: SkipoBase;",
-    "void route; void nodeAdapter; void portableBase; void readFile;",
+    "declare const fileCache: FileCache<string>;",
+    "void route; void nodeAdapter; void portableBase; void readFile; void fileCache;",
   ].join("\n") + "\n");
   execFileSync(path.join(root, "node_modules", ".bin", "tsc"), [
     "--noEmit", "--target", "ES2022", "--module", "NodeNext", "--moduleResolution", "NodeNext",
