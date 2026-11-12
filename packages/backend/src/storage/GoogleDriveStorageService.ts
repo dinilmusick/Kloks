@@ -3,12 +3,12 @@ import { BaseStorageAdapter } from './BaseStorageAdapter.js';
 import type {
   ConnectionTestResult,
   FileInfo,
-  GoogleDriveFolder,
   StorageConfig,
 } from './types.js';
 import type {
   GoogleDriveWorkspaceTokens,
   GoogleDriveWorkspaceOptions,
+  GoogleDriveWorkspaceFolder,
 } from './GoogleDriveWorkspaceService.js';
 
 export type GoogleDriveTokenSet = GoogleDriveWorkspaceTokens;
@@ -93,11 +93,11 @@ export class GoogleDriveStorageService extends BaseStorageAdapter {
     return (await this.workspace()).mkdir(path);
   }
 
-  async listFolders(parentFolderId?: string): Promise<GoogleDriveFolder[]> {
+  async listFolders(parentFolderId?: string): Promise<GoogleDriveWorkspaceFolder[]> {
     return (await this.workspace()).listFolders(parentFolderId);
   }
 
-  async selectRootFolder(folderId: string): Promise<GoogleDriveFolder> {
+  async selectRootFolder(folderId: string): Promise<GoogleDriveWorkspaceFolder> {
     const folder = await (await this.workspace()).selectRootFolder(folderId);
     this.config.googleRootFolderId = folder.id;
     return folder;
