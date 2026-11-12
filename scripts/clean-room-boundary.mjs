@@ -95,7 +95,7 @@ try {
   const platformProbe = path.join(consumer, "platform-probe.mjs");
   fs.writeFileSync(platformProbe, [
     "const functions = await import(" + JSON.stringify(pkg.name + "/functions") + ");",
-    "if (functions.readFile || functions.execCmd || functions.FileCache) throw new Error('Portable functions entrypoint exposed Node-only utilities');",
+    "if (functions.readFile || functions.execCmd || functions.FileCache || functions.loadEnv) throw new Error('Portable functions entrypoint exposed Node-only utilities');",
     "if (!functions.FunctionsServiceFacade) throw new Error('KrnlTS service facade is missing from the compatibility entrypoint');",
     "await import(" + JSON.stringify(pkg.name + "/backend/node") + ");",
   ].join("\n") + "\n");
