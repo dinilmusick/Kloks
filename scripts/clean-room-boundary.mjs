@@ -42,7 +42,7 @@ try {
     "const nodeFunctions = await import(" + JSON.stringify(pkg.name + "/functions/node") + ");",
     "if (typeof nodeFunctions.readFile !== 'function' || typeof nodeFunctions.execCmd !== 'function') throw new Error('Node functions adapter is incomplete');",
     "await import(" + JSON.stringify(pkg.name + "/backend/node") + ");",
-  ].join("\\n") + "\\n");
+  ].join("\n") + "\n");
   execFileSync(process.execPath, [platformProbe], {cwd: consumer, stdio: "pipe"});
 
   const resolveProbe = path.join(consumer, "resolve.mjs");
