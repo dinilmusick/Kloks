@@ -30,7 +30,7 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts src/base.ts src/node.ts --format esm --dts --clean --external zod --external ws",
+    "build": "tsup src/index.ts src/base.ts src/node.ts --format esm --dts --clean --external zod --external ws --external @ultrst-armada/krnl",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
