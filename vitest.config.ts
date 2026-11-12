@@ -5,6 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@kloks/functions/base': path.resolve(__dirname, 'packages/functions/dist/base.js'),
+      '@kloks/functions/portable': path.resolve(__dirname, 'packages/functions/dist/portable.js'),
       '@kloks/functions': path.resolve(__dirname, 'packages/functions/dist/index.js'),
       '@kloks/state-graph': path.resolve(__dirname, 'packages/state-graph/dist/index.js'),
       '@kloks/audio-midi': path.resolve(__dirname, 'packages/audio-midi/dist/index.js'),
@@ -14,6 +15,7 @@ export default defineConfig({
       '@kloks/orchestrations': path.resolve(__dirname, 'packages/orchestrations/dist/index.js'),
       '@kloks/contracts': path.resolve(__dirname, 'packages/contracts/dist/index.js'),
       '@ultrst-armada/kloks/functions/base': path.resolve(__dirname, 'packages/functions/dist/base.js'),
+      '@ultrst-armada/kloks/functions/portable': path.resolve(__dirname, 'packages/functions/dist/portable.js'),
       '@ultrst-armada/kloks/functions': path.resolve(__dirname, 'packages/functions/dist/index.js'),
       '@ultrst-armada/kloks/state-graph': path.resolve(__dirname, 'packages/state-graph/dist/index.js'),
       '@ultrst-armada/kloks/audio-midi/services': path.resolve(__dirname, 'packages/audio-midi/dist/services/index.js'),
