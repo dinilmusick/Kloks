@@ -31,6 +31,8 @@ try {
     "if (!backend.BaseApiRoute) throw new Error('Portable backend API entrypoint is missing BaseApiRoute');",
     "const base = await import(" + JSON.stringify(pkg.name + "/functions/base") + ");",
     "if (!base.SkipoBase) throw new Error('Portable functions base subpath is missing SkipoBase');",
+    "const nodeStorage = await import(" + JSON.stringify(pkg.name + "/backend/storage/node") + ");",
+    "if (!nodeStorage.StorageAdapterFactory) throw new Error('Node storage adapter is missing its factory');",
   ].join("\n") + "\n");
   execFileSync(process.execPath, [portableProbe], {cwd: consumer, stdio: "pipe"});
 
