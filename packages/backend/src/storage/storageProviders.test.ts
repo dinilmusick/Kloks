@@ -4,6 +4,7 @@ import { GoogleDriveWorkspaceService } from './GoogleDriveWorkspaceService.js';
 import { GoogleDriveStorageService } from './GoogleDriveStorageService.js';
 import { LocalFSAdapter } from './LocalFSAdapter.js';
 import { StorageAdapterFactory } from './StorageAdapterFactory.js';
+import * as nodeStorage from './node.js';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -108,6 +109,16 @@ describe('Fetch-native Google Drive storage integration', () => {
     expect(url.searchParams.get('code_challenge')).toBe(challenge);
     expect(url.searchParams.get('code_challenge_method')).toBe('S256');
     expect(url.searchParams.has('client_secret')).toBe(false);
+  });
+
+
+  it('exports the Fetch-native Drive facade and LocalFS while retiring the legacy SDK surface', () => {
+    expect(nodeStorage.GoogleDriveStorageService).toBe(GoogleDriveStorageService);
+    expect(nodeStorage.LocalFSAdapter).toBe(LocalFSAdapter);
+    expect(nodeStorage).not.toHaveProperty('GoogleDriveAdapter');
+    expect(nodeStorage).not.toHaveProperty('GoogleDriveOAuth');
+    expect(nodeStorage).not.toHaveProperty('createGoogleDriveAuthorizationUrl');
+    expect(nodeStorage).not.toHaveProperty('refreshGoogleDriveAccessToken');
   });
 
   it('keeps LocalFS available as a Node-only storage provider', () => {
