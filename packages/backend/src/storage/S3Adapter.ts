@@ -54,7 +54,7 @@ export class S3Adapter extends BaseStorageAdapter {
   }
 
   async write(pathStr: string, data: Uint8Array | string, contentType = 'application/octet-stream'): Promise<void> {
-    this.ensureClient();
+    await this.ensureClient();
     const body = typeof data === 'string' ? Buffer.from(data, 'utf-8') : Buffer.from(data);
     const command = new this.PutObjectCommandCtor({
       Bucket: this.bucket,
@@ -66,27 +66,27 @@ export class S3Adapter extends BaseStorageAdapter {
   }
 
   async delete(pathStr: string): Promise<void> {
-    this.ensureClient();
+    await this.ensureClient();
     await permanentDeleteS3Object(this.client, this.bucket, this.normalizePath(pathStr));
   }
 
   async deleteFolder(pathStr: string): Promise<DeleteFolderResult> {
-    this.ensureClient();
+    await this.ensureClient();
     return await permanentDeleteS3Folder(this.client, this.bucket, this.normalizePath(pathStr));
   }
 
   async renameFolder(oldPath: string, newPath: string): Promise<RenameFolderResult> {
-    this.ensureClient();
+    await this.ensureClient();
     return await renameS3Folder(this.client, this.bucket, this.normalizePath(oldPath), this.normalizePath(newPath));
   }
 
   async ensureDirectory(pathStr: string): Promise<void> {
-    this.ensureClient();
+    await this.ensureClient();
     await ensureS3DirectoryMarker(this.client, this.bucket, this.normalizePath(pathStr));
   }
 
   async exists(pathStr: string): Promise<boolean> {
-    this.ensureClient();
+    await this.ensureClient();
     try {
       const command = new this.HeadObjectCommandCtor({ Bucket: this.bucket, Key: this.normalizePath(pathStr) });
       await this.client.send(command);
@@ -98,7 +98,7 @@ export class S3Adapter extends BaseStorageAdapter {
   }
 
   async list(pathStr = ''): Promise<FileInfo[]> {
-    this.ensureClient();
+    await this.ensureClient();
     const prefix = pathStr ? this.normalizePath(pathStr).replace(/\/+$/, '') + '/' : '';
     const command = new this.ListObjectsV2CommandCtor({ Bucket: this.bucket, Prefix: prefix });
     const response = await this.client.send(command);
@@ -111,8 +111,8 @@ export class S3Adapter extends BaseStorageAdapter {
   }
 
   async stat(pathStr: string): Promise<FileInfo> {
-    this.ensureClient();
-    const command = new HeadObjectCommand({ Bucket: this.bucket, Key: this.normalizePath(pathStr) });
+    await this.ensureClient();
+    const command = new this.HeadObjectCommandCtor({ Bucket: this.bucket, Key: this.normalizePath(pathStr) });
     const response = await this.client.send(command);
     return {
       path: pathStr,
@@ -128,8 +128,8 @@ export class S3Adapter extends BaseStorageAdapter {
   async testConnection(): Promise<ConnectionTestResult> {
     const start = performance.now();
     try {
-      this.ensureClient();
-      const res = await this.client.send(new ListObjectsV2Command({ Bucket: this.bucket, MaxKeys: 1 }));
+      await this.ensureClient();
+      const res = await this.client.send(new this.ListObjectsV2CommandCtor({ Bucket: this.bucket, MaxKeys: 1 }));
       return {
         ok: true,
         latencyMs: Math.round(performance.now() - start),
