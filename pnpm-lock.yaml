@@ -20,9 +20,6 @@ importers:
       '@webcontainer/api':
         specifier: ^1.6.4
         version: 1.6.4
-      googleapis:
-        specifier: ^189.0.0
-        version: 189.0.0
       ws:
         specifier: ^8.18.0
         version: 8.22.0
@@ -112,9 +109,6 @@ importers:
       '@webcontainer/api':
         specifier: ^1.6.4
         version: 1.6.4
-      googleapis:
-        specifier: ^189.0.0
-        version: 189.0.0
       react:
         specifier: ^18.0.0 || ^19.0.0
         version: 19.3.0
@@ -342,7 +336,7 @@ packages:
     engines: {node: '>=18.0.0'}
 
   '@dinilmusick/gutts@1.4.4':
-    resolution: {tarball: https://registry.npmjs.org/@dinilmusick/gutts/-/gutts-1.4.4.tgz}
+    resolution: {integrity: sha512-em0Yup7SLHLQFuCkXGEYSBG8FL38siPFtUtHJlDmk22aKb76U2S/iBfqjbqj6fXEdSUacuW8bF9u5TWbQlsjwQ==}
 
   '@dinilmusick/gutts@1.6.0':
     resolution: {integrity: sha512-HE5dL/CZUNiB7wF5xhzJ6UL6jLMv3Tp9BgcSgaUEKd2dZGRPEbCkB8XfCdSpdJKrmks/KB75U/GAunOREikfgg==}
