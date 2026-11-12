@@ -168,7 +168,14 @@ export async function fetchCloudflareData(
     // SRKL Engine fallback if available
     try {
       const srklUrl = await getPrimarySrklDeploymentUrl(env);
-      const srklRes = await fetch(`${srklUrl}/api/resources?serviceId=cloudflare&token=${encodeURIComponent(token)}&cfAccountId=${encodeURIComponent(accountTag)}`, { signal: AbortSignal.timeout(6000) });
+      const srklRes = await fetch(`${srklUrl}/api/resources`, {
+        headers: {
+          'x-service-id': 'cloudflare',
+          authorization: `Bearer ${token}`,
+          'x-cf-account-id': accountTag,
+        },
+        signal: AbortSignal.timeout(6000),
+      });
       if (srklRes.ok) {
         const sData = await srklRes.json();
         if (sData.success && Array.isArray(sData.resources)) {
