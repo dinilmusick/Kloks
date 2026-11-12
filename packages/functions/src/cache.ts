@@ -1,6 +1,6 @@
 /**
  * @file cache.ts
- * @description LRU cache, TTL cache, Stale-While-Revalidate, and File-system persistent caching.
+ * @description Portable LRU cache, TTL cache, and Stale-While-Revalidate utilities.
  */
 
 import fs from "fs";
