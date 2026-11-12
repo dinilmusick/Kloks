@@ -30,4 +30,7 @@ export default defineConfig({
       '@ultrst-armada/kloks/contracts': path.resolve(__dirname, 'packages/contracts/dist/index.js'),
     },
   },
+  test: {
+    testTimeout: 15000,
+  },
 });

@@ -1,6 +1,6 @@
 {
   "name": "@ultrst-armada/kloks",
-  "version": "1.26.3",
+  "version": "1.26.4",
   "private": false,
   "publishConfig": {
     "access": "public",
@@ -267,7 +267,8 @@
     "verify:npm-trusted-publishing": "node scripts/verify-npm-trusted-publishing.mjs",
     "boundary": "node scripts/architecture-boundary.mjs",
     "boundary:clean-room": "node scripts/clean-room-boundary.mjs",
-    "boundary:relative": "node scripts/relative-package-boundary.mjs"
+    "boundary:relative": "node scripts/relative-package-boundary.mjs",
+    "verify:package-exports": "node scripts/verify-package-exports.mjs"
   },
   "dependencies": {
     "@dinilmusick/gutts": "^2.0.2",
