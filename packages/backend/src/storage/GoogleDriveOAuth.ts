@@ -47,6 +47,8 @@ export function createGoogleDriveAuthorizationUrl(
   state: string,
   codeChallenge?: string,
 ): string {
+  if (!config.clientId?.trim()) throw new Error('Google OAuth client ID is required.');
+  if (!config.redirectUri?.trim()) throw new Error('Google OAuth redirect URI is required.');
   if (!state?.trim()) throw new Error('A non-empty OAuth state value is required.');
   if (codeChallenge !== undefined && !codeChallenge.trim()) {
     throw new Error('PKCE code challenge cannot be empty.');
