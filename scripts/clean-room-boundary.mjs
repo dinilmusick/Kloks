@@ -64,7 +64,7 @@ try {
   if (optionalPeers.length) execFileSync("npm", ["install", ...optionalPeers], {cwd: consumer, stdio: "pipe"});
 
   const importProbe = path.join(consumer, "probe.mjs");
-  fs.writeFileSync(importProbe, "await import(" + JSON.stringify(pkg.name) + ");\\n");
+  fs.writeFileSync(importProbe, "await import(" + JSON.stringify(pkg.name) + ");\n");
   execFileSync(process.execPath, [importProbe], {cwd: consumer, stdio: "pipe"});
 
   const platformProbe = path.join(consumer, "platform-probe.mjs");
@@ -74,7 +74,7 @@ try {
     "const nodeFunctions = await import(" + JSON.stringify(pkg.name + "/functions/node") + ");",
     "if (typeof nodeFunctions.readFile !== 'function' || typeof nodeFunctions.execCmd !== 'function') throw new Error('Node functions adapter is incomplete');",
     "await import(" + JSON.stringify(pkg.name + "/backend/node") + ");",
-  ].join("\\n") + "\\n");
+  ].join("\n") + "\n");
   execFileSync(process.execPath, [platformProbe], {cwd: consumer, stdio: "pipe"});
 
   const resolveProbe = path.join(consumer, "resolve.mjs");
