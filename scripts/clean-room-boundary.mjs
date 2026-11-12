@@ -65,6 +65,22 @@ try {
     .map(([name]) => `${name}@${pkg.peerDependencies[name]}`);
   if (optionalPeers.length) execFileSync("npm", ["install", ...optionalPeers], {cwd: consumer, stdio: "pipe"});
 
+  const typesProbe = path.join(consumer, "types-probe.mts");
+  fs.writeFileSync(typesProbe, [
+    "import { BaseApiRoute } from " + JSON.stringify(pkg.name + "/backend") + ";",
+    "import { LocalFSAdapter } from " + JSON.stringify(pkg.name + "/backend/storage/node") + ";",
+    "import { SkipoBase } from " + JSON.stringify(pkg.name + "/functions/base") + ";",
+    "import { readFile } from " + JSON.stringify(pkg.name + "/functions/node") + ";",
+    "declare const route: BaseApiRoute;",
+    "declare const nodeAdapter: LocalFSAdapter;",
+    "declare const portableBase: SkipoBase;",
+    "void route; void nodeAdapter; void portableBase; void readFile;",
+  ].join("\n") + "\n");
+  execFileSync(path.join(root, "node_modules", ".bin", "tsc"), [
+    "--noEmit", "--target", "ES2022", "--module", "NodeNext", "--moduleResolution", "NodeNext",
+    typesProbe,
+  ], {cwd: consumer, stdio: "pipe"});
+
   const importProbe = path.join(consumer, "probe.mjs");
   fs.writeFileSync(importProbe, "await import(" + JSON.stringify(pkg.name) + ");\n");
   execFileSync(process.execPath, [importProbe], {cwd: consumer, stdio: "pipe"});
