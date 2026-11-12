@@ -9,7 +9,12 @@ export class AudioContextManager {
 
   public initContext(state: SynthEngineState): void {
     const config = this.configManager.getConfig();
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const AudioCtx = typeof window === 'undefined'
+      ? undefined
+      : window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (typeof AudioCtx !== 'function') {
+      throw new Error('Web Audio API is unavailable in this runtime.');
+    }
 
     const options: AudioContextOptions = {};
     if (config.sampleRate > 0) options.sampleRate = config.sampleRate;
