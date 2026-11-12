@@ -39,9 +39,9 @@ The runtime-neutral utility surface is explicit:
 - `@kloks/functions/base`
 - `@ultrst-armada/kloks/functions/base`
 
-The compatibility `@kloks/functions` entrypoint also exposes the KrnlTS FunctionsServiceFacade and therefore uses the optional `@ultrst-armada/krnl` peer. The `/portable` and `/base` subpaths do not require that peer.
+The compatibility `@kloks/functions` entrypoint also exposes the KrnlTS FunctionsServiceFacade and therefore uses the optional `@ultrst-armada/krnl` peer. The `/portable` and `/base` subpaths do not require that peer. Portable environment helpers accept an explicit environment object for Worker bindings; filesystem-backed `.env` loading is available from `/node`.
 
-Node filesystem, persistent `FileCache`, file-locking, and shell/process utilities are explicit Node adapters:
+Node filesystem, persistent `FileCache`, `.env` file loading, file-locking, and shell/process utilities are explicit Node adapters:
 
 - `@kloks/functions/node`
 - `@ultrst-armada/kloks/functions/node`
