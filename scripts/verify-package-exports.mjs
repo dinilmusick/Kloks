@@ -45,7 +45,12 @@ try {
     ["pack", "--json", "--ignore-scripts", "--pack-destination", tempDir],
     { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] }
   );
-  const [packed] = JSON.parse(output);
+  const jsonStart = output.indexOf("[") !== -1 && (output.indexOf("{") === -1 || output.indexOf("[") < output.indexOf("{"))
+    ? output.indexOf("[")
+    : output.indexOf("{");
+  const raw = jsonStart !== -1 ? output.slice(jsonStart) : output;
+  const parsed = JSON.parse(raw);
+  const packed = Array.isArray(parsed) ? parsed[0] : parsed;
   if (!packed?.filename || !Array.isArray(packed.files)) {
     throw new Error("npm pack did not return its expected JSON artifact manifest.");
   }
