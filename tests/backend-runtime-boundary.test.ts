@@ -4,15 +4,17 @@ import { dirname, resolve } from 'node:path';
 import { builtinModules } from 'node:module';
 
 const dist = resolve(process.cwd(), 'packages/backend/dist');
+const functionsDist = resolve(process.cwd(), 'packages/functions/dist');
 const builtins = new Set(builtinModules.flatMap((name) => [name, 'node:' + name]));
 const blocked = ['LocalFSAdapter', 'GoogleDriveAdapter', 'GoogleDriveOAuth',
   'WorkingWorkspaceService', 'nodeGraphPersistence', '/server/', '/core/',
   'unifiedDb', 'workspaceSyncEngine', '/client/'];
 
-function graph(entry: string) {
+function graphFrom(root: string, entry: string) {
   const files = new Set<string>();
   const imports = new Set<string>();
-  const pending = [resolve(dist, entry)];
+  const external = new Set<string>();
+  const pending = [resolve(root, entry)];
   const patterns = [
     /(?:^|\n)\s*(?:import|export)\s+(?:type\s+)?(?:[\s\S]*?\s+from\s+)?['"]([^'"]+)['"]/g,
     /import\(\s*['"]([^'"]+)['"]\s*\)/g,
@@ -30,11 +32,17 @@ function graph(entry: string) {
         else if (specifier.startsWith('.')) {
           const target = resolve(dirname(file), specifier);
           if (existsSync(target)) pending.push(target);
+        } else {
+          external.add(specifier);
         }
       }
     }
   }
-  return { files: [...files], builtins: [...imports] };
+  return { files: [...files], builtins: [...imports], external: [...external] };
+}
+
+function graph(entry: string) {
+  return graphFrom(dist, entry);
 }
 
 describe('Kloks portable and Node dependency graphs', () => {
@@ -42,10 +50,28 @@ describe('Kloks portable and Node dependency graphs', () => {
     const result = graph('index.js');
     expect(result.files.length).toBeGreaterThan(0);
     expect(result.builtins).toEqual([]);
+    expect(result.external.some((specifier) => specifier === '@kloks/functions' || specifier.startsWith('@kloks/functions/'))).toBe(false);
+    expect(result.external.some((specifier) => specifier.startsWith('@kloks/'))).toBe(false);
+    expect(result.external).not.toContain('@ultrst-armada/krnl');
     expect(result.files.some((file) => file.includes('client/'))).toBe(false);
     for (const file of result.files) {
       for (const name of blocked) expect(file).not.toContain(name);
     }
+  });
+
+  it('keeps the default functions entry portable and retains Node utilities behind /node', () => {
+    const portable = graphFrom(functionsDist, 'index.js');
+    expect(portable.builtins).toEqual([]);
+    expect(portable.files.some((file) => /\/(?:fs|fs-lock|shell)\.js$/.test(file))).toBe(false);
+
+    const portableFunctions = graphFrom(functionsDist, 'portable.js');
+    expect(portableFunctions.builtins).toEqual([]);
+    expect(portableFunctions.external).not.toContain('@ultrst-armada/krnl');
+
+    const nodeFunctions = graphFrom(functionsDist, 'node.js');
+    expect(nodeFunctions.external).not.toContain('@ultrst-armada/krnl');
+    expect(nodeFunctions.builtins.some((name) => ['fs', 'node:fs'].includes(name))).toBe(true);
+    expect(nodeFunctions.builtins.some((name) => ['child_process', 'node:child_process'].includes(name))).toBe(true);
   });
 
   it('retains Node filesystem capabilities behind explicit adapters', () => {
@@ -53,6 +79,7 @@ describe('Kloks portable and Node dependency graphs', () => {
     expect(result.files.length).toBeGreaterThan(0);
     expect(result.builtins.some((name) => ['fs', 'node:fs'].includes(name))).toBe(true);
     expect(result.builtins.some((name) => ['path', 'node:path'].includes(name))).toBe(true);
+    expect(result.external.some((specifier) => specifier === '@kloks/functions' || specifier.startsWith('@kloks/functions/'))).toBe(false);
   });
 
   it('publishes separate portable and Node adapter package exports', () => {
@@ -63,7 +90,17 @@ describe('Kloks portable and Node dependency graphs', () => {
     expect(pkg.exports['./services/node'].import).toBe('./dist/services/node.js');
     expect(pkg.exports['./workspace/node'].import).toBe('./dist/workspace/node.js');
 
+    const functionsPkg = JSON.parse(readFileSync(resolve(process.cwd(), 'packages/functions/package.json'), 'utf8'));
+    expect(functionsPkg.exports['.'].import).toBe('./dist/index.js');
+    expect(functionsPkg.exports['./base'].import).toBe('./dist/base.js');
+    expect(functionsPkg.exports['./portable'].import).toBe('./dist/portable.js');
+    expect(functionsPkg.exports['./node'].import).toBe('./dist/node.js');
+
     const rootPkg = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'));
+    expect(rootPkg.exports['./functions'].import).toBe('./packages/functions/dist/index.js');
+    expect(rootPkg.exports['./functions/base'].import).toBe('./packages/functions/dist/base.js');
+    expect(rootPkg.exports['./functions/portable'].import).toBe('./packages/functions/dist/portable.js');
+    expect(rootPkg.exports['./functions/node'].import).toBe('./packages/functions/dist/node.js');
     expect(rootPkg.exports['./backend'].import).toBe('./packages/backend/dist/index.js');
     expect(rootPkg.exports['./backend/node'].import).toBe('./packages/backend/dist/node.js');
     expect(rootPkg.exports['./backend/storage/node'].import).toBe('./packages/backend/dist/storage/node.js');

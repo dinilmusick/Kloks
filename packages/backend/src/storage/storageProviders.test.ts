@@ -1,13 +1,27 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@supabase/supabase-js', () => {
+  throw new Error('The optional Supabase driver must not load during module initialization.');
+});
 import {
   BucketStorageService,
   GoogleDriveStorageService,
+  SupabaseStorageAdapter,
   StorageAdapterFactory,
   createGoogleDriveAuthorizationUrl,
   GOOGLE_DRIVE_STORAGE_SCOPE,
 } from './node.js';
 
 describe('canonical storage providers', () => {
+  it('keeps the optional Supabase driver lazy until storage is used', () => {
+    const adapter = new SupabaseStorageAdapter({
+      provider: 'supabase',
+      bucket: 'workspace',
+      endpoint: 'https://example.supabase.co',
+      accessKey: 'test-key',
+    });
+    expect(adapter).toBeInstanceOf(SupabaseStorageAdapter);
+  });
   it('exposes S3-compatible bucket storage through the canonical service', () => {
     const service = new BucketStorageService({
       provider: 's3_compatible',

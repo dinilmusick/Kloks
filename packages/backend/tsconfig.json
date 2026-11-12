@@ -27,6 +27,9 @@
       ],
       "@kloks/orchestrations": [
         "../orchestrations/dist/index.d.ts"
+      ],
+      "@kloks/functions/base": [
+        "../functions/dist/base.d.ts"
       ]
     }
   },

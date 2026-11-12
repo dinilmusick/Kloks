@@ -1,5 +1,5 @@
 ---
-"@ultrst-armada/kloks": patch
+"@ultrst-armada/kloks": major
 ---
 
-Harden package and ecosystem boundaries with dependency-graph, export, clean-room, and relative-package validation.
+**Breaking:** The aggregate package now exposes platform boundaries explicitly. Generic server consumers should import `@ultrst-armada/kloks/backend`; Node adapters and browser audio/MIDI capabilities require their explicit subpaths.

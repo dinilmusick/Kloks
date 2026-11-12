@@ -22,14 +22,84 @@ try {
   const tarball = fs.readdirSync(packDir).find((name) => name.endsWith(".tgz"));
   if (!tarball) throw new Error("npm pack produced no tarball");
   execFileSync("npm", ["init", "-y"], {cwd: consumer, stdio: "ignore"});
+  execFileSync("npm", ["install", path.join(packDir, tarball)], {cwd: consumer, stdio: "pipe"});
+
+  // First prove the portable backend and base subpath work with only declared package dependencies.
+  const portableProbe = path.join(consumer, "portable-probe.mjs");
+  fs.writeFileSync(portableProbe, [
+    "const backend = await import(" + JSON.stringify(pkg.name + "/backend") + ");",
+    "if (!backend.BaseApiRoute) throw new Error('Portable backend API entrypoint is missing BaseApiRoute');",
+    "const base = await import(" + JSON.stringify(pkg.name + "/functions/base") + ");",
+    "if (!base.SkipoBase) throw new Error('Portable functions base subpath is missing SkipoBase');",
+    "const portableFunctions = await import(" + JSON.stringify(pkg.name + "/functions/portable") + ");",
+    "if (!portableFunctions.LRUCache || !portableFunctions.SkipoBase) throw new Error('Portable functions subpath is incomplete');",
+    "const nodeFunctions = await import(" + JSON.stringify(pkg.name + "/functions/node") + ");",
+    "if (typeof nodeFunctions.readFile !== 'function' || typeof nodeFunctions.execCmd !== 'function' || typeof nodeFunctions.loadEnv !== 'function' || !nodeFunctions.FileCache) throw new Error('Node functions subpath is incomplete or requires an unrelated peer');",
+    "const nodeStorage = await import(" + JSON.stringify(pkg.name + "/backend/storage/node") + ");",
+    "if (!nodeStorage.StorageAdapterFactory) throw new Error('Node storage adapter is missing its factory');",
+  ].join("\n") + "\n");
+  execFileSync(process.execPath, [portableProbe], {cwd: consumer, stdio: "pipe"});
+
+  const workerEntry = path.join(consumer, "worker.mjs");
+  fs.writeFileSync(workerEntry, [
+    "import { BaseApiRoute } from " + JSON.stringify(pkg.name + "/backend") + ";",
+    "class ProbeRoute extends BaseApiRoute { async handle(request) { return new Response('portable'); } }",
+    "export default { async fetch(request) { return new ProbeRoute().handle(request); } };",
+  ].join("\n") + "\n");
+  fs.writeFileSync(path.join(consumer, "wrangler.toml"), [
+    'name = "kloks-portability-consumer"',
+    'main = "worker.mjs"',
+    'compatibility_date = "2026-11-12"',
+  ].join("\n") + "\n");
+  execFileSync("npx", ["--yes", "wrangler@4.160.0", "deploy", "--dry-run", "--outdir", "worker-dist"], {cwd: consumer, stdio: "pipe"});
+  const workerBundle = path.join(consumer, "worker-dist", "worker.js");
+  if (!fs.existsSync(workerBundle)) throw new Error("Wrangler did not emit the expected Worker bundle.");
+  const bundleSource = fs.readFileSync(workerBundle, "utf8");
+  if (/(?:from|import\s*\(|require\s*\()\s*["'](?:node:)?(?:fs|fs\/promises|child_process|path|os)["']/.test(bundleSource)) {
+    throw new Error("Portable Worker bundle contains a Node built-in import.");
+  }
+  if (/AudioContext|MIDIInput|MIDIOutput|AudioMidiOrchestratorDefinition|AudioInputManager/.test(bundleSource)) {
+    throw new Error("Portable Worker bundle contains browser audio/MIDI implementation code.");
+  }
+  console.log("CLOUDFLARE CONSUMER BUILD PASSED: " + Buffer.byteLength(bundleSource) + " bytes; no Node filesystem or audio/MIDI modules.");
+
+  // Install optional peers only after the portable Worker build; then verify opt-in adapters.
   const optionalPeers = Object.entries(pkg.peerDependenciesMeta || {})
     .filter(([name, meta]) => meta?.optional && pkg.peerDependencies?.[name])
     .map(([name]) => `${name}@${pkg.peerDependencies[name]}`);
-  execFileSync("npm", ["install", path.join(packDir, tarball), ...optionalPeers], {cwd: consumer, stdio: "pipe"});
+  if (optionalPeers.length) execFileSync("npm", ["install", ...optionalPeers], {cwd: consumer, stdio: "pipe"});
+
+  const typesProbe = path.join(consumer, "types-probe.mts");
+  fs.writeFileSync(typesProbe, [
+    "import { BaseApiRoute } from " + JSON.stringify(pkg.name + "/backend") + ";",
+    "import { LocalFSAdapter } from " + JSON.stringify(pkg.name + "/backend/storage/node") + ";",
+    "import { SkipoBase } from " + JSON.stringify(pkg.name + "/functions/base") + ";",
+    "import { readFile, FileCache, loadEnv } from " + JSON.stringify(pkg.name + "/functions/node") + ";",
+    "import { LRUCache } from " + JSON.stringify(pkg.name + "/functions/portable") + ";",
+    "declare const route: BaseApiRoute;",
+    "declare const nodeAdapter: LocalFSAdapter;",
+    "declare const portableBase: SkipoBase;",
+    "declare const fileCache: FileCache<string>;",
+    "declare const portableCache: LRUCache<string, number>;",
+    "void route; void nodeAdapter; void portableBase; void readFile; void fileCache; void portableCache; void loadEnv;",
+  ].join("\n") + "\n");
+  execFileSync(path.join(root, "node_modules", ".bin", "tsc"), [
+    "--noEmit", "--target", "ES2022", "--module", "NodeNext", "--moduleResolution", "NodeNext",
+    typesProbe,
+  ], {cwd: consumer, stdio: "pipe"});
 
   const importProbe = path.join(consumer, "probe.mjs");
   fs.writeFileSync(importProbe, "await import(" + JSON.stringify(pkg.name) + ");\n");
   execFileSync(process.execPath, [importProbe], {cwd: consumer, stdio: "pipe"});
+
+  const platformProbe = path.join(consumer, "platform-probe.mjs");
+  fs.writeFileSync(platformProbe, [
+    "const functions = await import(" + JSON.stringify(pkg.name + "/functions") + ");",
+    "if (functions.readFile || functions.execCmd || functions.FileCache || functions.loadEnv) throw new Error('Portable functions entrypoint exposed Node-only utilities');",
+    "if (!functions.FunctionsServiceFacade) throw new Error('KrnlTS service facade is missing from the compatibility entrypoint');",
+    "await import(" + JSON.stringify(pkg.name + "/backend/node") + ");",
+  ].join("\n") + "\n");
+  execFileSync(process.execPath, [platformProbe], {cwd: consumer, stdio: "pipe"});
 
   const resolveProbe = path.join(consumer, "resolve.mjs");
   const publicKeys = Object.keys(exportsMap).filter((key) => key !== "./gutts.manifest.json" && !key.endsWith("/*"));

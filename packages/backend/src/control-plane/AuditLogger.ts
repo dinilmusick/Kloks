@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { SkipoBase } from '@kloks/functions';
+import { SkipoBase } from '@kloks/functions/base';
 import { AuditEvent } from './types.js';
 
 export class AuditLogger extends SkipoBase {

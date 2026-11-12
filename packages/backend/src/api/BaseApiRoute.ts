@@ -1,4 +1,4 @@
-import { SkipoBase } from '@kloks/functions';
+import { SkipoBase } from '@kloks/functions/base';
 import { RouteConfig } from './types.js';
 
 export abstract class BaseApiRoute extends SkipoBase {

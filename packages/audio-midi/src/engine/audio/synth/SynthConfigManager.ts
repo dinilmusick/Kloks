@@ -8,6 +8,7 @@ export class SynthConfigManager {
   private config: AudioEngineConfig = this.loadAudioConfig();
 
   private loadAudioConfig(): AudioEngineConfig {
+    if (typeof localStorage === 'undefined') return { ...DEFAULT_AUDIO_CONFIG };
     try {
       const raw = localStorage.getItem(STORAGE_KEY_AUDIO_CONFIG);
       if (raw) {
@@ -29,8 +30,10 @@ export class SynthConfigManager {
 
   public updateConfig(newConfig: Partial<AudioEngineConfig>): void {
     this.config = { ...this.config, ...newConfig };
-    try {
-      localStorage.setItem(STORAGE_KEY_AUDIO_CONFIG, JSON.stringify(this.config));
-    } catch (e) {}
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY_AUDIO_CONFIG, JSON.stringify(this.config));
+      } catch (e) {}
+    }
   }
 }

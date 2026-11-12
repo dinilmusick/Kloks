@@ -1,4 +1,8 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@neondatabase/serverless', () => {
+  throw new Error('The optional Neon driver must not load during module initialization.');
+});
 import { cleanDbUrl, getUnifiedDbUrl } from './unifiedDb';
 
 const keys = ['SYSTEM_DATABASE_URL_1', 'SYSTEM_DATABASE_URL_2', 'SYSTEM_DATABASE_URL_3', 'DATABASE_URL'] as const;
@@ -13,6 +17,10 @@ afterEach(() => {
 });
 
 describe('system database URL contract', () => {
+  it('keeps the optional Neon driver lazy until a query executes', () => {
+    expect(getUnifiedDbUrl({ SYSTEM_DATABASE_URL_1: 'postgresql://worker/db' }))
+      .toBe('postgresql://worker/db');
+  });
   it('cleans quoted database URLs', () => {
     expect(cleanDbUrl('  "postgresql://primary/db"  ')).toBe('postgresql://primary/db');
   });

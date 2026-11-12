@@ -1,6 +1,6 @@
 /**
  * @file index.ts
- * @description Barrel export for @kloks/functions — Reusable backend functions & KrnlTS FunctionsServiceFacade.
+ * @description KrnlTS FunctionsServiceFacade plus the portable function library.
  */
 
 import {
@@ -10,18 +10,7 @@ import {
   type ServiceDefinition,
 } from '@ultrst-armada/krnl';
 
-export * from './types.js';
-export * from './base.js';
-export * from './string.js';
-export * from './async.js';
-export * from './object.js';
-export * from './cache.js';
-export * from './env.js';
-export * from './http.js';
-export * from './shell.js';
-export * from './fs-lock.js';
-export * from './fs.js';
-export * from './events.js';
+export * from './portable.js';
 
 import { toKebabCase, toCamelCase, toPascalCase } from './string.js';
 import { deepClone, deepMerge } from './object.js';

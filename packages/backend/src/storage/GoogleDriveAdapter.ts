@@ -1,4 +1,4 @@
-import { google } from './googleDriveSdk.js';
+import { getGoogleSdk } from './googleDriveSdk.js';
 import { Readable } from 'node:stream';
 import { BaseStorageAdapter } from './BaseStorageAdapter.js';
 import type { GoogleDriveFolder, FileInfo, StorageConfig, ConnectionTestResult } from './types.js';
@@ -50,6 +50,7 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
     if (this.authPromise) return this.authPromise;
 
     this.authPromise = (async () => {
+      const google = await getGoogleSdk();
       const client = new google.auth.OAuth2(
         this.config.googleClientId,
         this.runtimeAuth.clientSecret,
@@ -109,6 +110,7 @@ export class GoogleDriveAdapter extends BaseStorageAdapter {
       return this.client;
     }
 
+    const google = await getGoogleSdk();
     const auth = await this.getAuth();
     const token = await auth.getAccessToken();
     if (this.pendingCredentialPersistence) await this.pendingCredentialPersistence;

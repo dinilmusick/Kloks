@@ -1,4 +1,4 @@
-import { SkipoBase } from '@kloks/functions';
+import { SkipoBase } from '@kloks/functions/base';
 import { BaseAccountProvider } from '../auth/BaseAccountProvider.js';
 import { AuditLogger } from './AuditLogger.js';
 import { DatabaseClusterManager } from './DatabaseClusterManager.js';

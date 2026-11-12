@@ -1,6 +1,6 @@
 ---
-"@ultrst-armada/kloks": patch
-"@kloks/backend": patch
+"@ultrst-armada/kloks": major
+"@kloks/backend": major
 ---
 
-Split the portable backend entrypoint from explicit Node-only adapters and document the migration path.
+**Breaking:** Portable backend exports no longer include Node filesystem/server adapters. Import those capabilities from `@kloks/backend/node` or `@kloks/backend/storage/node`; the generic `/backend` entry remains Fetch-compatible and Worker-safe.

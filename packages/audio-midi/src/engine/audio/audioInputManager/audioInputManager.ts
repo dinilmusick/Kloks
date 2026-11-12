@@ -24,6 +24,7 @@ export class AudioInputManager {
   private busDriver = new AudioBusDriver();
   private isListening = false;
   private listeners: Set<() => void> = new Set();
+  private initialized = false;
 
   public namedInputs: NamedAudioBus[] = [...DEFAULT_NAMED_BUSSES];
   public selectedDeviceId: string = 'default';
@@ -37,13 +38,31 @@ export class AudioInputManager {
   public availableOutputDevices: AudioDeviceInfo[] = [];
   public lastError: string | null = null;
 
-  constructor() {
+  constructor() {}
+
+  /**
+   * Initializes browser audio-device discovery on demand. Importing the module
+   * must not touch browser globals or create an AudioContext.
+   */
+  public async initialize(): Promise<void> {
+    if (this.initialized) return;
+    this.initialized = true;
     this.loadConfig();
     this.initDeviceChangeListener();
-    this.enumerateAudioDevices().catch((err) => {
-      console.warn('Initial enumerateAudioDevices failed:', err);
-    });
     this.registerWithSynthEngine();
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) return;
+    try {
+      await this.enumerateAudioDevices();
+    } catch (err) {
+      this.lastError = err instanceof Error ? err.message : String(err);
+      console.warn('Initial enumerateAudioDevices failed:', err);
+    }
+  }
+
+  private hasAudioContextSupport(): boolean {
+    if (typeof window === 'undefined') return false;
+    const browserWindow = window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
+    return typeof browserWindow.AudioContext === 'function' || typeof browserWindow.webkitAudioContext === 'function';
   }
 
   private registerWithSynthEngine() {
@@ -107,7 +126,15 @@ export class AudioInputManager {
   }
 
   public loadConfig(): ConnectionsConfig {
-    const config = loadStoredConfig(this.namedInputs, this.selectedDeviceId, this.selectedOutputDeviceId);
+    const config = typeof localStorage === 'undefined'
+      ? {
+          selectedAudioDeviceId: this.selectedDeviceId,
+          selectedAudioOutputDeviceId: this.selectedOutputDeviceId,
+          namedAudioInputs: this.namedInputs,
+          selectedMidiDeviceId: null,
+          midiConfigs: {},
+        } as ConnectionsConfig
+      : loadStoredConfig(this.namedInputs, this.selectedDeviceId, this.selectedOutputDeviceId);
     this.namedInputs = config.namedAudioInputs;
     this.selectedDeviceId = config.selectedAudioDeviceId;
     this.selectedOutputDeviceId = config.selectedAudioOutputDeviceId;
@@ -119,6 +146,7 @@ export class AudioInputManager {
     if (config?.selectedAudioDeviceId !== undefined) this.selectedDeviceId = config.selectedAudioDeviceId;
     if (config?.selectedAudioOutputDeviceId !== undefined) this.selectedOutputDeviceId = config.selectedAudioOutputDeviceId;
 
+    if (typeof localStorage === 'undefined') return;
     saveStoredConfig({
       selectedAudioDeviceId: this.selectedDeviceId,
       selectedAudioOutputDeviceId: this.selectedOutputDeviceId,
@@ -129,6 +157,11 @@ export class AudioInputManager {
   }
 
   public async enumerateAudioDevices(): Promise<{ inputs: AudioDeviceInfo[]; outputs: AudioDeviceInfo[] }> {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) {
+      this.availableDevices = [];
+      this.availableOutputDevices = [];
+      return { inputs: [], outputs: [] };
+    }
     const res = await enumerateSystemAudioDevices();
     this.availableDevices = res.inputs;
     this.availableOutputDevices = res.outputs;
@@ -150,7 +183,7 @@ export class AudioInputManager {
       }
     }
 
-    const ctx = synthEngine.getContext();
+    const ctx = this.hasAudioContextSupport() ? synthEngine.getContext() : null;
     const rawDestMax = ctx?.destination?.maxChannelCount;
     const destMax = (typeof rawDestMax === 'number' && isFinite(rawDestMax)) ? rawDestMax : 2;
 
@@ -173,6 +206,7 @@ export class AudioInputManager {
   }
 
   public async selectNativeAudioOutput(): Promise<boolean> {
+    if (typeof navigator === 'undefined') return false;
     const nav = navigator as any;
     if (nav.mediaDevices && typeof nav.mediaDevices.selectAudioOutput === 'function') {
       try {

@@ -54,5 +54,13 @@
   },
   "devDependencies": {
     "@ultrst-armada/krnl": "^1.0.9"
+  },
+  "peerDependencies": {
+    "@ultrst-armada/krnl": "^1.0.9"
+  },
+  "peerDependenciesMeta": {
+    "@ultrst-armada/krnl": {
+      "optional": true
+    }
   }
 }

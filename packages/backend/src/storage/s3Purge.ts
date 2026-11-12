@@ -5,7 +5,7 @@
 export async function ensureS3DirectoryMarker(s3: any, bucketName: string, folderPrefix: string): Promise<void> {
   const clean = folderPrefix.replace(/^\/+|\/+$/g, '');
   if (!clean) return;
-  const { PutObjectCommand } = await import('@dinilmusick/gutts/storage');
+  const { PutObjectCommand } = await import('@aws-sdk/client-s3');
   try {
     await s3.send(new PutObjectCommand({
       Bucket: bucketName,
@@ -20,7 +20,7 @@ export async function ensureS3DirectoryMarker(s3: any, bucketName: string, folde
 
 export async function permanentDeleteS3Object(s3: any, bucketName: string, fullKey: string): Promise<boolean> {
   try {
-    const { DeleteObjectCommand } = await import('@dinilmusick/gutts/storage');
+    const { DeleteObjectCommand } = await import('@aws-sdk/client-s3');
     await s3.send(new DeleteObjectCommand({ Bucket: bucketName, Key: fullKey }));
     return true;
   } catch (err) {
@@ -39,7 +39,7 @@ export async function permanentDeleteS3Folder(
   const isMatch = (k: string) => k === bare || k === `${bare}/` || k.startsWith(`${bare}/`);
 
   try {
-    const { DeleteObjectsCommand, DeleteObjectCommand, ListObjectsV2Command } = await import('@dinilmusick/gutts/storage');
+    const { DeleteObjectsCommand, DeleteObjectCommand, ListObjectsV2Command } = await import('@aws-sdk/client-s3');
     let contToken: string | undefined;
     let more = true;
     while (more) {
@@ -92,7 +92,7 @@ export async function renameS3Folder(
   let movedCount = 0;
 
   try {
-    const { ListObjectsV2Command, GetObjectCommand, PutObjectCommand } = await import('@dinilmusick/gutts/storage');
+    const { ListObjectsV2Command, GetObjectCommand, PutObjectCommand } = await import('@aws-sdk/client-s3');
     let contToken: string | undefined;
     let more = true;
     const items: { Key: string; isDir: boolean; subRel: string }[] = [];

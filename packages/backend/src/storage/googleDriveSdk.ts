@@ -1,7 +1,19 @@
 /**
- * Canonical Google SDK boundary for storage integrations.
+ * Lazy Google SDK boundary for storage integrations.
  *
- * This stable local module lets unit tests replace Google OAuth and Drive
- * calls without requiring network credentials or reaching Google's API.
+ * Importing backend Node storage adapters must not load optional Google or
+ * AWS SDK packages. The SDK is resolved only when Google Drive is used.
  */
-export { google } from '@dinilmusick/gutts/storage';
+let googleSdkPromise: Promise<any> | undefined;
+
+export async function getGoogleSdk(): Promise<any> {
+  if (!googleSdkPromise) {
+    googleSdkPromise = import('googleapis')
+      .then((storage) => storage.google)
+      .catch((error) => {
+        googleSdkPromise = undefined;
+        throw error;
+      });
+  }
+  return googleSdkPromise;
+}

@@ -4,7 +4,7 @@
  * Conforms to Skipo Governance (< 200 lines).
  */
 
-import { SkipoBase } from '@kloks/functions';
+import { SkipoBase } from '@kloks/functions/base';
 import { WorkspaceSecondaryClone } from './types.js';
 
 export interface CloneReplicationResult {
