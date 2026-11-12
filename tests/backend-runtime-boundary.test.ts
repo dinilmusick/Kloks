@@ -50,7 +50,7 @@ describe('Kloks portable and Node dependency graphs', () => {
     const result = graph('index.js');
     expect(result.files.length).toBeGreaterThan(0);
     expect(result.builtins).toEqual([]);
-    expect(result.external).not.toContain('@kloks/functions');
+    expect(result.external.some((specifier) => specifier === '@kloks/functions' || specifier.startsWith('@kloks/functions/'))).toBe(false);
     expect(result.files.some((file) => file.includes('client/'))).toBe(false);
     for (const file of result.files) {
       for (const name of blocked) expect(file).not.toContain(name);
@@ -60,7 +60,7 @@ describe('Kloks portable and Node dependency graphs', () => {
   it('keeps the default functions entry portable and retains Node utilities behind /node', () => {
     const portable = graphFrom(functionsDist, 'index.js');
     expect(portable.builtins).toEqual([]);
-    expect(portable.files.some((file) => /\\/(?:fs|fs-lock|shell)\\.js$/.test(file))).toBe(false);
+    expect(portable.files.some((file) => /\/(?:fs|fs-lock|shell)\.js$/.test(file))).toBe(false);
 
     const nodeFunctions = graphFrom(functionsDist, 'node.js');
     expect(nodeFunctions.builtins.some((name) => ['fs', 'node:fs'].includes(name))).toBe(true);
