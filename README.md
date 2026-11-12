@@ -43,3 +43,5 @@ Node filesystem, file-locking, and shell/process utilities are explicit Node ada
 - `@ultrst-armada/kloks/functions/node`
 
 The portable `SkipoBase` contract is available from `@kloks/functions/base` and `@ultrst-armada/kloks/functions/base`.
+
+**Important:** the package root remains a legacy all-capabilities aggregate. For generic Node, Vercel, Cloud Run, or Cloudflare Worker backends, import the explicit `/backend` entrypoint rather than the aggregate root. Audio/MIDI remains available through `/audio-midi`, `/clock`, `/midi`, and `/osc`.
