@@ -251,6 +251,10 @@
       "types": "./packages/functions/dist/node.d.ts",
       "import": "./packages/functions/dist/node.js",
       "default": "./packages/functions/dist/node.js"
+    },
+    "./functions/portable": {
+      "types": "./packages/functions/dist/portable.d.ts",
+      "import": "./packages/functions/dist/portable.js"
     }
   },
   "scripts": {
