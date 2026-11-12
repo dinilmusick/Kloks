@@ -11,7 +11,7 @@ import path from 'path';
 import { formatCanonicalWorkspaceFolderName } from './workspaceCanonical';
 import { b2ListFileNames, b2DownloadFile, b2UploadFile, b2ListBuckets } from './b2DirectCore';
 import { queryUnifiedDb } from './unifiedDb';
-import { GoogleDriveAdapter } from '../storage/GoogleDriveAdapter.js';
+import { GoogleDriveStorageService } from '../storage/GoogleDriveStorageService.js';
 
 const ACCOUNTS_FILE = path.resolve('.skipo/accounts.json');
 const CONFIG_FILE = path.resolve('.skipo/workspace_config.json');
@@ -294,13 +294,18 @@ export async function syncWorkspace(workspaceId: string): Promise<WorkspaceSyncS
   if (isGoogleDrive) {
     const creds = workspace.storageConfig || connection?.credentials || connection || {};
     const rootFolderId = creds.googleRootFolderId || creds.rootFolderId || workspace.googleRootFolderId;
-    const adapter = new GoogleDriveAdapter({
+    const adapter = new GoogleDriveStorageService({
       provider: 'google_drive',
       googleAccessToken: creds.googleAccessToken || creds.accessToken,
       googleAccessTokenExpiresAt: creds.googleAccessTokenExpiresAt,
       googleRefreshToken: creds.googleRefreshToken || creds.refreshToken,
       googleClientId: creds.googleClientId || process.env.GOOGLE_CLIENT_ID,
+      googleRedirectUri: creds.googleRedirectUri || process.env.GOOGLE_REDIRECT_URI,
+      googleAccountId: creds.googleAccountId,
       googleRootFolderId: rootFolderId,
+    }, {
+      // OAuth secrets remain in server environment, never in workspace connection records.
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     });
 
     try {
