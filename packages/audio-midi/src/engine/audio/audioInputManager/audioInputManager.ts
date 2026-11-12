@@ -61,7 +61,7 @@ export class AudioInputManager {
 
   private hasAudioContextSupport(): boolean {
     if (typeof window === 'undefined') return false;
-    const browserWindow = window as Window & { webkitAudioContext?: typeof AudioContext };
+    const browserWindow = window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
     return typeof browserWindow.AudioContext === 'function' || typeof browserWindow.webkitAudioContext === 'function';
   }
 
