@@ -1,10 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 
+vi.mock('@supabase/supabase-js', () => {
+  throw new Error('The optional Supabase driver must not load during module initialization.');
+});
+
 import { GoogleDriveWorkspaceService } from './GoogleDriveWorkspaceService.js';
 import { GoogleDriveStorageService } from './GoogleDriveStorageService.js';
 import { LocalFSAdapter } from './LocalFSAdapter.js';
 import { StorageAdapterFactory } from './StorageAdapterFactory.js';
 import * as nodeStorage from './node.js';
+import { BucketStorageService, SupabaseStorageAdapter } from './node.js';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -22,6 +27,35 @@ const baseConfig = {
 };
 
 describe('Fetch-native Google Drive storage integration', () => {
+
+  it('keeps the optional Supabase driver lazy until storage is used', () => {
+    const adapter = new SupabaseStorageAdapter({
+      provider: 'supabase',
+      bucket: 'workspace',
+      endpoint: 'https://example.supabase.co',
+      accessKey: 'test-key',
+    });
+    expect(adapter).toBeInstanceOf(SupabaseStorageAdapter);
+  });
+
+  it('preserves S3-compatible bucket storage through the existing factory', () => {
+    const service = new BucketStorageService({
+      provider: 's3_compatible',
+      bucket: 'workspace',
+      region: 'us-east-1',
+      endpoint: 'https://s3.example.test',
+      accessKey: 'access',
+      secretKey: 'secret',
+    });
+    expect(service).toBeInstanceOf(BucketStorageService);
+    expect(StorageAdapterFactory.create({
+      provider: 's3',
+      bucket: 'workspace',
+      accessKey: 'access',
+      secretKey: 'secret',
+    })).toBeInstanceOf(BucketStorageService);
+  });
+
   it('constructs the canonical workspace service lazily through the storage factory', () => {
     const fetcher = vi.fn<typeof fetch>();
     const adapter = StorageAdapterFactory.create(baseConfig, {
