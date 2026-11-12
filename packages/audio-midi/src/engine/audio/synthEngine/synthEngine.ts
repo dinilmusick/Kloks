@@ -41,6 +41,7 @@ export class SynthEngine {
   private graphNodeMap: Map<string, BaseAudioGraphNode> = new Map();
 
   private loadAudioConfig(): AudioEngineConfig {
+    if (typeof localStorage === 'undefined') return { ...DEFAULT_AUDIO_CONFIG };
     try {
       const raw = localStorage.getItem(STORAGE_KEY_AUDIO_CONFIG);
       if (raw) {
@@ -62,9 +63,11 @@ export class SynthEngine {
 
   public async updateAudioSettings(newConfig: Partial<AudioEngineConfig>): Promise<void> {
     this.audioEngineConfig = { ...this.audioEngineConfig, ...newConfig };
-    try {
-      localStorage.setItem(STORAGE_KEY_AUDIO_CONFIG, JSON.stringify(this.audioEngineConfig));
-    } catch (e) {}
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY_AUDIO_CONFIG, JSON.stringify(this.audioEngineConfig));
+      } catch (e) {}
+    }
 
     await this.reinitContext();
   }
@@ -179,7 +182,12 @@ export class SynthEngine {
       return;
     }
 
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const AudioCtx = typeof window === 'undefined'
+      ? undefined
+      : window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (typeof AudioCtx !== 'function') {
+      throw new Error('Web Audio API is unavailable in this runtime.');
+    }
 
     const options: AudioContextOptions = {};
     if (typeof this.audioEngineConfig.sampleRate === 'number' && isFinite(this.audioEngineConfig.sampleRate) && this.audioEngineConfig.sampleRate > 0) {
@@ -244,6 +252,7 @@ export class SynthEngine {
     multiChannelOutputRouter.connectInput(this.masterGain);
 
     this.isInitialized = true;
+    void audioInputManager.initialize();
   }
 
   public playAuditionTestPulse() {
