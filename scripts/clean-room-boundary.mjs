@@ -22,28 +22,17 @@ try {
   const tarball = fs.readdirSync(packDir).find((name) => name.endsWith(".tgz"));
   if (!tarball) throw new Error("npm pack produced no tarball");
   execFileSync("npm", ["init", "-y"], {cwd: consumer, stdio: "ignore"});
-  const optionalPeers = Object.entries(pkg.peerDependenciesMeta || {})
-    .filter(([name, meta]) => meta?.optional && pkg.peerDependencies?.[name])
-    .map(([name]) => `${name}@${pkg.peerDependencies[name]}`);
-  execFileSync("npm", ["install", path.join(packDir, tarball), ...optionalPeers], {cwd: consumer, stdio: "pipe"});
+  execFileSync("npm", ["install", path.join(packDir, tarball)], {cwd: consumer, stdio: "pipe"});
 
-  const importProbe = path.join(consumer, "probe.mjs");
-  fs.writeFileSync(importProbe, "await import(" + JSON.stringify(pkg.name) + ");\n");
-  execFileSync(process.execPath, [importProbe], {cwd: consumer, stdio: "pipe"});
-
-  const platformProbe = path.join(consumer, "platform-probe.mjs");
-  fs.writeFileSync(platformProbe, [
+  // First prove the portable backend and base subpath work with only declared package dependencies.
+  const portableProbe = path.join(consumer, "portable-probe.mjs");
+  fs.writeFileSync(portableProbe, [
     "const backend = await import(" + JSON.stringify(pkg.name + "/backend") + ");",
     "if (!backend.BaseApiRoute) throw new Error('Portable backend API entrypoint is missing BaseApiRoute');",
-    "const functions = await import(" + JSON.stringify(pkg.name + "/functions") + ");",
-    "if (functions.readFile || functions.execCmd) throw new Error('Portable functions entrypoint exposed Node-only utilities');",
     "const base = await import(" + JSON.stringify(pkg.name + "/functions/base") + ");",
     "if (!base.SkipoBase) throw new Error('Portable functions base subpath is missing SkipoBase');",
-    "const nodeFunctions = await import(" + JSON.stringify(pkg.name + "/functions/node") + ");",
-    "if (typeof nodeFunctions.readFile !== 'function' || typeof nodeFunctions.execCmd !== 'function') throw new Error('Node functions adapter is incomplete');",
-    "await import(" + JSON.stringify(pkg.name + "/backend/node") + ");",
   ].join("\n") + "\n");
-  execFileSync(process.execPath, [platformProbe], {cwd: consumer, stdio: "pipe"});
+  execFileSync(process.execPath, [portableProbe], {cwd: consumer, stdio: "pipe"});
 
   const workerEntry = path.join(consumer, "worker.mjs");
   fs.writeFileSync(workerEntry, [
@@ -67,6 +56,26 @@ try {
     throw new Error("Portable Worker bundle contains browser audio/MIDI implementation code.");
   }
   console.log("CLOUDFLARE CONSUMER BUILD PASSED: " + Buffer.byteLength(bundleSource) + " bytes; no Node filesystem or audio/MIDI modules.");
+
+  // Install optional peers only after the portable Worker build; then verify opt-in adapters.
+  const optionalPeers = Object.entries(pkg.peerDependenciesMeta || {})
+    .filter(([name, meta]) => meta?.optional && pkg.peerDependencies?.[name])
+    .map(([name]) => `${name}@${pkg.peerDependencies[name]}`);
+  if (optionalPeers.length) execFileSync("npm", ["install", ...optionalPeers], {cwd: consumer, stdio: "pipe"});
+
+  const importProbe = path.join(consumer, "probe.mjs");
+  fs.writeFileSync(importProbe, "await import(" + JSON.stringify(pkg.name) + ");\\n");
+  execFileSync(process.execPath, [importProbe], {cwd: consumer, stdio: "pipe"});
+
+  const platformProbe = path.join(consumer, "platform-probe.mjs");
+  fs.writeFileSync(platformProbe, [
+    "const functions = await import(" + JSON.stringify(pkg.name + "/functions") + ");",
+    "if (functions.readFile || functions.execCmd) throw new Error('Portable functions entrypoint exposed Node-only utilities');",
+    "const nodeFunctions = await import(" + JSON.stringify(pkg.name + "/functions/node") + ");",
+    "if (typeof nodeFunctions.readFile !== 'function' || typeof nodeFunctions.execCmd !== 'function') throw new Error('Node functions adapter is incomplete');",
+    "await import(" + JSON.stringify(pkg.name + "/backend/node") + ");",
+  ].join("\\n") + "\\n");
+  execFileSync(process.execPath, [platformProbe], {cwd: consumer, stdio: "pipe"});
 
   const resolveProbe = path.join(consumer, "resolve.mjs");
   const publicKeys = Object.keys(exportsMap).filter((key) => key !== "./gutts.manifest.json" && !key.endsWith("/*"));
