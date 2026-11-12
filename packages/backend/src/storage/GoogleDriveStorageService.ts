@@ -50,10 +50,10 @@ export class GoogleDriveStorageService extends BaseStorageAdapter {
           googleAccountId: this.config.googleAccountId,
           fetcher: this.runtimeAuth.fetcher,
           persistTokens: async (next) => {
+            await this.runtimeAuth.persistCredentials?.({ ...next });
             this.config.googleAccessToken = next.accessToken;
             this.config.googleRefreshToken = next.refreshToken;
             this.config.googleAccessTokenExpiresAt = next.expiresAt;
-            await this.runtimeAuth.persistCredentials?.({ ...next });
           },
         };
         return new GoogleDriveWorkspaceService(options);
@@ -104,7 +104,9 @@ export class GoogleDriveStorageService extends BaseStorageAdapter {
   }
 
   async getAccountIdentity(): Promise<{ accountId: string; email?: string }> {
-    return (await this.workspace()).getAccountIdentity();
+    const identity = await (await this.workspace()).getAccountIdentity();
+    this.config.googleAccountId = identity.accountId;
+    return identity;
   }
 
   async refreshTokens(): Promise<GoogleDriveWorkspaceTokens> {
@@ -128,6 +130,10 @@ export class GoogleDriveStorageService extends BaseStorageAdapter {
   }
 
   async testConnection(): Promise<ConnectionTestResult> {
-    return (await this.workspace()).testConnection();
+    const result = await (await this.workspace()).testConnection();
+    if (result.ok && typeof result.details?.accountId === 'string') {
+      this.config.googleAccountId = result.details.accountId;
+    }
+    return result;
   }
 }
