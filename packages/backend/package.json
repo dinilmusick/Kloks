@@ -156,7 +156,9 @@
     "@supabase/supabase-js": "^2.45.0",
     "react": "^18.0.0 || ^19.0.0",
     "zod": "^3.22.0",
-    "@ultrst-armada/krnl": "^1.0.9"
+    "@ultrst-armada/krnl": "^1.0.9",
+    "@aws-sdk/client-s3": "^3.1164.0",
+    "googleapis": "^189.0.0"
   },
   "peerDependenciesMeta": {
     "@supabase/supabase-js": {
@@ -172,6 +174,12 @@
       "optional": true
     },
     "@ultrst-armada/krnl": {
+      "optional": true
+    },
+    "@aws-sdk/client-s3": {
+      "optional": true
+    },
+    "googleapis": {
       "optional": true
     }
   },
