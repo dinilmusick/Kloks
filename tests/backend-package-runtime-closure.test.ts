@@ -259,6 +259,8 @@ describe('Kloks packed portable runtime closure', () => {
 
       const packageDirectory = join(consumerDirectory, 'node_modules', '@ultrst-armada', 'kloks');
       const packedManifest = JSON.parse(readFileSync(join(packageDirectory, 'package.json'), 'utf8')) as {
+        name?: string;
+        version?: string;
         exports?: Record<string, unknown>;
       };
       const portableEntrypoints = [
