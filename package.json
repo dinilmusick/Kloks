@@ -285,7 +285,8 @@
     "@ultrst-armada/krnl": "^1.0.11",
     "react": "^18.0.0 || ^19.0.0",
     "@types/node": ">=20.0.0",
-    "@types/react": "^18.0.0 || ^19.0.0"
+    "@types/react": "^18.0.0 || ^19.0.0",
+    "googleapis": "^189.0.0"
   },
   "peerDependenciesMeta": {
     "@aws-sdk/client-s3": {
@@ -307,6 +308,9 @@
       "optional": true
     },
     "@types/react": {
+      "optional": true
+    },
+    "googleapis": {
       "optional": true
     }
   },
