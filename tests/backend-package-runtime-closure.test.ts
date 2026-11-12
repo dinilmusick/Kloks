@@ -15,7 +15,7 @@ import * as ts from 'typescript';
 
 const repositoryRoot = process.cwd();
 const builtinNames = new Set(builtinModules.map((name) => name.replace(/^node:/, '')));
-const legacyDriveFile = /(?:^|[/\\])(?:GoogleDriveAdapter|googleDriveSdk)(?:\.[cm]?js)?$/i;
+const legacyDriveFile = /(?:^|[/\\])(?:GoogleDriveAdapter|GoogleDriveStorageAdapter|GoogleDriveStorageService|GoogleDriveOAuth|googleDriveSdk)(?:\.[cm]?js)?$/i;
 const googleSdkSpecifier = /^(?:googleapis|@googleapis)(?:\/|$)/;
 
 function isInside(parent: string, candidate: string): boolean {
@@ -239,7 +239,7 @@ describe('Kloks packed portable runtime closure', () => {
         ['pack', '--json', '--ignore-scripts', '--pack-destination', packDirectory],
         { cwd: repositoryRoot, encoding: 'utf8', timeout: 120_000 },
       );
-      const packRecords = JSON.parse(packOutput) as Array<{ filename: string }>;
+      const packRecords = JSON.parse(packOutput) as Array<{ filename: string; name?: string; version?: string; size?: number; unpackedSize?: number }>;
       const filename = packRecords[0]?.filename;
       expect(filename).toBeTruthy();
 
@@ -275,7 +275,7 @@ describe('Kloks packed portable runtime closure', () => {
         return { description, entry };
       });
 
-      for (const { description, entry } of resolvedEntries) {
+      const graphResults = resolvedEntries.map(({ description, entry }) => {
         const graph = inspectPackedImportGraph(entry, consumerDirectory);
         expect(graph.files.length, description + ' must have a non-empty packed import graph.').toBeGreaterThan(0);
         expect(graph.builtins, description + ' must not import Node built-ins (including node:stream, node:fs, or node:path).').toEqual([]);
@@ -283,15 +283,17 @@ describe('Kloks packed portable runtime closure', () => {
         expect(graph.legacyDriveFiles, description + ' must not include a Node-only Google Drive adapter/SDK module.').toEqual([]);
         expect(graph.legacyDriveImports, description + ' must not reference a Node-only Google Drive adapter/SDK module.').toEqual([]);
         expect(graph.unresolvedRelativeImports, description + ' must not contain dangling relative imports in its packed graph.').toEqual([]);
-      }
+        return { description, files: graph.files.length, builtins: graph.builtins, googleSdkImports: graph.googleSdkImports, legacyDriveFiles: graph.legacyDriveFiles, legacyDriveImports: graph.legacyDriveImports, unresolvedRelativeImports: graph.unresolvedRelativeImports };
+      });
 
       const consumerProgram = join(consumerDirectory, 'consumer.mjs');
       writeFileSync(consumerProgram, packedConsumerProgram);
-      execFileSync(process.execPath, [consumerProgram], {
+      const consumerOutput = execFileSync(process.execPath, [consumerProgram], {
         cwd: consumerDirectory,
         encoding: 'utf8',
         timeout: 60_000,
       });
+      console.log('[kloks-packed-runtime-closure] ' + JSON.stringify({ package: { name: packedManifest.name, version: packedManifest.version, tarball: filename, size: packRecords[0]?.size, unpackedSize: packRecords[0]?.unpackedSize }, portableEntrypoints: graphResults, consumer: consumerOutput.trim() }));
     } finally {
       rmSync(temporaryRoot, { recursive: true, force: true });
     }
