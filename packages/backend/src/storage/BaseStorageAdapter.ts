@@ -1,4 +1,4 @@
-import { SkipoBase } from '@kloks/functions';
+import { SkipoBase } from '@kloks/functions/base';
 import {
   FileInfo,
   StorageConfig,
