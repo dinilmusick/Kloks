@@ -72,6 +72,7 @@ describe('Kloks portable and Node dependency graphs', () => {
     expect(result.files.length).toBeGreaterThan(0);
     expect(result.builtins.some((name) => ['fs', 'node:fs'].includes(name))).toBe(true);
     expect(result.builtins.some((name) => ['path', 'node:path'].includes(name))).toBe(true);
+    expect(result.external.some((specifier) => specifier === '@kloks/functions' || specifier.startsWith('@kloks/functions/'))).toBe(false);
   });
 
   it('publishes separate portable and Node adapter package exports', () => {
