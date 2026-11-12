@@ -47,19 +47,20 @@ const mocks = vi.hoisted(() => {
     }
   }
 
-  return { drive, MockOAuth2, setRefreshError: (error: Error | null) => { refreshError = error; } };
+  const google = {
+    auth: { OAuth2: MockOAuth2 },
+    drive: vi.fn(() => drive),
+  };
+  return { drive, MockOAuth2, google, setRefreshError: (error: Error | null) => { refreshError = error; } };
 });
 
 vi.mock('../packages/backend/src/storage/googleDriveSdk.js', () => ({
-  google: {
-    auth: { OAuth2: mocks.MockOAuth2 },
-    drive: vi.fn(() => mocks.drive),
-  },
+  getGoogleSdk: async () => mocks.google,
 }));
 
 const drive = mocks.drive;
+const google = mocks.google;
 
-import { google } from '../packages/backend/src/storage/googleDriveSdk.js';
 import { StorageAdapterFactory } from '../packages/backend/src/storage/StorageAdapterFactory.js';
 import {
   createGoogleDriveAuthorizationUrl,
