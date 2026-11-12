@@ -29,3 +29,17 @@ Node-only filesystem, database, server, and service-engine implementations are e
 
 **Migration:** consumers that previously imported Node implementations (for example, `LocalFSAdapter`, `StorageAdapterFactory`, `WorkingWorkspaceService`, database or server services) from the default backend or storage/workspace/services barrels should change those imports to the corresponding `/node` adapter. Portable contracts and Fetch-based APIs remain on the default entrypoints. The Node adapter preserves the previous aggregate backend exports.
 
+
+## Portable functions and Node adapters
+
+The default functions entrypoint is runtime-neutral:
+
+- `@kloks/functions`
+- `@ultrst-armada/kloks/functions`
+
+Node filesystem, file-locking, and shell/process utilities are explicit Node adapters:
+
+- `@kloks/functions/node`
+- `@ultrst-armada/kloks/functions/node`
+
+The portable `SkipoBase` contract is available from `@kloks/functions/base` and `@ultrst-armada/kloks/functions/base`.
