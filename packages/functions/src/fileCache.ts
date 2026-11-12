@@ -54,4 +54,3 @@ export class FileCache<T> {
     } catch (e) {}
   }
 }
-
