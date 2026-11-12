@@ -17,10 +17,20 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./base": {
+      "types": "./dist/base.d.ts",
+      "import": "./dist/base.js",
+      "default": "./dist/base.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js",
+      "default": "./dist/node.js"
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean --external zod --external ws",
+    "build": "tsup src/index.ts src/base.ts src/node.ts --format esm --dts --clean --external zod --external ws",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
