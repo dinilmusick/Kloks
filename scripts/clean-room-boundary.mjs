@@ -31,6 +31,10 @@ try {
     "if (!backend.BaseApiRoute) throw new Error('Portable backend API entrypoint is missing BaseApiRoute');",
     "const base = await import(" + JSON.stringify(pkg.name + "/functions/base") + ");",
     "if (!base.SkipoBase) throw new Error('Portable functions base subpath is missing SkipoBase');",
+    "const portableFunctions = await import(" + JSON.stringify(pkg.name + "/functions/portable") + ");",
+    "if (!portableFunctions.LRUCache || !portableFunctions.SkipoBase) throw new Error('Portable functions subpath is incomplete');",
+    "const nodeFunctions = await import(" + JSON.stringify(pkg.name + "/functions/node") + ");",
+    "if (typeof nodeFunctions.readFile !== 'function' || typeof nodeFunctions.execCmd !== 'function' || !nodeFunctions.FileCache) throw new Error('Node functions subpath is incomplete or requires an unrelated peer');",
     "const nodeStorage = await import(" + JSON.stringify(pkg.name + "/backend/storage/node") + ");",
     "if (!nodeStorage.StorageAdapterFactory) throw new Error('Node storage adapter is missing its factory');",
   ].join("\n") + "\n");
@@ -71,11 +75,13 @@ try {
     "import { LocalFSAdapter } from " + JSON.stringify(pkg.name + "/backend/storage/node") + ";",
     "import { SkipoBase } from " + JSON.stringify(pkg.name + "/functions/base") + ";",
     "import { readFile, FileCache } from " + JSON.stringify(pkg.name + "/functions/node") + ";",
+    "import { LRUCache } from " + JSON.stringify(pkg.name + "/functions/portable") + ";",
     "declare const route: BaseApiRoute;",
     "declare const nodeAdapter: LocalFSAdapter;",
     "declare const portableBase: SkipoBase;",
     "declare const fileCache: FileCache<string>;",
-    "void route; void nodeAdapter; void portableBase; void readFile; void fileCache;",
+    "declare const portableCache: LRUCache<string, number>;",
+    "void route; void nodeAdapter; void portableBase; void readFile; void fileCache; void portableCache;",
   ].join("\n") + "\n");
   execFileSync(path.join(root, "node_modules", ".bin", "tsc"), [
     "--noEmit", "--target", "ES2022", "--module", "NodeNext", "--moduleResolution", "NodeNext",
@@ -89,9 +95,8 @@ try {
   const platformProbe = path.join(consumer, "platform-probe.mjs");
   fs.writeFileSync(platformProbe, [
     "const functions = await import(" + JSON.stringify(pkg.name + "/functions") + ");",
-    "if (functions.readFile || functions.execCmd) throw new Error('Portable functions entrypoint exposed Node-only utilities');",
-    "const nodeFunctions = await import(" + JSON.stringify(pkg.name + "/functions/node") + ");",
-    "if (typeof nodeFunctions.readFile !== 'function' || typeof nodeFunctions.execCmd !== 'function') throw new Error('Node functions adapter is incomplete');",
+    "if (functions.readFile || functions.execCmd || functions.FileCache) throw new Error('Portable functions entrypoint exposed Node-only utilities');",
+    "if (!functions.FunctionsServiceFacade) throw new Error('KrnlTS service facade is missing from the compatibility entrypoint');",
     "await import(" + JSON.stringify(pkg.name + "/backend/node") + ");",
   ].join("\n") + "\n");
   execFileSync(process.execPath, [platformProbe], {cwd: consumer, stdio: "pipe"});
