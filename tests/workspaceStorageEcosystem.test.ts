@@ -33,18 +33,20 @@ const googleOAuthMocks = vi.hoisted(() => {
       return { token: 'new-google-access-token-999' };
     }
   }
+  const google = {
+    auth: { OAuth2: MockOAuth2 },
+    drive: vi.fn(() => ({})),
+  };
   return {
     MockOAuth2,
+    google,
     setRefreshError: (error: Error | null) => { refreshError = error; },
     getLastClient: () => lastClient,
   };
 });
 
 vi.mock('../packages/backend/src/storage/googleDriveSdk.js', () => ({
-  google: {
-    auth: { OAuth2: googleOAuthMocks.MockOAuth2 },
-    drive: vi.fn(() => ({})),
-  },
+  getGoogleSdk: async () => googleOAuthMocks.google,
 }));
 import { WorkspaceAutosaveController } from '../packages/client/src/WorkspaceAutosaveController.js';
 
