@@ -23,21 +23,27 @@ import { retrospectiveBufferEngine } from './audio/retrospectiveBufferEngine.js'
 import { midiManager } from './midi/midiManager.js';
 import { oscManager } from './osc/oscManager.js';
 
-// Automatically wire the @kloks/state-graph runtime bridges with the canonical engines
-configureCanonicalMidiBridge(midiManager);
-configureControlDispatcher({
-  synthEngine,
-  sequencerEngine,
-  audioClipEngine,
-});
-configureNodePerformanceTracker({
-  synthEngine,
-  sequencerEngine,
-  midiManager,
-  oscManager,
-  audioClipEngine,
-});
-configureSolidifyExecution(synthEngine);
+// Bridge wiring is an explicit runtime initialization step, never a module-import side effect.
+let audioMidiBridgesInitialized = false;
+
+export function initializeAudioMidiEngineBridges(): void {
+  if (audioMidiBridgesInitialized) return;
+  configureCanonicalMidiBridge(midiManager);
+  configureControlDispatcher({
+    synthEngine,
+    sequencerEngine,
+    audioClipEngine,
+  });
+  configureNodePerformanceTracker({
+    synthEngine,
+    sequencerEngine,
+    midiManager,
+    oscManager,
+    audioClipEngine,
+  });
+  configureSolidifyExecution(synthEngine);
+  audioMidiBridgesInitialized = true;
+}
 
 // Re-export all engines, DSP modules, routers, and types
 export * from './audio/synthEngine.js';
@@ -86,6 +92,7 @@ export * from './osc/oscManager.js';
 
 export const SynthEngineServiceDefinition: ServiceDefinition = createServiceDefinition({
   id: 'kloks.audio.synth',
+  lifecycle: { onInit: initializeAudioMidiEngineBridges },
   name: 'SynthEngineService',
   version: '1.0.0',
   operations: {
@@ -126,6 +133,7 @@ export const SynthEngineServiceFacade = {
 
 export const SequencerEngineServiceDefinition: ServiceDefinition = createServiceDefinition({
   id: 'kloks.audio.sequencer',
+  lifecycle: { onInit: initializeAudioMidiEngineBridges },
   name: 'SequencerEngineService',
   version: '1.0.0',
   operations: {
@@ -159,6 +167,7 @@ export const SequencerEngineServiceFacade = {
 
 export const OscServiceDefinition: ServiceDefinition = createServiceDefinition({
   id: 'kloks.osc.manager',
+  lifecycle: { onInit: initializeAudioMidiEngineBridges },
   name: 'OscService',
   version: '1.0.0',
   operations: {
