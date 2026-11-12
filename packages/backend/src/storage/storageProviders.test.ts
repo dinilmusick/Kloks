@@ -1,88 +1,120 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@supabase/supabase-js', () => {
-  throw new Error('The optional Supabase driver must not load during module initialization.');
-});
-import {
-  BucketStorageService,
-  GoogleDriveStorageService,
-  SupabaseStorageAdapter,
-  StorageAdapterFactory,
-  createGoogleDriveAuthorizationUrl,
-  GOOGLE_DRIVE_STORAGE_SCOPE,
-} from './node.js';
+import { GoogleDriveWorkspaceService } from './GoogleDriveWorkspaceService.js';
+import { GoogleDriveStorageService } from './GoogleDriveStorageService.js';
+import { LocalFSAdapter } from './LocalFSAdapter.js';
+import { StorageAdapterFactory } from './StorageAdapterFactory.js';
 
-describe('canonical storage providers', () => {
-  it('keeps the optional Supabase driver lazy until storage is used', () => {
-    const adapter = new SupabaseStorageAdapter({
-      provider: 'supabase',
-      bucket: 'workspace',
-      endpoint: 'https://example.supabase.co',
-      accessKey: 'test-key',
-    });
-    expect(adapter).toBeInstanceOf(SupabaseStorageAdapter);
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
   });
-  it('exposes S3-compatible bucket storage through the canonical service', () => {
-    const service = new BucketStorageService({
-      provider: 's3_compatible',
-      bucket: 'workspace',
-      region: 'us-east-1',
-      endpoint: 'https://s3.example.test',
-      accessKey: 'access',
-      secretKey: 'secret',
+}
+
+const baseConfig = {
+  provider: 'google_drive' as const,
+  googleClientId: 'client-id',
+  googleRedirectUri: 'https://app.example.test/google/callback',
+  googleAccessToken: 'access-token',
+  googleRefreshToken: 'refresh-token',
+};
+
+describe('Fetch-native Google Drive storage integration', () => {
+  it('constructs the canonical workspace service lazily through the storage factory', () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const adapter = StorageAdapterFactory.create(baseConfig, {
+      googleDrive: { fetcher },
     });
 
-    expect(service).toBeInstanceOf(BucketStorageService);
-    expect(StorageAdapterFactory.create({
-      provider: 's3',
-      bucket: 'workspace',
-      accessKey: 'access',
-      secretKey: 'secret',
-    })).toBeInstanceOf(BucketStorageService);
+    expect(adapter).toBeInstanceOf(GoogleDriveStorageService);
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it('exposes Google Drive through the canonical service and factory', () => {
-    const service = new GoogleDriveStorageService({
+  it('delegates file operations to the canonical Fetch service and preserves Drive metadata', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
+      files: [{
+        id: 'drive-file-1',
+        name: 'notes.txt',
+        mimeType: 'text/plain',
+        size: '12',
+        modifiedTime: '2026-11-12T00:00:00.000Z',
+        parents: ['root'],
+      }],
+    }));
+    const persistCredentials = vi.fn();
+    const adapter = new GoogleDriveStorageService(baseConfig, {
+      fetcher,
+      persistCredentials,
+    });
+
+    await expect(adapter.list()).resolves.toMatchObject([{
+      path: 'notes.txt',
+      id: 'drive-file-1',
+      mimeType: 'text/plain',
+      isFolder: false,
+      size: 12,
+    }]);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(persistCredentials).not.toHaveBeenCalled();
+    expect(adapter.getConnectionMetadata()).toEqual({
       provider: 'google_drive',
       googleClientId: 'client-id',
-      googleRefreshToken: 'refresh-token',
+      googleRedirectUri: 'https://app.example.test/google/callback',
+    });
+  });
+
+  it('loads persisted credentials and routes refresh through canonical persistence', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(jsonResponse({
+      access_token: 'rotated-access-token',
+      refresh_token: 'rotated-refresh-token',
+      expires_in: 3600,
+    }));
+    const persistCredentials = vi.fn();
+    const adapter = new GoogleDriveStorageService({
+      ...baseConfig,
+      googleAccessTokenExpiresAt: 1,
+    }, {
+      clientSecret: 'server-secret',
+      fetcher,
+      getCredentials: async () => ({
+        accessToken: 'expired-access-token',
+        refreshToken: 'existing-refresh-token',
+        expiresAt: 1,
+      }),
+      persistCredentials,
     });
 
-    expect(service).toBeInstanceOf(GoogleDriveStorageService);
-    expect(StorageAdapterFactory.create({
-      provider: 'google_drive',
-      googleClientId: 'client-id',
-      googleRefreshToken: 'refresh-token',
-    })).toBeInstanceOf(GoogleDriveStorageService);
+    await expect(adapter.refreshTokens()).resolves.toMatchObject({
+      accessToken: 'rotated-access-token',
+      refreshToken: 'rotated-refresh-token',
+    });
+    expect(persistCredentials).toHaveBeenCalledWith(expect.objectContaining({
+      accessToken: 'rotated-access-token',
+      refreshToken: 'rotated-refresh-token',
+    }));
   });
 
-  it('requests the minimum scope required for an arbitrary read/write storage root', () => {
-    const url = createGoogleDriveAuthorizationUrl(
-      {
-        clientId: 'client-id',
-        redirectUri: 'https://example.test/oauth/google-drive',
-      },
-      'workspace-state',
-    );
+  it('uses the canonical OAuth/PKCE contract without a Node Google SDK', async () => {
+    const verifier = GoogleDriveWorkspaceService.createPkceCodeVerifier();
+    const challenge = await GoogleDriveWorkspaceService.createPkceCodeChallenge(verifier);
+    const url = new URL(GoogleDriveWorkspaceService.createAuthorizationUrl({
+      clientId: 'client-id',
+      redirectUri: 'https://app.example.test/google/callback',
+    }, 'workspace-state', undefined, challenge));
 
-    const params = new URL(url).searchParams;
-    expect(params.get('scope')).toBe(GOOGLE_DRIVE_STORAGE_SCOPE);
-    expect(params.get('state')).toBe('workspace-state');
-    expect(params.get('access_type')).toBe('offline');
+    expect(url.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/drive');
+    expect(url.searchParams.get('state')).toBe('workspace-state');
+    expect(url.searchParams.get('code_challenge')).toBe(challenge);
+    expect(url.searchParams.get('code_challenge_method')).toBe('S256');
+    expect(url.searchParams.has('client_secret')).toBe(false);
   });
 
-  it('supports PKCE for Drive authorization', () => {
-    const url = createGoogleDriveAuthorizationUrl(
-      {
-        clientId: 'client-id',
-        redirectUri: 'https://example.test/oauth/google-drive',
-      },
-      'workspace-state',
-      'verifier-derived-challenge',
-    );
-
-    const params = new URL(url).searchParams;
-    expect(params.get('code_challenge')).toBe('verifier-derived-challenge');
-    expect(params.get('code_challenge_method')).toBe('S256');
+  it('keeps LocalFS available as a Node-only storage provider', () => {
+    const local = StorageAdapterFactory.create({
+      provider: 'local_fs',
+      basePath: '/tmp/kloks-storage-test',
+    });
+    expect(local).toBeInstanceOf(LocalFSAdapter);
   });
 });
