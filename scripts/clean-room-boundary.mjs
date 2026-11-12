@@ -34,7 +34,7 @@ try {
     "const portableFunctions = await import(" + JSON.stringify(pkg.name + "/functions/portable") + ");",
     "if (!portableFunctions.LRUCache || !portableFunctions.SkipoBase) throw new Error('Portable functions subpath is incomplete');",
     "const nodeFunctions = await import(" + JSON.stringify(pkg.name + "/functions/node") + ");",
-    "if (typeof nodeFunctions.readFile !== 'function' || typeof nodeFunctions.execCmd !== 'function' || !nodeFunctions.FileCache) throw new Error('Node functions subpath is incomplete or requires an unrelated peer');",
+    "if (typeof nodeFunctions.readFile !== 'function' || typeof nodeFunctions.execCmd !== 'function' || typeof nodeFunctions.loadEnv !== 'function' || !nodeFunctions.FileCache) throw new Error('Node functions subpath is incomplete or requires an unrelated peer');",
     "const nodeStorage = await import(" + JSON.stringify(pkg.name + "/backend/storage/node") + ");",
     "if (!nodeStorage.StorageAdapterFactory) throw new Error('Node storage adapter is missing its factory');",
   ].join("\n") + "\n");
@@ -74,14 +74,14 @@ try {
     "import { BaseApiRoute } from " + JSON.stringify(pkg.name + "/backend") + ";",
     "import { LocalFSAdapter } from " + JSON.stringify(pkg.name + "/backend/storage/node") + ";",
     "import { SkipoBase } from " + JSON.stringify(pkg.name + "/functions/base") + ";",
-    "import { readFile, FileCache } from " + JSON.stringify(pkg.name + "/functions/node") + ";",
+    "import { readFile, FileCache, loadEnv } from " + JSON.stringify(pkg.name + "/functions/node") + ";",
     "import { LRUCache } from " + JSON.stringify(pkg.name + "/functions/portable") + ";",
     "declare const route: BaseApiRoute;",
     "declare const nodeAdapter: LocalFSAdapter;",
     "declare const portableBase: SkipoBase;",
     "declare const fileCache: FileCache<string>;",
     "declare const portableCache: LRUCache<string, number>;",
-    "void route; void nodeAdapter; void portableBase; void readFile; void fileCache; void portableCache;",
+    "void route; void nodeAdapter; void portableBase; void readFile; void fileCache; void portableCache; void loadEnv;",
   ].join("\n") + "\n");
   execFileSync(path.join(root, "node_modules", ".bin", "tsc"), [
     "--noEmit", "--target", "ES2022", "--module", "NodeNext", "--moduleResolution", "NodeNext",
