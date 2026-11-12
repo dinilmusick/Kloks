@@ -40,26 +40,27 @@ if (missingOnDisk.length) {
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "kloks-package-export-check-"));
 try {
-  const output = execFileSync(
+  const packOut = execFileSync(
     "npm",
-    ["pack", "--json", "--ignore-scripts", "--pack-destination", tempDir],
-    { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] }
+    ["pack", "--ignore-scripts", "--pack-destination", tempDir],
+    { cwd: root, encoding: "utf8" }
   );
-  const jsonStart = output.indexOf("[") !== -1 && (output.indexOf("{") === -1 || output.indexOf("[") < output.indexOf("{"))
-    ? output.indexOf("[")
-    : output.indexOf("{");
-  const raw = jsonStart !== -1 ? output.slice(jsonStart) : output;
-  const parsed = JSON.parse(raw);
-  const packed = Array.isArray(parsed) ? parsed[0] : parsed;
-  if (!packed?.filename || !Array.isArray(packed.files)) {
-    throw new Error("npm pack did not return its expected JSON artifact manifest.");
-  }
-  const packedFiles = new Set(packed.files.map((file) => file.path));
+  const tarballName = packOut.trim().split("\n").map((line) => line.trim()).filter(Boolean).pop();
+  const tarballPath = path.join(tempDir, tarballName);
+  const tarOutput = execFileSync("tar", ["-tzf", tarballPath], { encoding: "utf8" });
+  const packedFiles = new Set(
+    tarOutput
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => (line.startsWith("package/") ? line.slice("package/".length) : line))
+  );
+
   const missingFromTarball = [...exportTargets].filter((target) => !packedFiles.has(target));
   if (missingFromTarball.length) {
     throw new Error(`Package exports are absent from the npm tarball:\n${missingFromTarball.join("\n")}`);
   }
-  console.log(`Verified ${exportTargets.size} export targets in ${packed.filename}.`);
+  console.log(`Verified ${exportTargets.size} export targets in ${tarballName}.`);
 } finally {
   fs.rmSync(tempDir, { recursive: true, force: true });
 }
