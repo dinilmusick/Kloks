@@ -45,6 +45,29 @@ try {
   ].join("\n") + "\n");
   execFileSync(process.execPath, [platformProbe], {cwd: consumer, stdio: "pipe"});
 
+  const workerEntry = path.join(consumer, "worker.mjs");
+  fs.writeFileSync(workerEntry, [
+    "import { BaseApiRoute } from " + JSON.stringify(pkg.name + "/backend") + ";",
+    "class ProbeRoute extends BaseApiRoute { async handle(request) { return new Response('portable'); } }",
+    "export default { async fetch(request) { return new ProbeRoute().handle(request); } };",
+  ].join("\n") + "\n");
+  fs.writeFileSync(path.join(consumer, "wrangler.toml"), [
+    'name = "kloks-portability-consumer"',
+    'main = "worker.mjs"',
+    'compatibility_date = "2026-11-12"',
+  ].join("\n") + "\n");
+  execFileSync("npx", ["--yes", "wrangler@4.160.0", "deploy", "--dry-run", "--outdir", "worker-dist"], {cwd: consumer, stdio: "pipe"});
+  const workerBundle = path.join(consumer, "worker-dist", "worker.js");
+  if (!fs.existsSync(workerBundle)) throw new Error("Wrangler did not emit the expected Worker bundle.");
+  const bundleSource = fs.readFileSync(workerBundle, "utf8");
+  if (/(?:from|import\\s*\\()\\s*["'](?:node:)?(?:fs|fs\\/promises|child_process|path|os)["']/.test(bundleSource)) {
+    throw new Error("Portable Worker bundle contains a Node built-in import.");
+  }
+  if (/AudioContext|MIDIInput|MIDIOutput|AudioMidiOrchestratorDefinition|AudioInputManager/.test(bundleSource)) {
+    throw new Error("Portable Worker bundle contains browser audio/MIDI implementation code.");
+  }
+  console.log("CLOUDFLARE CONSUMER BUILD PASSED: " + Buffer.byteLength(bundleSource) + " bytes; no Node filesystem or audio/MIDI modules.");
+
   const resolveProbe = path.join(consumer, "resolve.mjs");
   const publicKeys = Object.keys(exportsMap).filter((key) => key !== "./gutts.manifest.json" && !key.endsWith("/*"));
   const specs = publicKeys.map((key) => key === "." ? pkg.name : pkg.name + key.slice(1));
