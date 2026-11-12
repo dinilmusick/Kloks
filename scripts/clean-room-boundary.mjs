@@ -51,7 +51,7 @@ try {
   const workerBundle = path.join(consumer, "worker-dist", "worker.js");
   if (!fs.existsSync(workerBundle)) throw new Error("Wrangler did not emit the expected Worker bundle.");
   const bundleSource = fs.readFileSync(workerBundle, "utf8");
-  if (/(?:from|import\\s*\\()\\s*["'](?:node:)?(?:fs|fs\\/promises|child_process|path|os)["']/.test(bundleSource)) {
+  if (/(?:from|import\s*\(|require\s*\()\s*["'](?:node:)?(?:fs|fs\/promises|child_process|path|os)["']/.test(bundleSource)) {
     throw new Error("Portable Worker bundle contains a Node built-in import.");
   }
   if (/AudioContext|MIDIInput|MIDIOutput|AudioMidiOrchestratorDefinition|AudioInputManager/.test(bundleSource)) {
