@@ -29,7 +29,7 @@ export class S3Adapter extends BaseStorageAdapter {
 
   private async ensureClient(): Promise<void> {
     if (this.client) return;
-    const storage = await import('@dinilmusick/gutts/storage');
+    const storage = await import('@aws-sdk/client-s3');
     this.S3ClientCtor = storage.S3Client;
     this.PutObjectCommandCtor = storage.PutObjectCommand;
     this.GetObjectCommandCtor = storage.GetObjectCommand;
