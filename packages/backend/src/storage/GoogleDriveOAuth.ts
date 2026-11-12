@@ -1,4 +1,4 @@
-import { google } from './googleDriveSdk.js';
+import { getGoogleSdk } from './googleDriveSdk.js';
 
 export interface GoogleDriveOAuthConfig {
   clientId: string;
@@ -35,9 +35,10 @@ export const GOOGLE_DRIVE_STORAGE_SCOPE = 'https://www.googleapis.com/auth/drive
 /** @deprecated Use GOOGLE_DRIVE_STORAGE_SCOPE for complete storage roots. */
 export const GOOGLE_DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 
-function createOAuthClient(config: GoogleDriveOAuthConfig): any {
+async function createOAuthClient(config: GoogleDriveOAuthConfig): Promise<any> {
   if (!config.clientId?.trim()) throw new Error('Google OAuth client ID is required.');
   if (!config.redirectUri?.trim()) throw new Error('Google OAuth redirect URI is required.');
+  const google = await getGoogleSdk();
   return new google.auth.OAuth2(config.clientId, config.clientSecret, config.redirectUri);
 }
 
@@ -51,18 +52,20 @@ export function createGoogleDriveAuthorizationUrl(
     throw new Error('PKCE code challenge cannot be empty.');
   }
 
-  const client = createOAuthClient(config);
-  return client.generateAuthUrl({
+  const params = new URLSearchParams({
+    client_id: config.clientId,
+    redirect_uri: config.redirectUri,
+    response_type: 'code',
+    scope: (config.scopes?.length ? config.scopes : [GOOGLE_DRIVE_STORAGE_SCOPE]).join(' '),
+    state,
     access_type: 'offline',
     prompt: 'consent',
-    include_granted_scopes: true,
-    response_type: 'code',
-    scope: config.scopes?.length ? config.scopes : [GOOGLE_DRIVE_STORAGE_SCOPE],
-    state,
+    include_granted_scopes: 'true',
     ...(codeChallenge
-      ? { code_challenge: codeChallenge, code_challenge_method: 'S256' as any }
+      ? { code_challenge: codeChallenge, code_challenge_method: 'S256' }
       : {}),
   });
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 }
 
 export async function exchangeGoogleDriveCode(
@@ -72,7 +75,7 @@ export async function exchangeGoogleDriveCode(
   existingRefreshToken?: string,
 ): Promise<GoogleDriveTokenSet> {
   if (!code?.trim()) throw new Error('Google OAuth authorization code is required.');
-  const client = createOAuthClient(config);
+  const client = await createOAuthClient(config);
 
   try {
     const { tokens } = await client.getToken({
@@ -111,6 +114,7 @@ export async function refreshGoogleDriveAccessToken(
     throw new Error('Google Drive refresh credentials are incomplete.');
   }
 
+  const google = await getGoogleSdk();
   const client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
   client.setCredentials({ refresh_token: refreshToken });
 
