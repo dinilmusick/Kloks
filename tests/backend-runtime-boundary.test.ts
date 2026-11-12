@@ -51,6 +51,8 @@ describe('Kloks portable and Node dependency graphs', () => {
     expect(result.files.length).toBeGreaterThan(0);
     expect(result.builtins).toEqual([]);
     expect(result.external.some((specifier) => specifier === '@kloks/functions' || specifier.startsWith('@kloks/functions/'))).toBe(false);
+    expect(result.external.some((specifier) => specifier.startsWith('@kloks/'))).toBe(false);
+    expect(result.external).not.toContain('@ultrst-armada/krnl');
     expect(result.files.some((file) => file.includes('client/'))).toBe(false);
     for (const file of result.files) {
       for (const name of blocked) expect(file).not.toContain(name);
