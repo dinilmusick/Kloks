@@ -31,6 +31,20 @@ try {
   fs.writeFileSync(importProbe, "await import(" + JSON.stringify(pkg.name) + ");\n");
   execFileSync(process.execPath, [importProbe], {cwd: consumer, stdio: "pipe"});
 
+  const platformProbe = path.join(consumer, "platform-probe.mjs");
+  fs.writeFileSync(platformProbe, [
+    "const backend = await import(" + JSON.stringify(pkg.name + "/backend") + ");",
+    "if (!backend.BaseApiRoute) throw new Error('Portable backend API entrypoint is missing BaseApiRoute');",
+    "const functions = await import(" + JSON.stringify(pkg.name + "/functions") + ");",
+    "if (functions.readFile || functions.execCmd) throw new Error('Portable functions entrypoint exposed Node-only utilities');",
+    "const base = await import(" + JSON.stringify(pkg.name + "/functions/base") + ");",
+    "if (!base.SkipoBase) throw new Error('Portable functions base subpath is missing SkipoBase');",
+    "const nodeFunctions = await import(" + JSON.stringify(pkg.name + "/functions/node") + ");",
+    "if (typeof nodeFunctions.readFile !== 'function' || typeof nodeFunctions.execCmd !== 'function') throw new Error('Node functions adapter is incomplete');",
+    "await import(" + JSON.stringify(pkg.name + "/backend/node") + ");",
+  ].join("\\n") + "\\n");
+  execFileSync(process.execPath, [platformProbe], {cwd: consumer, stdio: "pipe"});
+
   const resolveProbe = path.join(consumer, "resolve.mjs");
   const publicKeys = Object.keys(exportsMap).filter((key) => key !== "./gutts.manifest.json" && !key.endsWith("/*"));
   const specs = publicKeys.map((key) => key === "." ? pkg.name : pkg.name + key.slice(1));
