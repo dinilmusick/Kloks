@@ -16,6 +16,7 @@ export function resolveSystemDatabaseUrl(
   env: Record<string, string | undefined> = typeof process !== 'undefined' ? process.env : {}
 ): string {
   const url =
+    (env['SYSTEM_DATABASE_URL'] && env['SYSTEM_DATABASE_URL'].trim()) ||
     (env['SYSTEM_DATABASE_URL_1'] && env['SYSTEM_DATABASE_URL_1'].trim()) ||
     (env['SYSTEM_DATABASE_URL_2'] && env['SYSTEM_DATABASE_URL_2'].trim()) ||
     (env['SYSTEM_DATABASE_URL_3'] && env['SYSTEM_DATABASE_URL_3'].trim());
@@ -23,7 +24,7 @@ export function resolveSystemDatabaseUrl(
   if (!url) {
     throw new Error(
       '[SKIPO DATABASE_INVARIANT] Missing system database configuration.\n' +
-      '  Set SYSTEM_DATABASE_URL_1 (primary), SYSTEM_DATABASE_URL_2 (fallback #1),\n' +
+      '  Set SYSTEM_DATABASE_URL (primary), SYSTEM_DATABASE_URL_2 (fallback #1),\n' +
       '  or SYSTEM_DATABASE_URL_3 (fallback #2).\n' +
       '  Generic DATABASE_URL is obsolete and strictly forbidden in this architecture.'
     );
@@ -39,6 +40,7 @@ export function tryResolveSystemDatabaseUrl(
   env: Record<string, string | undefined> = typeof process !== 'undefined' ? process.env : {}
 ): string | null {
   const url =
+    (env['SYSTEM_DATABASE_URL'] && env['SYSTEM_DATABASE_URL'].trim()) ||
     (env['SYSTEM_DATABASE_URL_1'] && env['SYSTEM_DATABASE_URL_1'].trim()) ||
     (env['SYSTEM_DATABASE_URL_2'] && env['SYSTEM_DATABASE_URL_2'].trim()) ||
     (env['SYSTEM_DATABASE_URL_3'] && env['SYSTEM_DATABASE_URL_3'].trim());

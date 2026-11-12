@@ -25,9 +25,7 @@ export async function getPrimarySrklDeploymentUrl(env?: Record<string, unknown>)
   } catch (err: any) {
     console.warn('[SrklCore] Deployment DB lookup fallback:', err.message);
   }
-  const fallback = 'https://srkl-engine.vercel.app';
-  cachedSrklUrl = { url: fallback, expiresAt: Date.now() + 10 * 60 * 1000 };
-  return fallback;
+  return cachedSrklUrl?.url || '';
 }
 
 function deduplicateAccounts(items: any[]): any[] {

@@ -16,7 +16,7 @@ import type {
   EcosystemAccountsResponse,
 } from './types.js';
 
-export const CANONICAL_SRKL_URL = 'https://srkl-engine.vercel.app';
+export const CANONICAL_SRKL_URL = '';
 
 export class SrklClient {
   private baseUrl: string;

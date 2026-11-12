@@ -34,23 +34,21 @@ export async function getRegisteredSrklDeploymentUrls(
     } catch {}
   }
 
-  const fallback = ['https://srkl-engine.vercel.app'];
-  cachedSrklUrls = { urls: fallback, expiresAt: Date.now() + 10 * 60 * 1000 };
-  return fallback;
+  return cachedSrklUrls?.urls || [];
 }
 
 export async function getPrimarySrklDeploymentUrl(
   queryDb?: (sql: string, params?: unknown[]) => Promise<{ rows: any[] }>
 ): Promise<string> {
   const urls = await getRegisteredSrklDeploymentUrls(queryDb);
-  return urls[0] || 'https://srkl-engine.vercel.app';
+  return urls[0] || '';
 }
 
 export async function getNextSrklDeploymentUrl(
   queryDb?: (sql: string, params?: unknown[]) => Promise<{ rows: any[] }>
 ): Promise<string> {
   const urls = await getRegisteredSrklDeploymentUrls(queryDb);
-  if (urls.length === 0) return 'https://srkl-engine.vercel.app';
+  if (urls.length === 0) return '';
   const next = urls[roundRobinIndex % urls.length];
   roundRobinIndex = (roundRobinIndex + 1) % urls.length;
   return next;
