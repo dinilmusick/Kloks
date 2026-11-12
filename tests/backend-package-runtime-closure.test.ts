@@ -9,14 +9,14 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import * as ts from 'typescript';
 
 const repositoryRoot = process.cwd();
 const builtinNames = new Set(builtinModules.map((name) => name.replace(/^node:/, '')));
-const legacyDriveFile = /(?:^|[/\\])(?:GoogleDriveAdapter|GoogleDriveStorageService|GoogleDriveOAuth|googleDriveSdk)(?:\\.[cm]?js)?$/i;
-const googleSdkSpecifier = /^(?:googleapis|@googleapis)(?:\\/|$)/;
+const legacyDriveFile = /(?:^|[/\\])(?:GoogleDriveAdapter|googleDriveSdk)(?:\.[cm]?js)?$/i;
+const googleSdkSpecifier = /^(?:googleapis|@googleapis)(?:\/|$)/;
 
 function isInside(parent: string, candidate: string): boolean {
   const path = relative(parent, candidate);
