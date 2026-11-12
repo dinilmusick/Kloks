@@ -1,4 +1,4 @@
-import { SkipoBase } from '@kloks/functions';
+import { SkipoBase } from '@kloks/functions/base';
 import { IDataProvider, QueryFilter, SortOrder } from './types.js';
 
 export abstract class BaseDataProvider<T> extends SkipoBase implements IDataProvider<T> {
