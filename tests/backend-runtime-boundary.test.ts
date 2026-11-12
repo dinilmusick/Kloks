@@ -64,7 +64,12 @@ describe('Kloks portable and Node dependency graphs', () => {
     expect(portable.builtins).toEqual([]);
     expect(portable.files.some((file) => /\/(?:fs|fs-lock|shell)\.js$/.test(file))).toBe(false);
 
+    const portableFunctions = graphFrom(functionsDist, 'portable.js');
+    expect(portableFunctions.builtins).toEqual([]);
+    expect(portableFunctions.external).not.toContain('@ultrst-armada/krnl');
+
     const nodeFunctions = graphFrom(functionsDist, 'node.js');
+    expect(nodeFunctions.external).not.toContain('@ultrst-armada/krnl');
     expect(nodeFunctions.builtins.some((name) => ['fs', 'node:fs'].includes(name))).toBe(true);
     expect(nodeFunctions.builtins.some((name) => ['child_process', 'node:child_process'].includes(name))).toBe(true);
   });
@@ -88,11 +93,13 @@ describe('Kloks portable and Node dependency graphs', () => {
     const functionsPkg = JSON.parse(readFileSync(resolve(process.cwd(), 'packages/functions/package.json'), 'utf8'));
     expect(functionsPkg.exports['.'].import).toBe('./dist/index.js');
     expect(functionsPkg.exports['./base'].import).toBe('./dist/base.js');
+    expect(functionsPkg.exports['./portable'].import).toBe('./dist/portable.js');
     expect(functionsPkg.exports['./node'].import).toBe('./dist/node.js');
 
     const rootPkg = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'));
     expect(rootPkg.exports['./functions'].import).toBe('./packages/functions/dist/index.js');
     expect(rootPkg.exports['./functions/base'].import).toBe('./packages/functions/dist/base.js');
+    expect(rootPkg.exports['./functions/portable'].import).toBe('./packages/functions/dist/portable.js');
     expect(rootPkg.exports['./functions/node'].import).toBe('./packages/functions/dist/node.js');
     expect(rootPkg.exports['./backend'].import).toBe('./packages/backend/dist/index.js');
     expect(rootPkg.exports['./backend/node'].import).toBe('./packages/backend/dist/node.js');
