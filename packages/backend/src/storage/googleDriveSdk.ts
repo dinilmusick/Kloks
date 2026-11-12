@@ -8,7 +8,7 @@ let googleSdkPromise: Promise<any> | undefined;
 
 export async function getGoogleSdk(): Promise<any> {
   if (!googleSdkPromise) {
-    googleSdkPromise = import('@dinilmusick/gutts/storage')
+    googleSdkPromise = import('googleapis')
       .then((storage) => storage.google)
       .catch((error) => {
         googleSdkPromise = undefined;
