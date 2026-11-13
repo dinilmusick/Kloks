@@ -90,7 +90,7 @@ try {
         import: "./dist/storage/s3.js",
         default: "./dist/storage/s3.js",
       };
-      fs.writeFileSync(guttsPackageJsonPath, JSON.stringify(guttsPackageJson, null, 2) + "\\n");
+      fs.writeFileSync(guttsPackageJsonPath, JSON.stringify(guttsPackageJson, null, 2) + String.fromCharCode(10));
       console.warn("GUTTS NPM ARTIFACT GATE: installed GutTS tarball lacks ./storage/s3; applied the merged GutTS source contract fixture for Kloks integration checks.");
       console.warn("A real npm consumer remains blocked until a GutTS release containing dist/storage/s3.js and its export map is published.");
     } else {
@@ -145,6 +145,28 @@ try {
 
   const packageDir = path.join(consumer, "node_modules", ...pkg.name.split("/"));
   const packageJson = JSON.parse(fs.readFileSync(path.join(packageDir, "package.json"), "utf8"));
+  const backendRuntimeFiles = [];
+  const collectBackendRuntimeFiles = (dir) => {
+    if (!fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
+      const file = path.join(dir, entry.name);
+      if (entry.isDirectory()) collectBackendRuntimeFiles(file);
+      else if (/\\.(?:js|mjs|cjs|d\\.ts)$/.test(entry.name)) backendRuntimeFiles.push(file);
+    }
+  };
+  collectBackendRuntimeFiles(path.join(packageDir, "packages", "backend", "dist"));
+  const backendRuntimeSource = backendRuntimeFiles.map((file) => fs.readFileSync(file, "utf8")).join("\\n");
+  if (/(?:from\\s*|import\\s*\\(|require\\s*\\()\\s*["']googleapis["']/.test(backendRuntimeSource)) {
+    throw new Error("Packed backend runtime contains a direct Google Node SDK import.");
+  }
+  if (/(?:from\\s*|import\\s*\\(|require\\s*\\()\\s*["']@dinilmusick\\/gutts\\/storage["']/.test(backendRuntimeSource)) {
+    throw new Error("Packed backend runtime imports the aggregate GutTS storage entrypoint instead of a provider-specific subpath.");
+  }
+  const srklServiceFile = backendRuntimeFiles.find((file) => file.endsWith(path.join("core", "SrklStorageService.js")));
+  if (!srklServiceFile || !/from\\s*["']@dinilmusick\\/gutts\\/storage\\/s3["']/.test(fs.readFileSync(srklServiceFile, "utf8"))) {
+    throw new Error("Packed SRKL storage service does not retain the isolated GutTS S3 import.");
+  }
+  console.log("PACKED BACKEND DEPENDENCY BOUNDARY PASSED: no direct googleapis or aggregate GutTS storage imports.");
   if (packageJson.name !== pkg.name || packageJson.version !== pkg.version) throw new Error("Installed tarball metadata does not match source package metadata.");
 
   const files = [];
