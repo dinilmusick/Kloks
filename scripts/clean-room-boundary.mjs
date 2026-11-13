@@ -63,7 +63,27 @@ try {
   }
   console.log("CLOUDFLARE CONSUMER BUILD PASSED: " + Buffer.byteLength(bundleSource) + " bytes; no Node filesystem or audio/MIDI modules.");
 
-  // Install optional peers only after the portable Worker build; then verify opt-in adapters.
+  // Verify the actual installed registry artifact. Never patch or overlay it.
+  const guttsPackageDir = path.join(consumer, 'node_modules', '@dinilmusick', 'gutts');
+  const guttsPackageJsonPath = path.join(guttsPackageDir, 'package.json');
+  if (!fs.existsSync(guttsPackageJsonPath)) throw new Error('Installed GutTS package was not found.');
+  const guttsPackageJson = JSON.parse(fs.readFileSync(guttsPackageJsonPath, 'utf8'));
+  if (guttsPackageJson.version !== '2.1.0') throw new Error('Expected published GutTS 2.1.0; found ' + guttsPackageJson.version);
+  const s3Export = guttsPackageJson.exports?.['./storage/s3'];
+  const s3ExportPath = typeof s3Export === 'string' ? s3Export : s3Export?.import || s3Export?.default;
+  if (!s3ExportPath || !fs.existsSync(path.join(guttsPackageDir, s3ExportPath))) {
+    throw new Error('Installed GutTS registry artifact does not expose ./storage/s3 and its emitted runtime file.');
+  }
+  const s3TypesPath = typeof s3Export === 'object' ? s3Export.types : undefined;
+  if (!s3TypesPath || !fs.existsSync(path.join(guttsPackageDir, s3TypesPath))) {
+    throw new Error('Installed GutTS registry artifact does not expose the S3 declaration file.');
+  }
+  const s3 = await import('@dinilmusick/gutts/storage/s3');
+  if (typeof s3.S3Client !== 'function' || typeof s3.ListObjectsV2Command !== 'function') {
+    throw new Error('Published GutTS S3 runtime exports are incomplete.');
+  }
+  console.log('GUTTS NPM ARTIFACT CHECK PASSED: published 2.1.0 S3 JavaScript, declarations, and runtime exports.');
+
   const optionalPeers = Object.entries(pkg.peerDependenciesMeta || {})
     .filter(([name, meta]) => meta?.optional && pkg.peerDependencies?.[name])
     .map(([name]) => `${name}@${pkg.peerDependencies[name]}`);
@@ -109,6 +129,31 @@ try {
 
   const packageDir = path.join(consumer, "node_modules", ...pkg.name.split("/"));
   const packageJson = JSON.parse(fs.readFileSync(path.join(packageDir, "package.json"), "utf8"));
+  const backendRuntimeFiles = [];
+  const collectBackendRuntimeFiles = (dir) => {
+    if (!fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
+      const file = path.join(dir, entry.name);
+      if (entry.isDirectory()) collectBackendRuntimeFiles(file);
+      else if (/\.(?:js|mjs|cjs|d\.ts)$/.test(entry.name)) backendRuntimeFiles.push(file);
+    }
+  };
+  collectBackendRuntimeFiles(path.join(packageDir, "packages", "backend", "dist"));
+  const backendRuntimeSource = backendRuntimeFiles.map((file) => fs.readFileSync(file, "utf8")).join("\n");
+  if (/(?:from\s*|import\s*\(|require\s*\()\s*["']googleapis["']/.test(backendRuntimeSource)) {
+    throw new Error("Packed backend runtime contains a direct Google Node SDK import.");
+  }
+  if (/(?:from\s*|import\s*\(|require\s*\()\s*["']@dinilmusick\/gutts\/storage["']/.test(backendRuntimeSource)) {
+    throw new Error("Packed backend runtime imports the aggregate GutTS storage entrypoint instead of a provider-specific subpath.");
+  }
+  const backendRuntimeJavaScript = backendRuntimeFiles
+    .filter((file) => /\.(?:js|mjs|cjs)$/.test(file))
+    .map((file) => fs.readFileSync(file, "utf8"))
+    .join("\n");
+  if (!/from\s*["']@dinilmusick\/gutts\/storage\/s3["']/.test(backendRuntimeJavaScript)) {
+    throw new Error("Packed backend JavaScript does not retain the isolated GutTS S3 import.");
+  }
+  console.log("PACKED BACKEND DEPENDENCY BOUNDARY PASSED: no direct googleapis or aggregate GutTS storage imports.");
   if (packageJson.name !== pkg.name || packageJson.version !== pkg.version) throw new Error("Installed tarball metadata does not match source package metadata.");
 
   const files = [];

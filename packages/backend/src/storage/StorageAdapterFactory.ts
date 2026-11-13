@@ -1,11 +1,11 @@
 import { BaseStorageAdapter } from './BaseStorageAdapter.js';
-import { StorageConfig } from './types.js';
+import type { StorageConfig } from './types.js';
 import { LocalFSAdapter } from './LocalFSAdapter.js';
 import { BucketStorageService } from './BucketStorageService.js';
 import { BackblazeB2Adapter } from './BackblazeB2Adapter.js';
 import { SupabaseStorageAdapter } from './SupabaseStorageAdapter.js';
 import { GoogleDriveStorageService } from './GoogleDriveStorageService.js';
-import type { GoogleDriveRuntimeAuthOptions } from './GoogleDriveOAuth.js';
+import type { GoogleDriveRuntimeAuthOptions } from './GoogleDriveStorageService.js';
 
 export interface StorageAdapterRuntimeOptions {
   /** Server-only OAuth dependencies; never include these in persisted connection JSON. */

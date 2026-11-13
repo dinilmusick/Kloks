@@ -15,14 +15,11 @@ importers:
         specifier: ^3.1164.0
         version: 3.1165.0(@aws-sdk/client-s3@3.1164.0)
       '@dinilmusick/gutts':
-        specifier: ^2.0.2
-        version: 2.0.3(@aws-sdk/client-s3@3.1164.0)(@huggingface/transformers@4.3.2(@types/node@22.20.5))(cactus-needle@0.3.0)(googleapis@189.0.0)
+        specifier: ^2.1.0
+        version: 2.1.0(@aws-sdk/client-s3@3.1164.0)(@huggingface/transformers@4.3.2(@types/node@22.20.5))(cactus-needle@0.3.0)(googleapis@189.0.0)
       '@webcontainer/api':
         specifier: ^1.6.4
         version: 1.6.4
-      googleapis:
-        specifier: ^189.0.0
-        version: 189.0.0
       ws:
         specifier: ^8.18.0
         version: 8.22.0
@@ -92,8 +89,8 @@ importers:
         specifier: ^3.1164.0
         version: 3.1164.0
       '@dinilmusick/gutts':
-        specifier: ^2.0.2
-        version: 2.0.3(@aws-sdk/client-s3@3.1164.0)(@huggingface/transformers@4.3.2(@types/node@22.20.5))(cactus-needle@0.3.0)(googleapis@189.0.0)
+        specifier: ^2.1.0
+        version: 2.1.0(@aws-sdk/client-s3@3.1164.0)(@huggingface/transformers@4.3.2(@types/node@22.20.5))(cactus-needle@0.3.0)(googleapis@189.0.0)
       '@kloks/functions':
         specifier: workspace:*
         version: link:../functions
@@ -112,9 +109,6 @@ importers:
       '@webcontainer/api':
         specifier: ^1.6.4
         version: 1.6.4
-      googleapis:
-        specifier: ^189.0.0
-        version: 189.0.0
       react:
         specifier: ^18.0.0 || ^19.0.0
         version: 19.3.0
@@ -342,13 +336,13 @@ packages:
     engines: {node: '>=18.0.0'}
 
   '@dinilmusick/gutts@1.4.4':
-    resolution: {tarball: https://registry.npmjs.org/@dinilmusick/gutts/-/gutts-1.4.4.tgz}
+    resolution: {integrity: sha512-em0Yup7SLHLQFuCkXGEYSBG8FL38siPFtUtHJlDmk22aKb76U2S/iBfqjbqj6fXEdSUacuW8bF9u5TWbQlsjwQ==}
 
   '@dinilmusick/gutts@1.6.0':
     resolution: {integrity: sha512-HE5dL/CZUNiB7wF5xhzJ6UL6jLMv3Tp9BgcSgaUEKd2dZGRPEbCkB8XfCdSpdJKrmks/KB75U/GAunOREikfgg==}
 
-  '@dinilmusick/gutts@2.0.3':
-    resolution: {integrity: sha512-nOzfztCls6GfhIqJGA/hjVIbd7tGrezXWM5sMYrb8KJo/H1fmXQINO6ZK4i22hSEyXjKKn7A//qb6tdbeZ8rIg==}
+  '@dinilmusick/gutts@2.1.0':
+    resolution: {integrity: sha512-lY6aIJA7vFx1sPuV5fjYkvtrGOATrd7roUAx2srqrPAM6RT9XPYjzWD9CyskRzHODtJWlrI2fwXCN4NUSPBoDw==}
     peerDependencies:
       '@aws-sdk/client-s3': ^3.1164.0
       '@huggingface/transformers': ^4.3.2
@@ -2207,7 +2201,7 @@ snapshots:
       - ai
       - supports-color
 
-  '@dinilmusick/gutts@2.0.3(@aws-sdk/client-s3@3.1164.0)(@huggingface/transformers@4.3.2(@types/node@22.20.5))(cactus-needle@0.3.0)(googleapis@189.0.0)':
+  '@dinilmusick/gutts@2.1.0(@aws-sdk/client-s3@3.1164.0)(@huggingface/transformers@4.3.2(@types/node@22.20.5))(cactus-needle@0.3.0)(googleapis@189.0.0)':
     dependencies:
       lodash-es: 4.18.1
       validator: 13.15.35

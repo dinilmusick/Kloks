@@ -1,12 +1,12 @@
 {
   "name": "@ultrst-armada/kloks",
-  "version": "1.26.6",
+  "version": "2.0.0",
   "private": false,
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
-  "description": "Kloks — Public Backend, State-Graph, Audio/MIDI & Service Package Library built on KrnlTS (@kloks/*)",
+  "description": "Kloks \u2014 Public Backend, State-Graph, Audio/MIDI & Service Package Library built on KrnlTS (@kloks/*)",
   "type": "module",
   "main": "./index.js",
   "module": "./index.js",
@@ -271,7 +271,7 @@
     "verify:package-exports": "node scripts/verify-package-exports.mjs"
   },
   "dependencies": {
-    "@dinilmusick/gutts": "^2.0.2",
+    "@dinilmusick/gutts": "^2.1.0",
     "@webcontainer/api": "^1.6.4",
     "ws": "^8.18.0",
     "zod": "^3.24.1",
@@ -283,7 +283,6 @@
     "@neondatabase/serverless": "^0.10.0 || ^1.0.0",
     "@supabase/supabase-js": "^2.45.0",
     "@ultrst-armada/krnl": "^1.0.11",
-    "googleapis": "^189.0.0",
     "react": "^18.0.0 || ^19.0.0",
     "@types/node": ">=20.0.0",
     "@types/react": "^18.0.0 || ^19.0.0"
@@ -302,9 +301,6 @@
       "optional": true
     },
     "@ultrst-armada/krnl": {
-      "optional": true
-    },
-    "googleapis": {
       "optional": true
     },
     "react": {
