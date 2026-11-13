@@ -216,7 +216,7 @@ const packedConsumerProgram = [
   'assert.equal(identity.email, "drive@example.invalid");',
   'assert.equal(requests.length, 2, "Token refresh and Drive identity must both use the injected fetcher.");',
   'assert.equal(requests[0].url, "https://oauth2.googleapis.com/token");',
-  'assert.equal(requests[1].init.headers.Authorization, "Bearer fresh-access-token");',
+  'assert.equal(new Headers(requests[1].init.headers).get("authorization"), "Bearer fresh-access-token", "Drive requests must send the refreshed bearer token.");',
   'assert.equal(persisted.length, 1, "A successful token refresh must invoke injected persistence.");',
   'assert.equal(persisted[0].accessToken, "fresh-access-token");',
   'assert.equal(persisted[0].refreshToken, "existing-refresh-token", "Google omission of a replacement refresh token must preserve the existing token.");',
