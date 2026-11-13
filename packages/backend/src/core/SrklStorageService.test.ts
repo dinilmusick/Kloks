@@ -6,6 +6,14 @@ vi.mock('@dinilmusick/gutts/storage', () => {
   throw new Error('SRKL S3 storage must not load the aggregate GutTS storage entrypoint.');
 });
 
+type S3ClientTestHarness = typeof S3Client & {
+  instances: Array<InstanceType<typeof S3Client> & {
+    options: Record<string, unknown>;
+    commands: unknown[];
+  }>;
+};
+const TestS3Client = S3Client as S3ClientTestHarness;
+
 const account = {
   id: 'live-b2-account',
   name: 'Live B2 account',
@@ -28,7 +36,7 @@ describe('SRKL storage S3 dependency boundary', () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('VITEST', '');
     vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ accounts: [account] })));
-    S3Client.instances.length = 0;
+    TestS3Client.instances.length = 0;
   });
 
   it('loads S3 from the provider-specific GutTS entrypoint without the aggregate storage module', async () => {
@@ -36,8 +44,8 @@ describe('SRKL storage S3 dependency boundary', () => {
 
     await expect(service.listBuckets(account.id)).resolves.toEqual(['audio-vault']);
 
-    expect(S3Client.instances).toHaveLength(1);
-    expect(S3Client.instances[0].options).toEqual({
+    expect(TestS3Client.instances).toHaveLength(1);
+    expect(TestS3Client.instances[0].options).toEqual({
       endpoint: 'https://s3.us-west-004.backblazeb2.com',
       region: 'us-west-004',
       credentials: {
@@ -46,9 +54,9 @@ describe('SRKL storage S3 dependency boundary', () => {
       },
       forcePathStyle: true,
     });
-    expect(S3Client.instances[0].commands).toHaveLength(1);
-    expect(S3Client.instances[0].commands[0]).toBeInstanceOf(ListObjectsV2Command);
-    expect((S3Client.instances[0].commands[0] as ListObjectsV2Command).input).toEqual({
+    expect(TestS3Client.instances[0].commands).toHaveLength(1);
+    expect(TestS3Client.instances[0].commands[0]).toBeInstanceOf(ListObjectsV2Command);
+    expect((TestS3Client.instances[0].commands[0] as ListObjectsV2Command).input).toEqual({
       Bucket: 'audio-vault',
       MaxKeys: 1,
     });
@@ -58,13 +66,13 @@ describe('SRKL storage S3 dependency boundary', () => {
     const service = new SrklStorageService('https://srkl.example.test');
 
     await expect(service.verifyBucketAccess(account.id, 'audio-vault')).resolves.toBe(true);
-    expect(S3Client.instances).toHaveLength(1);
-    expect(S3Client.instances[0].commands[0]).toBeInstanceOf(ListObjectsV2Command);
+    expect(TestS3Client.instances).toHaveLength(1);
+    expect(TestS3Client.instances[0].commands[0]).toBeInstanceOf(ListObjectsV2Command);
   });
 
   it('retains the configured-bucket fallback when the S3 request fails', async () => {
     const service = new SrklStorageService('https://srkl.example.test');
-    const client = S3Client.instances;
+    const client = TestS3Client.instances;
     vi.spyOn(S3Client.prototype, 'send').mockRejectedValueOnce(new Error('access denied'));
 
     await expect(service.verifyBucketAccess(account.id, 'audio-vault')).resolves.toBe(true);
