@@ -20,9 +20,6 @@ importers:
       '@webcontainer/api':
         specifier: ^1.6.4
         version: 1.6.4
-      googleapis:
-        specifier: ^189.0.0
-        version: 189.0.0
       ws:
         specifier: ^8.18.0
         version: 8.22.0
@@ -112,9 +109,6 @@ importers:
       '@webcontainer/api':
         specifier: ^1.6.4
         version: 1.6.4
-      googleapis:
-        specifier: ^189.0.0
-        version: 189.0.0
       react:
         specifier: ^18.0.0 || ^19.0.0
         version: 19.3.0
