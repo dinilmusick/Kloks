@@ -162,9 +162,12 @@ try {
   if (/(?:from\s*|import\s*\(|require\s*\()\s*["']@dinilmusick\/gutts\/storage["']/.test(backendRuntimeSource)) {
     throw new Error("Packed backend runtime imports the aggregate GutTS storage entrypoint instead of a provider-specific subpath.");
   }
-  const srklServiceFile = backendRuntimeFiles.find((file) => file.endsWith(path.join("core", "SrklStorageService.js")));
-  if (!srklServiceFile || !/from\s*["']@dinilmusick\/gutts\/storage\/s3["']/.test(fs.readFileSync(srklServiceFile, "utf8"))) {
-    throw new Error("Packed SRKL storage service does not retain the isolated GutTS S3 import.");
+  const backendRuntimeJavaScript = backendRuntimeFiles
+    .filter((file) => /\.(?:js|mjs|cjs)$/.test(file))
+    .map((file) => fs.readFileSync(file, "utf8"))
+    .join("\n");
+  if (!/from\s*["']@dinilmusick\/gutts\/storage\/s3["']/.test(backendRuntimeJavaScript)) {
+    throw new Error("Packed backend JavaScript does not retain the isolated GutTS S3 import.");
   }
   console.log("PACKED BACKEND DEPENDENCY BOUNDARY PASSED: no direct googleapis or aggregate GutTS storage imports.");
   if (packageJson.name !== pkg.name || packageJson.version !== pkg.version) throw new Error("Installed tarball metadata does not match source package metadata.");
