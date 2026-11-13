@@ -16,9 +16,13 @@ declare module '@dinilmusick/gutts/storage/s3' {
 
   export class ListObjectsV2Command {
     constructor(input: ListObjectsV2Input);
+    readonly input: ListObjectsV2Input;
   }
 
   export class S3Client {
+    static instances: S3Client[];
+    readonly options: S3ClientOptions;
+    readonly commands: unknown[];
     constructor(options: S3ClientOptions);
     send(command: ListObjectsV2Command): Promise<unknown>;
   }
