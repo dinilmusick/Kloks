@@ -1,4 +1,4 @@
-import { S3Client, ListObjectsV2Command } from '@dinilmusick/gutts/storage/s3';
+import { S3Client, ListObjectsV2Command } from '@dinilmusick/gutts/storage';
 import { promises as fs } from 'fs';
 import path from 'path';
 
