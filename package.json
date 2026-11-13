@@ -6,7 +6,7 @@
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
-  "description": "Kloks — Public Backend, State-Graph, Audio/MIDI & Service Package Library built on KrnlTS (@kloks/*)",
+  "description": "Kloks \u2014 Public Backend, State-Graph, Audio/MIDI & Service Package Library built on KrnlTS (@kloks/*)",
   "type": "module",
   "main": "./index.js",
   "module": "./index.js",
@@ -271,7 +271,7 @@
     "verify:package-exports": "node scripts/verify-package-exports.mjs"
   },
   "dependencies": {
-    "@dinilmusick/gutts": "^2.0.2",
+    "@dinilmusick/gutts": "^2.1.0",
     "@webcontainer/api": "^1.6.4",
     "ws": "^8.18.0",
     "zod": "^3.24.1",

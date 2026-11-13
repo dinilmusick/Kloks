@@ -1,7 +1,7 @@
 {
   "name": "@kloks/backend",
   "version": "1.2.0",
-  "description": "Kloks Backend Services — Auth, Storage, Workspace, Control Plane, API, Connectivity & Execution built on KrnlTS",
+  "description": "Kloks Backend Services \u2014 Auth, Storage, Workspace, Control Plane, API, Connectivity & Execution built on KrnlTS",
   "type": "module",
   "private": false,
   "publishConfig": {
@@ -145,7 +145,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@dinilmusick/gutts": "^2.0.2",
+    "@dinilmusick/gutts": "^2.1.0",
     "@kloks/functions": "workspace:*",
     "@kloks/state-graph": "workspace:*",
     "@webcontainer/api": "^1.6.4",

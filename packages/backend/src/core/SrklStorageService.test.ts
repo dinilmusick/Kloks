@@ -2,6 +2,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { S3Client, ListObjectsV2Command } from '@dinilmusick/gutts/storage/s3';
 import { SrklStorageService } from './SrklStorageService.js';
 
+vi.mock('@dinilmusick/gutts/storage/s3', () => {
+  class MockListObjectsV2Command {
+    constructor(readonly input: { Bucket: string; MaxKeys: number }) {}
+  }
+  class MockS3Client {
+    static instances: MockS3Client[] = [];
+    readonly commands: unknown[] = [];
+    constructor(readonly options: Record<string, unknown>) { MockS3Client.instances.push(this); }
+    async send(command: unknown): Promise<unknown> { this.commands.push(command); return {}; }
+  }
+  return { S3Client: MockS3Client, ListObjectsV2Command: MockListObjectsV2Command };
+});
+
 vi.mock('@dinilmusick/gutts/storage', () => {
   throw new Error('SRKL S3 storage must not load the aggregate GutTS storage entrypoint.');
 });

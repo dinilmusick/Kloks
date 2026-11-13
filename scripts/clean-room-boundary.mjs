@@ -63,42 +63,26 @@ try {
   }
   console.log("CLOUDFLARE CONSUMER BUILD PASSED: " + Buffer.byteLength(bundleSource) + " bytes; no Node filesystem or audio/MIDI modules.");
 
-  // The GutTS S3 subpath is merged on GutTS main, but may not yet exist in the
-  // published tarball pinned by the current lockfile. Overlay only that exact
-  // public entrypoint contract for Kloks integration verification; retain every
-  // other file from the real installed GutTS package and report the release gate.
-  const guttsPackageDir = path.join(consumer, "node_modules", "@dinilmusick", "gutts");
-  const guttsPackageJsonPath = path.join(guttsPackageDir, "package.json");
-  if (fs.existsSync(guttsPackageJsonPath)) {
-    const guttsPackageJson = JSON.parse(fs.readFileSync(guttsPackageJsonPath, "utf8"));
-    const s3Export = guttsPackageJson.exports?.["./storage/s3"];
-    const s3ExportPath = typeof s3Export === "string"
-      ? s3Export
-      : s3Export?.import || s3Export?.default;
-    if (!s3ExportPath || !fs.existsSync(path.join(guttsPackageDir, s3ExportPath))) {
-      const fixtureDir = path.join(root, "tests", "fixtures", "gutts-s3-package");
-      const fixtureSource = path.join(fixtureDir, "storage", "s3.js");
-      if (!fs.existsSync(fixtureSource)) throw new Error("GutTS S3 contract fixture is missing.");
-      const targetDir = path.join(guttsPackageDir, "dist", "storage");
-      fs.mkdirSync(targetDir, {recursive: true});
-      fs.copyFileSync(fixtureSource, path.join(targetDir, "s3.js"));
-      const fixtureTypes = path.join(fixtureDir, "storage", "s3.d.ts");
-      if (fs.existsSync(fixtureTypes)) fs.copyFileSync(fixtureTypes, path.join(targetDir, "s3.d.ts"));
-      guttsPackageJson.exports = guttsPackageJson.exports || {};
-      guttsPackageJson.exports["./storage/s3"] = {
-        types: "./dist/storage/s3.d.ts",
-        import: "./dist/storage/s3.js",
-        default: "./dist/storage/s3.js",
-      };
-      fs.writeFileSync(guttsPackageJsonPath, JSON.stringify(guttsPackageJson, null, 2) + String.fromCharCode(10));
-      console.warn("GUTTS NPM ARTIFACT GATE: installed GutTS tarball lacks ./storage/s3; applied the merged GutTS source contract fixture for Kloks integration checks.");
-      console.warn("A real npm consumer remains blocked until a GutTS release containing dist/storage/s3.js and its export map is published.");
-    } else {
-      console.log("GUTTS NPM ARTIFACT CHECK PASSED: installed package exports ./storage/s3.");
-    }
-  } else {
-    throw new Error("Installed GutTS package was not found in the clean-room consumer.");
+  // Verify the actual installed registry artifact. Never patch or overlay it.
+  const guttsPackageDir = path.join(consumer, 'node_modules', '@dinilmusick', 'gutts');
+  const guttsPackageJsonPath = path.join(guttsPackageDir, 'package.json');
+  if (!fs.existsSync(guttsPackageJsonPath)) throw new Error('Installed GutTS package was not found.');
+  const guttsPackageJson = JSON.parse(fs.readFileSync(guttsPackageJsonPath, 'utf8'));
+  if (guttsPackageJson.version !== '2.1.0') throw new Error('Expected published GutTS 2.1.0; found ' + guttsPackageJson.version);
+  const s3Export = guttsPackageJson.exports?.['./storage/s3'];
+  const s3ExportPath = typeof s3Export === 'string' ? s3Export : s3Export?.import || s3Export?.default;
+  if (!s3ExportPath || !fs.existsSync(path.join(guttsPackageDir, s3ExportPath))) {
+    throw new Error('Installed GutTS registry artifact does not expose ./storage/s3 and its emitted runtime file.');
   }
+  const s3TypesPath = typeof s3Export === 'object' ? s3Export.types : undefined;
+  if (!s3TypesPath || !fs.existsSync(path.join(guttsPackageDir, s3TypesPath))) {
+    throw new Error('Installed GutTS registry artifact does not expose the S3 declaration file.');
+  }
+  const s3 = await import('@dinilmusick/gutts/storage/s3');
+  if (typeof s3.S3Client !== 'function' || typeof s3.ListObjectsV2Command !== 'function') {
+    throw new Error('Published GutTS S3 runtime exports are incomplete.');
+  }
+  console.log('GUTTS NPM ARTIFACT CHECK PASSED: published 2.1.0 S3 JavaScript, declarations, and runtime exports.');
 
   const optionalPeers = Object.entries(pkg.peerDependenciesMeta || {})
     .filter(([name, meta]) => meta?.optional && pkg.peerDependencies?.[name])
