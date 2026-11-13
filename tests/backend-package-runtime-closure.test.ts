@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -234,16 +235,17 @@ describe('Kloks packed portable runtime closure', () => {
     mkdirSync(consumerDirectory, { recursive: true });
 
     try {
-      const packOutput = execFileSync(
+      execFileSync(
         'npm',
-        ['pack', '--json', '--ignore-scripts', '--pack-destination', packDirectory],
+        ['pack', '--ignore-scripts', '--pack-destination', packDirectory],
         { cwd: repositoryRoot, encoding: 'utf8', timeout: 120_000 },
       );
-      const packRecords = JSON.parse(packOutput) as Array<{ filename: string; name?: string; version?: string; size?: number; unpackedSize?: number }>;
-      const filename = packRecords[0]?.filename;
-      expect(filename).toBeTruthy();
-
-      const tarball = join(packDirectory, filename!);
+      // Do not depend on npm CLI JSON output shape: the release workflow upgrades
+      // npm independently of the project toolchain. The generated tarball itself
+      // is the stable artifact contract.
+      const packedFiles = readdirSync(packDirectory).filter((name) => name.endsWith('.tgz'));
+      expect(packedFiles, 'npm pack must produce exactly one package tarball.').toHaveLength(1);
+      const tarball = join(packDirectory, packedFiles[0]);
       const consumerManifest = {
         name: 'kloks-packed-runtime-closure-consumer',
         version: '1.0.0',
@@ -295,7 +297,7 @@ describe('Kloks packed portable runtime closure', () => {
         encoding: 'utf8',
         timeout: 60_000,
       });
-      console.log('[kloks-packed-runtime-closure] ' + JSON.stringify({ package: { name: packedManifest.name, version: packedManifest.version, tarball: filename, size: packRecords[0]?.size, unpackedSize: packRecords[0]?.unpackedSize }, portableEntrypoints: graphResults, consumer: consumerOutput.trim() }));
+      console.log('[kloks-packed-runtime-closure] ' + JSON.stringify({ package: { name: packedManifest.name, version: packedManifest.version, tarball: packedFiles[0] }, portableEntrypoints: graphResults, consumer: consumerOutput.trim() }));
     } finally {
       rmSync(temporaryRoot, { recursive: true, force: true });
     }
