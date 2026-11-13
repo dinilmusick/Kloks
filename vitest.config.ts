@@ -4,6 +4,7 @@ import path from 'path';
 export default defineConfig({
   resolve: {
     alias: {
+      '@dinilmusick/gutts/storage/s3': path.resolve(__dirname, 'tests/fixtures/gutts-storage-s3.ts'),
       '@kloks/functions/base': path.resolve(__dirname, 'packages/functions/dist/base.js'),
       '@kloks/functions/portable': path.resolve(__dirname, 'packages/functions/dist/portable.js'),
       '@kloks/functions': path.resolve(__dirname, 'packages/functions/dist/index.js'),
