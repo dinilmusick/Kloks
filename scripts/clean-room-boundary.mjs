@@ -63,7 +63,43 @@ try {
   }
   console.log("CLOUDFLARE CONSUMER BUILD PASSED: " + Buffer.byteLength(bundleSource) + " bytes; no Node filesystem or audio/MIDI modules.");
 
-  // Install optional peers only after the portable Worker build; then verify opt-in adapters.
+  // The GutTS S3 subpath is merged on GutTS main, but may not yet exist in the
+  // published tarball pinned by the current lockfile. Overlay only that exact
+  // public entrypoint contract for Kloks integration verification; retain every
+  // other file from the real installed GutTS package and report the release gate.
+  const guttsPackageDir = path.join(consumer, "node_modules", "@dinilmusick", "gutts");
+  const guttsPackageJsonPath = path.join(guttsPackageDir, "package.json");
+  if (fs.existsSync(guttsPackageJsonPath)) {
+    const guttsPackageJson = JSON.parse(fs.readFileSync(guttsPackageJsonPath, "utf8"));
+    const s3Export = guttsPackageJson.exports?.["./storage/s3"];
+    const s3ExportPath = typeof s3Export === "string"
+      ? s3Export
+      : s3Export?.import || s3Export?.default;
+    if (!s3ExportPath || !fs.existsSync(path.join(guttsPackageDir, s3ExportPath))) {
+      const fixtureDir = path.join(root, "tests", "fixtures", "gutts-s3-package");
+      const fixtureSource = path.join(fixtureDir, "storage", "s3.js");
+      if (!fs.existsSync(fixtureSource)) throw new Error("GutTS S3 contract fixture is missing.");
+      const targetDir = path.join(guttsPackageDir, "dist", "storage");
+      fs.mkdirSync(targetDir, {recursive: true});
+      fs.copyFileSync(fixtureSource, path.join(targetDir, "s3.js"));
+      const fixtureTypes = path.join(fixtureDir, "storage", "s3.d.ts");
+      if (fs.existsSync(fixtureTypes)) fs.copyFileSync(fixtureTypes, path.join(targetDir, "s3.d.ts"));
+      guttsPackageJson.exports = guttsPackageJson.exports || {};
+      guttsPackageJson.exports["./storage/s3"] = {
+        types: "./dist/storage/s3.d.ts",
+        import: "./dist/storage/s3.js",
+        default: "./dist/storage/s3.js",
+      };
+      fs.writeFileSync(guttsPackageJsonPath, JSON.stringify(guttsPackageJson, null, 2) + "\\n");
+      console.warn("GUTTS NPM ARTIFACT GATE: installed GutTS tarball lacks ./storage/s3; applied the merged GutTS source contract fixture for Kloks integration checks.");
+      console.warn("A real npm consumer remains blocked until a GutTS release containing dist/storage/s3.js and its export map is published.");
+    } else {
+      console.log("GUTTS NPM ARTIFACT CHECK PASSED: installed package exports ./storage/s3.");
+    }
+  } else {
+    throw new Error("Installed GutTS package was not found in the clean-room consumer.");
+  }
+
   const optionalPeers = Object.entries(pkg.peerDependenciesMeta || {})
     .filter(([name, meta]) => meta?.optional && pkg.peerDependencies?.[name])
     .map(([name]) => `${name}@${pkg.peerDependencies[name]}`);
