@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   CanonicalAuthClient,
   DEFAULT_LUTH_URL,
@@ -64,5 +64,49 @@ describe('Kloks public canonical auth entrypoint', () => {
     expect(body.jsonrpc).toBe('2.0');
     expect(body.error?.code).toBe(-32001);
     expect(body.error?.message).toBe('A verified Luth session is required.');
+  });
+});
+
+describe('createUniversalAuthFetch shared transport contract', () => {
+  it('injects canonical headers and defaults credentials to include', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response('ok'));
+    vi.stubGlobal('fetch', fetchMock);
+    const { createUniversalAuthFetch } = await import('./auth.js');
+    const authFetch = createUniversalAuthFetch({ getAuthHeaders: () => ({ Authorization: 'Bearer luth-token', 'X-Luth-App': 'aiko' }) });
+    await authFetch('/api/private', { headers: { 'X-Trace-Id': 'trace-1' } });
+    const [, init] = fetchMock.mock.calls[0];
+    const headers = new Headers(init?.headers);
+    expect(headers.get('authorization')).toBe('Bearer luth-token');
+    expect(headers.get('x-luth-app')).toBe('aiko');
+    expect(headers.get('x-trace-id')).toBe('trace-1');
+    expect(init?.credentials).toBe('include');
+  });
+
+  it('preserves caller Authorization and caller-supplied headers', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response('ok'));
+    vi.stubGlobal('fetch', fetchMock);
+    const { createUniversalAuthFetch } = await import('./auth.js');
+    const authFetch = createUniversalAuthFetch({ getAuthHeaders: () => ({ Authorization: 'Bearer canonical-token' }) });
+    const requestHeaders = new Headers({ 'X-Trace-Id': 'immutable' });
+    await authFetch('/api/private', { headers: requestHeaders, credentials: 'same-origin' });
+    const [, init] = fetchMock.mock.calls[0];
+    expect(new Headers(init?.headers).get('authorization')).toBe('Bearer canonical-token');
+    expect(new Headers(init?.headers).get('x-trace-id')).toBe('immutable');
+    expect(init?.credentials).toBe('same-origin');
+    expect(requestHeaders.has('authorization')).toBe(false);
+  });
+
+  it('merges Request input headers with init and canonical headers', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response('ok'));
+    vi.stubGlobal('fetch', fetchMock);
+    const { createUniversalAuthFetch } = await import('./auth.js');
+    const authFetch = createUniversalAuthFetch({ getAuthHeaders: () => ({ Authorization: 'Bearer luth-token' }) });
+    const request = new Request('https://example.test/api/private', { headers: { 'X-From-Request': 'request' } });
+    await authFetch(request, { headers: { 'X-From-Init': 'init' } });
+    const [, init] = fetchMock.mock.calls[0];
+    const headers = new Headers(init?.headers);
+    expect(headers.get('x-from-request')).toBe('request');
+    expect(headers.get('x-from-init')).toBe('init');
+    expect(headers.get('authorization')).toBe('Bearer luth-token');
   });
 });
