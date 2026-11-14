@@ -44,4 +44,25 @@ describe('Kloks public canonical auth entrypoint', () => {
     expect(protectedResult instanceof Response).toBe(true);
     expect((protectedResult as Response).status).toBe(401);
   });
+
+  it('extracts token across Bearer, x-api-key, Better-Auth cookies, and luth_session', async () => {
+    const { extractLuthToken } = await import('./auth.js');
+    expect(extractLuthToken(new Request('https://a.test', { headers: { authorization: 'Bearer token-1' } }))).toBe('token-1');
+    expect(extractLuthToken(new Request('https://a.test', { headers: { 'x-api-key': 'key-2' } }))).toBe('key-2');
+    expect(extractLuthToken(new Request('https://a.test', { headers: { cookie: 'better-auth.session_token=ba-token' } }))).toBe('ba-token');
+    expect(extractLuthToken(new Request('https://a.test', { headers: { cookie: '__Secure-better-auth.session_token=sec-token' } }))).toBe('sec-token');
+    expect(extractLuthToken(new Request('https://a.test', { headers: { cookie: 'luth_session=ls-token' } }))).toBe('ls-token');
+  });
+
+  it('formats unauthenticated MCP requests as JSON-RPC 2.0 error', async () => {
+    const { verifyLuthRequest } = await import('./auth.js');
+    const mcpReq = new Request('https://aiko.test/api/mcp', { method: 'POST' });
+    const res = await verifyLuthRequest(mcpReq);
+    expect(res instanceof Response).toBe(true);
+    expect((res as Response).status).toBe(401);
+    const body = await (res as Response).json();
+    expect(body.jsonrpc).toBe('2.0');
+    expect(body.error?.code).toBe(-32001);
+    expect(body.error?.message).toBe('A verified Luth session is required.');
+  });
 });

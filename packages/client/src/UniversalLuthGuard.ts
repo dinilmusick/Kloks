@@ -26,15 +26,18 @@ export function extractLuthToken(request: Request): string {
   const authorization = request.headers.get('authorization') || '';
   const bearer = /^Bearer\s+([^\s]+)$/i.exec(authorization.trim());
   if (bearer) return bearer[1];
-  const cookie = (request.headers.get('cookie') || '')
-    .split(';')
-    .map(c => c.trim())
-    .find(c => c.startsWith('luth_session='));
-  if (cookie) {
-    try {
-      return decodeURIComponent(cookie.slice('luth_session='.length));
-    } catch {
-      return '';
+  const apiKey = request.headers.get('x-api-key')?.trim();
+  if (apiKey) return apiKey;
+  const cookieHeader = request.headers.get('cookie') || '';
+  const cookies = cookieHeader.split(';').map(c => c.trim());
+  for (const prefix of ['better-auth.session_token=', '__Secure-better-auth.session_token=', 'luth_session=']) {
+    const found = cookies.find(c => c.startsWith(prefix));
+    if (found) {
+      try {
+        return decodeURIComponent(found.slice(prefix.length));
+      } catch {
+        return '';
+      }
     }
   }
   return '';
@@ -55,12 +58,13 @@ export async function verifyLuthRequest(
   if (request.method === 'OPTIONS') return null;
   if (isPublicRoute(url.pathname, options?.extraPublicRoutes)) return null;
 
+  const isMcp = url.pathname.includes('/mcp');
   const token = extractLuthToken(request);
   if (!token) {
-    return new Response(
-      JSON.stringify({ success: false, error: 'A verified Luth session is required.' }),
-      { status: 401, headers: { 'Content-Type': 'application/json' } }
-    );
+    const payload = isMcp
+      ? { jsonrpc: '2.0', id: null, error: { code: -32001, message: 'A verified Luth session is required.' } }
+      : { success: false, error: 'A verified Luth session is required.' };
+    return new Response(JSON.stringify(payload), { status: 401, headers: { 'Content-Type': 'application/json' } });
   }
 
   const now = Date.now();
@@ -80,19 +84,19 @@ export async function verifyLuthRequest(
     });
 
     if (!res.ok) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'The Luth session is invalid or expired.' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
-      );
+      const payload = isMcp
+        ? { jsonrpc: '2.0', id: null, error: { code: -32001, message: 'The Luth session is invalid or expired.' } }
+        : { success: false, error: 'The Luth session is invalid or expired.' };
+      return new Response(JSON.stringify(payload), { status: 401, headers: { 'Content-Type': 'application/json' } });
     }
 
     const data = await res.json() as any;
     const user = data?.user || (data?.authenticated ? data?.session?.user : null);
     if (!user || !user.id) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'The Luth session is invalid or expired.' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
-      );
+      const payload = isMcp
+        ? { jsonrpc: '2.0', id: null, error: { code: -32001, message: 'The Luth session is invalid or expired.' } }
+        : { success: false, error: 'The Luth session is invalid or expired.' };
+      return new Response(JSON.stringify(payload), { status: 401, headers: { 'Content-Type': 'application/json' } });
     }
 
     const principal: LuthPrincipal = {
@@ -105,9 +109,9 @@ export async function verifyLuthRequest(
     sessionCache.set(token, { principal, expiresAt: now + SESSION_CACHE_TTL_MS });
     return principal;
   } catch {
-    return new Response(
-      JSON.stringify({ success: false, error: 'Canonical Luth authentication service unavailable.' }),
-      { status: 503, headers: { 'Content-Type': 'application/json' } }
-    );
+    const payload = isMcp
+      ? { jsonrpc: '2.0', id: null, error: { code: -32603, message: 'Canonical Luth authentication service unavailable.' } }
+      : { success: false, error: 'Canonical Luth authentication service unavailable.' };
+    return new Response(JSON.stringify(payload), { status: 503, headers: { 'Content-Type': 'application/json' } });
   }
 }

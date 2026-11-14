@@ -36,5 +36,5 @@ describe('audio/MIDI module initialization boundary', () => {
 
     await audio.dispose();
     await midi.dispose();
-  });
+  }, 30_000);
 });

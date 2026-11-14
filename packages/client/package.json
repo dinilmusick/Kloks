@@ -1,6 +1,6 @@
 {
   "name": "@kloks/client",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Kloks Browser-Safe Execution Client & Shared Contracts with Zero Server Closure",
   "type": "module",
   "private": false,
