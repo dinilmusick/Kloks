@@ -29,8 +29,10 @@ describe('withAuth', () => {
     ['multiple token segments', 'Bearer first second'],
   ])('rejects %s without calling the verifier', async (_label, authorization) => {
     const verify = vi.fn(async () => true);
-    const headers = authorization === undefined ? undefined : { authorization };
-    const result = await withAuth(verify)(new Request('https://example.test/api/private', { headers }));
+    const request = authorization === undefined
+      ? new Request('https://example.test/api/private')
+      : new Request('https://example.test/api/private', { headers: { authorization } });
+    const result = await withAuth(verify)(request);
     expect(result?.status).toBe(401);
     expect(verify).not.toHaveBeenCalled();
   });
