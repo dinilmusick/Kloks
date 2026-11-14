@@ -37,3 +37,12 @@ export {
   LuthAuthClient as CanonicalAuthClient,
   createLuthAuthClient as createCanonicalAuthClient,
 } from '@dinilmusick/gutts/auth';
+
+export {
+  CANONICAL_PUBLIC_ROUTES,
+  extractLuthToken,
+  isPublicRoute,
+  verifyLuthRequest,
+} from './UniversalLuthGuard.js';
+export type { LuthPrincipal } from './UniversalLuthGuard.js';
+
