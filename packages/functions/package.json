@@ -34,7 +34,7 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts src/base.ts src/portable.ts src/node.ts --format esm --dts --clean --external zod --external ws --external @ultrst-armada/krnl",
+    "build": "tsup src/index.ts src/base.ts src/portable.ts src/node.ts --format esm --clean --external zod --external ws --external @ultrst-armada/krnl && tsc --emitDeclarationOnly --declaration --project tsconfig.json",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },

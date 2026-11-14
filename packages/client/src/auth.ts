@@ -49,7 +49,17 @@ export type { LuthPrincipal } from './UniversalLuthGuard.js';
 /** Creates an authenticated fetch function that automatically injects Luth bearer headers and credentials: 'include'. */
 export function createUniversalAuthFetch(authClient: { getAuthHeaders: () => HeadersInit }) {
   return async function universalAuthFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
-    const headers = new Headers(init.headers);
+    const headers = new Headers();
+    if (typeof input === 'object' && input !== null && 'headers' in input && input.headers) {
+      new Headers(input.headers).forEach((value, key) => {
+        headers.set(key, value);
+      });
+    }
+    if (init.headers) {
+      new Headers(init.headers).forEach((value, key) => {
+        headers.set(key, value);
+      });
+    }
     new Headers(authClient.getAuthHeaders()).forEach((value, key) => {
       if (!headers.has(key)) headers.set(key, value);
     });
