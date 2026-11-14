@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   CanonicalAuthClient,
   DEFAULT_LUTH_URL,
@@ -68,6 +68,7 @@ describe('Kloks public canonical auth entrypoint', () => {
 });
 
 describe('createUniversalAuthFetch shared transport contract', () => {
+  afterEach(() => vi.unstubAllGlobals());
   it('injects canonical headers and defaults credentials to include', async () => {
     const fetchMock = vi.fn<typeof fetch>(async () => new Response('ok'));
     vi.stubGlobal('fetch', fetchMock);
