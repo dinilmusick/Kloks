@@ -1,9 +1,8 @@
-import {
-  createWasmRuntime,
-  type BrowserWasmRuntimeOptions,
-  type RuntimeExecuteRequest,
-  type RuntimeResult,
-  type WasmRuntime,
+import type {
+  BrowserWasmRuntimeOptions,
+  RuntimeExecuteRequest,
+  RuntimeResult,
+  WasmRuntime,
 } from "@kloks/wasm-runtime";
 import {
   createService,
@@ -15,7 +14,10 @@ import {
 let runtime: WasmRuntime | undefined;
 
 async function getRuntime(options: BrowserWasmRuntimeOptions = {}): Promise<WasmRuntime> {
-  runtime ??= await createWasmRuntime(options);
+  if (!runtime) {
+    const { createWasmRuntime } = await import("@kloks/wasm-runtime");
+    runtime = await createWasmRuntime(options);
+  }
   return runtime;
 }
 
