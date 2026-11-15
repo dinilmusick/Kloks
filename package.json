@@ -36,6 +36,21 @@
       "import": "./packages/functions/dist/index.js",
       "default": "./packages/functions/dist/index.js"
     },
+    "./functions/base": {
+      "types": "./packages/functions/dist/base.d.ts",
+      "import": "./packages/functions/dist/base.js",
+      "default": "./packages/functions/dist/base.js"
+    },
+    "./functions/node": {
+      "types": "./packages/functions/dist/node.d.ts",
+      "import": "./packages/functions/dist/node.js",
+      "default": "./packages/functions/dist/node.js"
+    },
+    "./functions/portable": {
+      "types": "./packages/functions/dist/portable.d.ts",
+      "import": "./packages/functions/dist/portable.js",
+      "default": "./packages/functions/dist/portable.js"
+    },
     "./state-graph": {
       "browser": "./packages/state-graph/dist/browser.js",
       "types": "./packages/state-graph/dist/index.d.ts",
