@@ -68,7 +68,7 @@ try {
   const guttsPackageJsonPath = path.join(guttsPackageDir, 'package.json');
   if (!fs.existsSync(guttsPackageJsonPath)) throw new Error('Installed GutTS package was not found.');
   const guttsPackageJson = JSON.parse(fs.readFileSync(guttsPackageJsonPath, 'utf8'));
-  if (guttsPackageJson.version !== '2.1.0') throw new Error('Expected published GutTS 2.1.0; found ' + guttsPackageJson.version);
+  if (!/^2\.1\./.test(guttsPackageJson.version)) throw new Error('Expected published GutTS ^2.1.0; found ' + guttsPackageJson.version);
   const s3Export = guttsPackageJson.exports?.['./storage/s3'];
   const s3ExportPath = typeof s3Export === 'string' ? s3Export : s3Export?.import || s3Export?.default;
   if (!s3ExportPath || !fs.existsSync(path.join(guttsPackageDir, s3ExportPath))) {
@@ -82,7 +82,7 @@ try {
   if (typeof s3.S3Client !== 'function' || typeof s3.ListObjectsV2Command !== 'function') {
     throw new Error('Published GutTS S3 runtime exports are incomplete.');
   }
-  console.log('GUTTS NPM ARTIFACT CHECK PASSED: published 2.1.0 S3 JavaScript, declarations, and runtime exports.');
+  console.log('GUTTS NPM ARTIFACT CHECK PASSED: published ' + guttsPackageJson.version + ' S3 JavaScript, declarations, and runtime exports.');
 
   const optionalPeers = Object.entries(pkg.peerDependenciesMeta || {})
     .filter(([name, meta]) => meta?.optional && pkg.peerDependencies?.[name])
