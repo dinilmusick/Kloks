@@ -150,7 +150,7 @@ try {
     .filter((file) => /\.(?:js|mjs|cjs)$/.test(file))
     .map((file) => fs.readFileSync(file, "utf8"))
     .join("\n");
-  if (!/from\s*["']@dinilmusick\/gutts\/storage\/s3["']/.test(backendRuntimeJavaScript)) {
+  if (!/(?:from\s*|import\s*\()\s*["']@dinilmusick\/gutts\/storage\/s3["']/.test(backendRuntimeJavaScript)) {
     throw new Error("Packed backend JavaScript does not retain the isolated GutTS S3 import.");
   }
   console.log("PACKED BACKEND DEPENDENCY BOUNDARY PASSED: no direct googleapis or aggregate GutTS storage imports.");

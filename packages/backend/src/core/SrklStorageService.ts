@@ -1,4 +1,4 @@
-import { S3Client, ListObjectsV2Command } from '@dinilmusick/gutts/storage/s3';
+import type { S3Client, ListObjectsV2Command } from '@dinilmusick/gutts/storage/s3';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -73,9 +73,10 @@ export class SrklStorageService {
     return account;
   }
 
-  private createB2Client(account: SrklB2Account): S3Client {
+  private async createB2Client(account: SrklB2Account): Promise<S3Client> {
+    const { S3Client: S3ClientCtor } = await import('@dinilmusick/gutts/storage/s3');
     const endpoint = account.endpoint.startsWith('http') ? account.endpoint : `https://${account.endpoint}`;
-    return new S3Client({
+    return new S3ClientCtor({
       endpoint,
       region: account.region || 'us-west-004',
       credentials: { accessKeyId: account.keyId, secretAccessKey: account.applicationKey },
@@ -89,9 +90,10 @@ export class SrklStorageService {
     if (this.isSimulated(account.id)) return ['audio-masters-vault', 'projects-archive', 'dsp-stems-raw'];
 
     try {
-      const client = this.createB2Client(account);
+      const client = await this.createB2Client(account);
+      const { ListObjectsV2Command: ListObjectsV2CommandCtor } = await import('@dinilmusick/gutts/storage/s3');
       if (account.bucketName) {
-        await client.send(new ListObjectsV2Command({ Bucket: account.bucketName, MaxKeys: 1 }));
+        await client.send(new ListObjectsV2CommandCtor({ Bucket: account.bucketName, MaxKeys: 1 }));
         return [account.bucketName];
       }
     } catch (err: any) {
@@ -110,8 +112,9 @@ export class SrklStorageService {
     if (this.isSimulated(account.id)) return Boolean(bucketName && bucketName.trim().length > 0);
 
     try {
-      const client = this.createB2Client(account);
-      await client.send(new ListObjectsV2Command({ Bucket: bucketName, MaxKeys: 1 }));
+      const client = await this.createB2Client(account);
+      const { ListObjectsV2Command: ListObjectsV2CommandCtor } = await import('@dinilmusick/gutts/storage/s3');
+      await client.send(new ListObjectsV2CommandCtor({ Bucket: bucketName, MaxKeys: 1 }));
       return true;
     } catch {
       return Boolean(account.bucketName && account.bucketName === bucketName);
