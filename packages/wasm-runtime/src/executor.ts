@@ -1,4 +1,3 @@
-import { createBrowserEngine } from "../vendor/forge/browser/dist/index.js";
 import type { RuntimeExecuteRequest, RuntimeResult, WasmRuntime } from "./types.js";
 import { ForgeToolchainResolver } from "./toolchainResolver.js";
 
@@ -19,7 +18,7 @@ export interface WasmExecutor {
 export class ForgeWasmExecutor implements WasmExecutor {
   private disposed = false;
 
-  constructor(private readonly engine: Awaited<ReturnType<typeof createBrowserEngine>>) {}
+  constructor(private readonly engine: { execute: (...args: any[]) => Promise<any>; dispose: () => void }) {}
 
   async execute(request: RuntimeExecuteRequest, language: "rust" | "go"): Promise<RuntimeResult> {
     if (this.disposed) throw new Error("Forge WASM executor has been disposed.");
@@ -88,6 +87,7 @@ export class ForgeWasmExecutor implements WasmExecutor {
 }
 
 export async function createForgeWasmExecutor(baseUrl: string): Promise<ForgeWasmExecutor> {
+  const { createBrowserEngine } = await import("../vendor/forge/browser/dist/index.js");
   const resolver = new ForgeToolchainResolver();
   const engine = await createBrowserEngine({
     artifactCache: true,
