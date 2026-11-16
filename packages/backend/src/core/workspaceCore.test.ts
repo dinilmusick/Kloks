@@ -124,6 +124,38 @@ describe('verified owner workspace lookup', () => {
     expect(workspaceMocks.queryUnifiedDb).not.toHaveBeenCalled();
   });
 
+  it('supports legacy-only workspace profiles without scanning other owners', async () => {
+    workspaceMocks.queryUnifiedDb.mockImplementation(async (sql: string, params: unknown[] = []) => {
+      if (sql.includes('FROM "ultrst-users"')) return { rows: [] };
+      if (sql.includes('FROM "srkl_application_profiles"')) {
+        expect(params).toEqual(['owner-1']);
+        return {
+          rows: [{
+            id: 'owner-1',
+            email: 'owner@example.test',
+            username: 'owner',
+            app_profiles: {
+              depm: {
+                workspaces: [{
+                  id: 'legacy-workspace',
+                  storageProvider: 'backblaze_b2',
+                  storageConnectionId: 'connection-1',
+                }],
+              },
+            },
+          }],
+        };
+      }
+      return { rows: [] };
+    });
+
+    await expect(findUserWorkspace('legacy-workspace', undefined, 'owner-1')).resolves.toMatchObject({
+      user: { id: 'owner-1' },
+      workspace: { id: 'legacy-workspace' },
+      connection: { id: 'connection-1', __ownerUserId: 'owner-1' },
+    });
+  });
+
   it('queries only the authenticated owner and returns an owner-bound connection', async () => {
     await expect(findUserWorkspace('workspace-1', undefined, 'owner-1')).resolves.toMatchObject({
       user: { id: 'owner-1' },
