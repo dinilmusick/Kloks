@@ -90,7 +90,7 @@ describe('canonical user storage connection security contract', () => {
           code: '42501',
         });
       }
-      if (/^\\s*(UPDATE|DELETE)\\b/i.test(sql)) writes += 1;
+      if (/^\s*(UPDATE|DELETE)\b/i.test(sql)) writes += 1;
       return { rows: [] };
     };
 
@@ -452,7 +452,7 @@ describe('canonical user storage connection security contract', () => {
       },
     };
     const query = async (sql: string) => {
-      if (/^\\s*(CREATE|ALTER|INSERT|UPDATE|DELETE)\\b/i.test(sql)) writes += 1;
+      if (/^\s*(CREATE|ALTER|INSERT|UPDATE|DELETE)\b/i.test(sql)) writes += 1;
       if (sql.includes('FROM "ultrst-users"')) {
         return { rows: [{ id: 'user-1', app_profiles: profiles }] };
       }
