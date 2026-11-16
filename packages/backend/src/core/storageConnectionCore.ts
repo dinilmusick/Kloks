@@ -667,7 +667,7 @@ export async function resolveUserStorageConnectionSecret(
 
 function normalizeWorkspaceAssociationPrefix(value: unknown): string | null {
   if (typeof value !== 'string' || !value.trim()) return null;
-  const normalized = value.trim().replaceAll('\\\\', '/').replace(/^\.\//, '');
+  const normalized = value.trim().replaceAll('\\', '/').replace(/^\.\//, '');
   const segments = normalized.split('/');
   if (segments.some((segment) => !segment || segment === '.' || segment === '..')) return null;
   return segments.join('/');
