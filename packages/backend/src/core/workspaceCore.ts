@@ -6,7 +6,7 @@
  */
 
 import { queryUnifiedDb } from './unifiedDb';
-import { toPublicStorageConnection } from './storageConnectionCore.js';
+import { listUserStorageConnections, resolveUserStorageConnectionSecret, testBackblazeCredentials, createGoogleDriveWorkspaceClient } from './storageConnectionCore.js';
 import { resolveWorkspaceConnection, syncWorkspaceCreateToBucket, syncWorkspaceDeleteToBucket } from './workspaceBucketSyncCore';
 
 function workspaceAppId(env?: Record<string, unknown>): string {
@@ -29,8 +29,19 @@ export async function findUserWorkspace(workspaceId: string, env?: Record<string
     const workspaces = Array.isArray(app.workspaces) ? app.workspaces : [];
     const ws = workspaces.find((w: any) => w.id === workspaceId);
     if (ws) {
-      const conn = resolveWorkspaceConnection(profiles, ws, workspaceAppId(env));
-      return { user, workspace: ws, connection: conn };
+      const resolved = resolveWorkspaceConnection(profiles, ws, workspaceAppId(env));
+      const conn = resolved || (ws.storageConnectionId
+        ? await resolveUserStorageConnectionSecret(
+            String(user.id),
+            String(ws.storageConnectionId),
+            (sql, params) => queryUnifiedDb(sql, params, env),
+          )
+        : null);
+      return {
+        user,
+        workspace: ws,
+        connection: conn ? { ...conn, __ownerUserId: String(user.id) } : null,
+      };
     }
   }
   return { user: null, workspace: null, connection: null };
@@ -50,10 +61,10 @@ export async function getWorkspaces(userId?: string, env?: Record<string, unknow
   const app = appProfile(profiles, workspaceAppId(env));
   const workspaces = Array.isArray(app.workspaces) ? app.workspaces : [];
   const activeWorkspaceId = app.activeWorkspaceId || null;
-  const conns = app.storage_connections?.length ? app.storage_connections : (profiles.srkl?.storage_connections || []);
-  const publicConnections = conns
-    .map(toPublicStorageConnection)
-    .filter((connection): connection is NonNullable<typeof connection> => Boolean(connection));
+  const publicConnections = await listUserStorageConnections(
+    String(userRow.id),
+    (sql, params) => queryUnifiedDb(sql, params, env),
+  );
 
   return { success: true, workspaces, activeWorkspaceId, storage_connections: publicConnections };
 }
@@ -64,38 +75,133 @@ export async function createWorkspace(userId: string, wsData: any, env?: Record<
   if (!user) throw new Error('User account not found.');
 
   const profiles = typeof user.app_profiles === 'string' ? JSON.parse(user.app_profiles) : (user.app_profiles || {});
-  const app = appProfile(profiles, workspaceAppId(env));
+  const appId = workspaceAppId(env);
+  const app = appProfile(profiles, appId);
   const workspaces = Array.isArray(app.workspaces) ? app.workspaces : [];
 
-  const appId = workspaceAppId(env);
-  const wsName = (wsData.name || 'New Workspace').trim();
-  const wsId = wsData.id || `ws-${appId}-${Date.now()}`;
-  const userName = user.username || user.name || 'user';
+  const wsName = String(wsData?.name || 'New Workspace').trim();
+  if (!wsName) throw new Error('Workspace name is required.');
+  const wsId = String(wsData?.id || `ws-${appId}-${crypto.randomUUID()}`);
+  const userName = String(user.username || user.name || 'user');
   const folderKey = `ultrst_${appId}_${userName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${wsName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
 
+  const requestedStorage = wsData?.storage && typeof wsData.storage === 'object' ? wsData.storage : {};
+  const storageProvider = String(wsData?.storageProvider || requestedStorage.provider || 'local_fs').toLowerCase();
+  if (!['local_fs', 'backblaze_b2', 'google_drive'].includes(storageProvider)) {
+    throw new Error(`Unsupported workspace storage provider: ${storageProvider}`);
+  }
+
+  const storageConnectionId = String(
+    wsData?.storageConnectionId || requestedStorage.connectionId || '',
+  ).trim();
+  let connection: Record<string, any> | null = null;
+  let bucketName = '';
+  let googleRootFolder: { id: string; name: string } | undefined;
+
+  if (storageProvider !== 'local_fs') {
+    if (!storageConnectionId) {
+      throw new Error(`Select an existing ${storageProvider === 'backblaze_b2' ? 'Backblaze B2' : 'Google Drive'} connection before creating this workspace.`);
+    }
+    connection = await resolveUserStorageConnectionSecret(
+      userId,
+      storageConnectionId,
+      (sql, params) => queryUnifiedDb(sql, params, env),
+    );
+    if (!connection || connection.enabled === false || connection.provider !== storageProvider) {
+      throw new Error('The selected storage connection is unavailable or does not match the selected provider.');
+    }
+    connection = { ...connection, __ownerUserId: userId };
+
+    if (storageProvider === 'backblaze_b2') {
+      const keyId = String(connection.b2KeyId || connection.keyId || connection.accessKeyId || '').trim();
+      const applicationKey = String(
+        connection.b2ApplicationKey || connection.applicationKey || connection.appKey || connection.secretAccessKey || '',
+      ).trim();
+      bucketName = String(
+        wsData?.b2BucketName || requestedStorage.b2BucketName || requestedStorage.bucketName
+        || connection.b2BucketName || connection.bucketName || '',
+      ).trim();
+      if (!keyId || !applicationKey) {
+        throw new Error('The selected Backblaze connection is missing its server-side credentials.');
+      }
+      if (!bucketName) throw new Error('Select a Backblaze B2 bucket for this workspace.');
+      const validated = await testBackblazeCredentials(keyId, applicationKey);
+      if (!validated.success) {
+        throw new Error(validated.error || 'The selected Backblaze connection could not be validated.');
+      }
+      if (!validated.buckets.some((bucket) => bucket.name === bucketName)) {
+        throw new Error('The selected Backblaze B2 bucket is not accessible to this connection.');
+      }
+    }
+
+    if (storageProvider === 'google_drive') {
+      const requestedRootFolderId = String(
+        wsData?.googleRootFolderId || requestedStorage.googleRootFolderId
+        || connection.googleRootFolderId || '',
+      ).trim();
+      if (!requestedRootFolderId) {
+        throw new Error('Select a Google Drive folder before creating this workspace.');
+      }
+      const drive = await createGoogleDriveWorkspaceClient(
+        userId,
+        storageConnectionId,
+        (sql, params) => queryUnifiedDb(sql, params, env),
+        requestedRootFolderId,
+      );
+      await drive.getAccountIdentity();
+      const folder = await drive.selectRootFolder(requestedRootFolderId);
+      googleRootFolder = { id: folder.id, name: folder.name };
+    }
+  }
+
+  const now = new Date().toISOString();
   const newWs = {
-    ...wsData,
     id: wsId,
     name: wsName,
+    ...(typeof wsData?.description === 'string' && wsData.description.trim()
+      ? { description: wsData.description.trim() }
+      : {}),
     localFolderName: folderKey,
     localFolderKey: folderKey,
     workspacePath: `./${folderKey}`,
-    storageProvider: wsData.storageProvider || 'backblaze_b2',
-    b2BucketName: wsData.b2BucketName || undefined,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    storageProvider,
+    ...(storageConnectionId ? { storageConnectionId } : {}),
+    ...(storageProvider === 'backblaze_b2' ? { b2BucketName: bucketName } : {}),
+    ...(googleRootFolder ? {
+      googleRootFolderId: googleRootFolder.id,
+      googleRootFolderName: googleRootFolder.name,
+    } : {}),
+    createdAt: now,
+    updatedAt: now,
   };
 
   workspaces.push(newWs);
   app.workspaces = workspaces;
   app.activeWorkspaceId = wsId;
-
   await queryUnifiedDb(`UPDATE "ultrst-users" SET app_profiles = $1, updated_at = NOW() WHERE id = $2`, [JSON.stringify(profiles), user.id], env);
-  const conn = resolveWorkspaceConnection(profiles, newWs, appId);
-  await syncWorkspaceCreateToBucket(newWs, conn, env);
-  return { success: true, workspace: newWs, workspaces };
-}
 
+  try {
+    if (storageProvider !== 'local_fs' && !connection) {
+      throw new Error('A verified storage connection is required to initialize this workspace.');
+    }
+    await syncWorkspaceCreateToBucket(newWs, connection, env);
+  } catch (error) {
+    // Roll back the workspace association when its selected persistent storage
+    // cannot be initialized. Never leave a successful-looking ghost workspace.
+    app.workspaces = workspaces.filter((workspace: any) => workspace.id !== wsId);
+    app.activeWorkspaceId = app.activeWorkspaceId === wsId
+      ? (app.workspaces[0]?.id || null)
+      : app.activeWorkspaceId;
+    await queryUnifiedDb(
+      `UPDATE "ultrst-users" SET app_profiles = $1, updated_at = NOW() WHERE id = $2`,
+      [JSON.stringify(profiles), user.id],
+      env,
+    );
+    throw error;
+  }
+
+  return { success: true, workspace: newWs, workspaces: app.workspaces };
+}
 export async function updateWorkspace(userId: string, params: any, env?: Record<string, unknown>) {
   const uRes = await queryUnifiedDb(`SELECT * FROM "ultrst-users" WHERE id = $1`, [userId], env);
   const user = uRes.rows[0];
