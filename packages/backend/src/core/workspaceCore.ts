@@ -48,6 +48,19 @@ export { getWorkspaceStorageDetails } from './workspaceStorageDetailsCore';
  * The owner ID must come from the server's verified Luth principal, never from
  * request-body data. Workspace IDs are not authorization credentials.
  */
+function isMissingProfileRelation(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const value = error as { code?: unknown; message?: unknown };
+  if (value.code === '42P01' || value.code === 'PGRST205') return true;
+  return typeof value.message === 'string'
+    && /(?:relation|table).*(?:does not exist|not found)|schema cache.*(?:relation|table)/i.test(value.message);
+}
+
+/**
+ * Resolve a workspace only within the supplied authenticated owner context.
+ * The owner ID must come from the server's verified Luth principal, never from
+ * request-body data. Workspace IDs are not authorization credentials.
+ */
 export async function findUserWorkspace(
   workspaceId: string,
   env?: Record<string, unknown>,
@@ -56,14 +69,45 @@ export async function findUserWorkspace(
   const ownerId = String(verifiedUserId || '').trim();
   if (!ownerId) return { user: null, workspace: null, connection: null };
 
-  const res = await queryUnifiedDb(
-    `SELECT id, email, username, app_profiles FROM "ultrst-users" WHERE id = $1 OR email = $1 LIMIT 1`,
-    [ownerId],
-    env,
-  );
-  const user = res.rows[0];
-  if (!user) return { user: null, workspace: null, connection: null };
+  let user: Record<string, any> | undefined;
+  try {
+    const result = await queryUnifiedDb(
+      `SELECT id, email, username, app_profiles FROM "ultrst-users" WHERE id = $1 OR email = $1 LIMIT 1`,
+      [ownerId],
+      env,
+    );
+    user = result.rows[0];
+  } catch (error) {
+    if (!isMissingProfileRelation(error)) throw error;
+  }
 
+  if (user) {
+    // This shared read migrates legacy-only app profile fields and workspace
+    // associations into the canonical user profile without replacing them.
+    await listUserStorageConnections(
+      String(user.id),
+      (sql, params) => queryUnifiedDb(sql, params, env),
+    );
+    const refreshed = await queryUnifiedDb(
+      `SELECT id, email, username, app_profiles FROM "ultrst-users" WHERE id = $1 LIMIT 1`,
+      [user.id],
+      env,
+    );
+    if (refreshed.rows[0]) user = refreshed.rows[0];
+  } else {
+    try {
+      const legacy = await queryUnifiedDb(
+        `SELECT id, email, username, app_profiles FROM "srkl_application_profiles" WHERE id = $1 OR email = $1 LIMIT 1`,
+        [ownerId],
+        env,
+      );
+      user = legacy.rows[0];
+    } catch (error) {
+      if (!isMissingProfileRelation(error)) throw error;
+    }
+  }
+
+  if (!user) return { user: null, workspace: null, connection: null };
   const profiles = typeof user.app_profiles === 'string' ? JSON.parse(user.app_profiles) : (user.app_profiles || {});
   const app = appProfile(profiles, workspaceAppId(env));
   const workspaces = Array.isArray(app.workspaces) ? app.workspaces : [];
