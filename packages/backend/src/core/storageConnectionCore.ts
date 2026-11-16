@@ -85,6 +85,46 @@ const PUBLIC_FIELDS = [
   'googleRootFolderName',
 ] as const;
 
+function mergeProfileDocuments(primary: any, legacy: any): any {
+  if (Array.isArray(primary) && Array.isArray(legacy)) {
+    const primaryHasIds = primary.every((item) => item && typeof item === 'object' && typeof item.id === 'string');
+    const legacyHasIds = legacy.every((item) => item && typeof item === 'object' && typeof item.id === 'string');
+    if (primaryHasIds && legacyHasIds) {
+      const merged = new Map<string, any>(primary.map((item) => [item.id, item]));
+      for (const item of legacy) {
+        const existing = merged.get(item.id);
+        merged.set(item.id, existing ? mergeProfileDocuments(existing, item) : item);
+      }
+      return [...merged.values()];
+    }
+    const merged = [...primary];
+    const seen = new Set(primary.map((item) => JSON.stringify(item)));
+    for (const item of legacy) {
+      const key = JSON.stringify(item);
+      if (!seen.has(key)) {
+        merged.push(item);
+        seen.add(key);
+      }
+    }
+    return merged;
+  }
+  if (
+    primary && typeof primary === 'object'
+    && !Array.isArray(primary)
+    && legacy && typeof legacy === 'object'
+    && !Array.isArray(legacy)
+  ) {
+    const merged: Record<string, any> = { ...legacy, ...primary };
+    for (const key of Object.keys(legacy)) {
+      if (Object.prototype.hasOwnProperty.call(primary, key)) {
+        merged[key] = mergeProfileDocuments(primary[key], legacy[key]);
+      }
+    }
+    return merged;
+  }
+  return primary === undefined ? legacy : primary;
+}
+
 function parseProfiles(value: unknown): Record<string, any> {
   if (typeof value === 'string') {
     try {
@@ -442,7 +482,9 @@ function deduplicateRawConnections(items: any[]): any[] {
   for (const item of items) {
     if (!item || typeof item.id !== 'string' || !item.id) continue;
     const existing = byId.get(item.id);
-    byId.set(item.id, existing ? { ...existing, ...item, id: existing.id } : item);
+    // Earlier collections are canonical; later legacy collections fill only
+    // fields that are absent from the canonical connection.
+    byId.set(item.id, existing ? { ...item, ...existing, id: existing.id } : item);
   }
   return [...byId.values()];
 }
@@ -460,11 +502,21 @@ async function findUserRecord(userId: string, query: StorageQuery): Promise<{
       [userId],
     );
     if (result.rows[0]) {
-      return {
-        id: String(result.rows[0].id),
-        profiles: parseProfiles(result.rows[0].app_profiles),
-        source: 'ultrst-users',
-      };
+      const userId = String(result.rows[0].id);
+      let profiles = parseProfiles(result.rows[0].app_profiles);
+      try {
+        const legacy = await query(
+          'SELECT app_profiles FROM "srkl_application_profiles" WHERE id = $1 OR email = $1 LIMIT 1',
+          [userId],
+        );
+        if (legacy.rows[0]) {
+          profiles = mergeProfileDocuments(profiles, parseProfiles(legacy.rows[0].app_profiles));
+        }
+      } catch (error) {
+        if (!isMissingOptionalProfileTable(error)) throw error;
+        // An absent legacy table is optional; operational failures are not.
+      }
+      return { id: userId, profiles, source: 'ultrst-users' };
     }
   } catch (error) {
     if (!isMissingOptionalProfileTable(error)) throw error;
