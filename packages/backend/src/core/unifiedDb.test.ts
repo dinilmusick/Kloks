@@ -4,7 +4,7 @@ vi.mock('@neondatabase/serverless', () => {
   throw new Error('The optional Neon driver must not load during module initialization.');
 });
 import { cleanDbUrl, configureUnifiedDatabaseEnvironmentResolver, getUnifiedDbUrl } from './unifiedDb';
-import { normalizeSystemEnvironment, resolveSystemDatabaseUrl, tryResolveSystemDatabaseUrl } from '../resolver/systemDatabaseUrl';
+import { normalizeSystemEnvironment, resolveSystemDatabaseUrl, resolveSystemDatabaseUrlCandidates, tryResolveSystemDatabaseUrl } from '../resolver/systemDatabaseUrl';
 
 const keys = ['SYSTEM_DATABASE_URL', 'SYSTEM_DATABASE_URL_1', 'SYSTEM_DATABASE_URL_2', 'SYSTEM_DATABASE_URL_3', 'DATABASE_URL'] as const;
 const original = Object.fromEntries(keys.map(key => [key, process.env[key]]));
@@ -33,6 +33,18 @@ describe('canonical system database URL contract', () => {
       SYSTEM_DATABASE_URL_2: 'postgresql://two/db',
       SYSTEM_DATABASE_URL_3: 'postgresql://three/db',
     })).toBe('postgresql://primary/db');
+  });
+
+
+  it('returns primary and fallback URLs in precedence order without duplicates', () => {
+    expect(resolveSystemDatabaseUrlCandidates({
+      SYSTEM_DATABASE_URL: 'postgresql://primary/db',
+      SYSTEM_DATABASE_URL_2: 'postgresql://fallback/db',
+      SYSTEM_DATABASE_URL_3: 'postgresql://fallback/db',
+    })).toEqual([
+      'postgresql://primary/db',
+      'postgresql://fallback/db',
+    ]);
   });
 
   it('uses SYSTEM_DATABASE_URL_2 and then SYSTEM_DATABASE_URL_3 only when primary is absent', () => {
