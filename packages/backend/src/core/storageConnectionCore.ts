@@ -9,6 +9,12 @@
  */
 
 import { authorizeB2, b2ListBuckets } from '../storage/B2DirectClient.js';
+import {
+  GOOGLE_DRIVE_WORKSPACE_SCOPE,
+  GoogleDriveWorkspaceService,
+  type GoogleDriveWorkspaceFolder,
+  type GoogleDriveWorkspaceTokens,
+} from '../storage/GoogleDriveWorkspaceService.js';
 import { queryUnifiedDb } from './unifiedDb.js';
 
 export type StorageProviderId = 'backblaze_b2' | 'google_drive';
@@ -483,4 +489,154 @@ export async function getStorageProviderCapabilities(
       discoveryCapabilities: { accounts: true, buckets: false, folders: true },
     },
   ];
+}
+
+
+/** Persist an exchanged or refreshed Google token set against the verified owner. */
+export async function persistGoogleDriveTokens(
+  userId: string,
+  connectionId: string,
+  tokens: GoogleDriveWorkspaceTokens,
+  query: StorageQuery = DEFAULT_QUERY,
+): Promise<PublicStorageConnection> {
+  if (!userId || !connectionId || !tokens.accessToken) {
+    throw new Error('Google Drive credential persistence inputs are incomplete.');
+  }
+  const connection = await resolveUserStorageConnectionSecret(userId, connectionId, query, 'google_drive');
+  if (!connection) throw new Error('Google Drive connection is not owned by the authenticated user.');
+
+  const updated = {
+    ...connection,
+    googleAccessToken: tokens.accessToken,
+    googleAccessTokenExpiresAt: tokens.expiresAt,
+    googleRefreshToken: tokens.refreshToken || connection.googleRefreshToken,
+    updatedAt: new Date().toISOString(),
+  };
+  await persistStorageConnection(userId, updated, query);
+  return toPublicStorageConnection(updated)!;
+}
+
+/** Construct a server-only Fetch-based Drive client for an owned connection. */
+export async function createGoogleDriveWorkspaceClient(
+  userId: string,
+  connectionId: string,
+  query: StorageQuery = DEFAULT_QUERY,
+  rootFolderId?: string,
+): Promise<GoogleDriveWorkspaceService> {
+  const connection = await resolveUserStorageConnectionSecret(userId, connectionId, query, 'google_drive');
+  if (!connection) throw new Error('Google Drive connection was not found for this user.');
+
+  const system = await getSystemGoogleOAuthConfiguration(query);
+  const tokens: GoogleDriveWorkspaceTokens = {
+    accessToken: String(connection.googleAccessToken || ''),
+    ...(connection.googleRefreshToken ? { refreshToken: String(connection.googleRefreshToken) } : {}),
+    ...(connection.googleAccessTokenExpiresAt
+      ? { expiresAt: Number(connection.googleAccessTokenExpiresAt) }
+      : {}),
+  };
+  if (!tokens.accessToken && !tokens.refreshToken) {
+    throw new Error('Google Drive connection has no saved authorization tokens. Reconnect the Google account.');
+  }
+
+  return new GoogleDriveWorkspaceService({
+    clientId: system.clientId,
+    clientSecret: system.clientSecret,
+    redirectUri: system.redirectUri,
+    tokens,
+    rootFolderId: rootFolderId || String(connection.googleRootFolderId || 'root'),
+    googleAccountId: String(connection.googleAccountId || ''),
+    persistTokens: async (nextTokens) => {
+      await persistGoogleDriveTokens(userId, connectionId, nextTokens, query);
+    },
+  });
+}
+
+/** Complete the system-configured OAuth exchange and save the resulting user connection. */
+export async function completeGoogleDriveAuthorization(
+  userId: string,
+  code: string,
+  query: StorageQuery = DEFAULT_QUERY,
+): Promise<PublicStorageConnection> {
+  if (!userId?.trim()) throw new Error('A verified Luth user is required to connect Google Drive.');
+  const system = await getSystemGoogleOAuthConfiguration(query);
+  const tokens = await GoogleDriveWorkspaceService.exchangeAuthorizationCode(
+    {
+      clientId: system.clientId,
+      clientSecret: system.clientSecret,
+      redirectUri: system.redirectUri,
+    },
+    code,
+  );
+
+  const provisional = new GoogleDriveWorkspaceService({
+    clientId: system.clientId,
+    clientSecret: system.clientSecret,
+    redirectUri: system.redirectUri,
+    tokens,
+  });
+  const identity = await provisional.getAccountIdentity();
+
+  const record = await findUserRecord(userId, query);
+  if (!record) throw new Error('A canonical user profile was not found for this Google Drive connection.');
+  const connections = await mergeLegacySrklConnections(record.id, record.profiles, query);
+  const existing = connections.find((item) =>
+    item.provider === 'google_drive'
+    && (item.googleAccountId === identity.accountId
+      || (identity.email && item.googleEmail === identity.email)),
+  );
+  const now = new Date().toISOString();
+  const connection = {
+    ...(existing || {}),
+    id: existing?.id || `conn_google_drive_${crypto.randomUUID()}`,
+    provider: 'google_drive',
+    label: `Google Drive — ${identity.email || 'Google account'}`,
+    role: existing?.role || (connections.length === 0 ? 'primary' : 'redundant_clone'),
+    enabled: true,
+    createdAt: existing?.createdAt || now,
+    updatedAt: now,
+    testedAt: now,
+    testStatus: 'ok',
+    googleEmail: identity.email || existing?.googleEmail || '',
+    googleAccountId: identity.accountId,
+    googleAccessToken: tokens.accessToken,
+    googleAccessTokenExpiresAt: tokens.expiresAt,
+    googleRefreshToken: tokens.refreshToken || existing?.googleRefreshToken,
+    googleRootFolderId: existing?.googleRootFolderId || 'root',
+    googleRootFolderName: existing?.googleRootFolderName || 'My Drive',
+  };
+  await persistStorageConnection(record.id, connection, query);
+  return toPublicStorageConnection(connection)!;
+}
+
+/** List Drive folders after verifying that the connection belongs to this user. */
+export async function listGoogleDriveFoldersForConnection(
+  userId: string,
+  connectionId: string,
+  parentFolderId?: string,
+  query: StorageQuery = DEFAULT_QUERY,
+): Promise<GoogleDriveWorkspaceFolder[]> {
+  const drive = await createGoogleDriveWorkspaceClient(userId, connectionId, query);
+  await drive.getAccountIdentity();
+  return drive.listFolders(parentFolderId || 'root');
+}
+
+/** Validate and persist the selected Drive root against the user-owned connection. */
+export async function selectGoogleDriveRootFolder(
+  userId: string,
+  connectionId: string,
+  folderId: string,
+  query: StorageQuery = DEFAULT_QUERY,
+): Promise<GoogleDriveWorkspaceFolder> {
+  const drive = await createGoogleDriveWorkspaceClient(userId, connectionId, query);
+  await drive.getAccountIdentity();
+  const folder = await drive.selectRootFolder(folderId);
+  const connection = await resolveUserStorageConnectionSecret(userId, connectionId, query, 'google_drive');
+  if (!connection) throw new Error('Google Drive connection was not found for this user.');
+  await persistStorageConnection(userId, {
+    ...connection,
+    googleRootFolderId: folder.id,
+    googleRootFolderName: folder.name,
+    updatedAt: new Date().toISOString(),
+  }, query);
+  return folder;
 }
