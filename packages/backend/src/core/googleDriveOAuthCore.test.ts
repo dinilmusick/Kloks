@@ -25,7 +25,7 @@ describe('canonical Google Drive OAuth callback boundary', () => {
           }],
         };
       }
-      if (/^\\s*(UPDATE|DELETE)\\b/i.test(sql)) profileWrites += 1;
+      if (/^\s*(UPDATE|DELETE)\\b/i.test(sql)) profileWrites += 1;
       return { rows: [] };
     };
 
