@@ -1,8 +1,8 @@
 /**
  * @file workspaceFileCore.ts
  * @description Fetch-compatible workspace file IO for B2, Google Drive, and local storage.
- * Node filesystem modules are loaded only by guarded dynamic imports; the Worker
- * path uses the Web Fetch-based Kloks provider adapters.
+ * This portable module has no Node imports. Local filesystem behavior is
+ * supplied only by the explicitly Node-specific entrypoint adapter.
  */
 
 import { b2UploadFile, b2DownloadFile, b2ListFileNames, b2DeleteFileVersion, b2DeleteFolder } from './b2DirectCore.js';
