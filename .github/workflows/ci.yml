@@ -50,6 +50,9 @@ jobs:
         run: |
           set -o pipefail
           pnpm test 2>&1 | tee artifacts/diagnostics/test.log
+      - name: Verify emitted package exports and declarations
+        if: success()
+        run: pnpm run verify:package-exports
       - name: Inspect published package contents
         if: always()
         run: npm pack --dry-run
