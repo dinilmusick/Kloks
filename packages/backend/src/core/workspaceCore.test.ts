@@ -1,7 +1,38 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { formatCanonicalWorkspaceFolderName } from '../workspace/WorkspaceCanonical.js';
 import { resolveWorkspaceConnection } from './workspaceBucketSyncCore.js';
 import { getWorkspaceFolderPrefix, normalizeWorkspaceStoragePath } from './workspaceFileCore.js';
+
+const workspaceMocks = vi.hoisted(() => ({
+  queryUnifiedDb: vi.fn(),
+  resolveUserStorageConnectionSecret: vi.fn(),
+  listUserStorageConnections: vi.fn(),
+  testBackblazeCredentials: vi.fn(),
+  createGoogleDriveWorkspaceClient: vi.fn(),
+  syncWorkspaceCreateToBucket: vi.fn(),
+  syncWorkspaceDeleteToBucket: vi.fn(),
+}));
+
+vi.mock('./unifiedDb.js', () => ({
+  queryUnifiedDb: workspaceMocks.queryUnifiedDb,
+}));
+vi.mock('./storageConnectionCore.js', () => ({
+  resolveUserStorageConnectionSecret: workspaceMocks.resolveUserStorageConnectionSecret,
+  listUserStorageConnections: workspaceMocks.listUserStorageConnections,
+  testBackblazeCredentials: workspaceMocks.testBackblazeCredentials,
+  createGoogleDriveWorkspaceClient: workspaceMocks.createGoogleDriveWorkspaceClient,
+}));
+vi.mock('./workspaceBucketSyncCore.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./workspaceBucketSyncCore.js')>();
+  return {
+    ...actual,
+    syncWorkspaceCreateToBucket: workspaceMocks.syncWorkspaceCreateToBucket,
+    syncWorkspaceDeleteToBucket: workspaceMocks.syncWorkspaceDeleteToBucket,
+  };
+});
+
+import { findUserWorkspace } from './workspaceCore.js';
+
 
 describe('workspace application scoping', () => {
   it('uses an application namespace for canonical workspace folders', () => {
@@ -54,5 +85,66 @@ describe('workspace storage path containment', () => {
   it('permits only the empty list prefix, not empty file names', () => {
     expect(normalizeWorkspaceStoragePath('', true)).toBe('');
     expect(() => normalizeWorkspaceStoragePath('')).toThrow(/relative path/i);
+  });
+});
+
+describe('verified owner workspace lookup', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    workspaceMocks.queryUnifiedDb.mockResolvedValue({
+      rows: [{
+        id: 'owner-1',
+        email: 'owner@example.test',
+        username: 'owner',
+        app_profiles: {
+          depm: {
+            workspaces: [{
+              id: 'workspace-1',
+              storageProvider: 'backblaze_b2',
+              storageConnectionId: 'connection-1',
+            }],
+          },
+        },
+      }],
+    });
+    workspaceMocks.resolveUserStorageConnectionSecret.mockResolvedValue({
+      id: 'connection-1',
+      provider: 'backblaze_b2',
+      enabled: true,
+      b2BucketName: 'production-bucket',
+    });
+  });
+
+  it('does not resolve workspace IDs without a verified owner identity', async () => {
+    await expect(findUserWorkspace('workspace-1')).resolves.toEqual({
+      user: null,
+      workspace: null,
+      connection: null,
+    });
+    expect(workspaceMocks.queryUnifiedDb).not.toHaveBeenCalled();
+  });
+
+  it('queries only the authenticated owner and returns an owner-bound connection', async () => {
+    await expect(findUserWorkspace('workspace-1', undefined, 'owner-1')).resolves.toMatchObject({
+      user: { id: 'owner-1' },
+      workspace: { id: 'workspace-1', storageConnectionId: 'connection-1' },
+      connection: {
+        id: 'connection-1',
+        provider: 'backblaze_b2',
+        __ownerUserId: 'owner-1',
+      },
+    });
+
+    expect(workspaceMocks.queryUnifiedDb).toHaveBeenCalledWith(
+      expect.stringContaining('WHERE id = $1 OR email = $1'),
+      ['owner-1'],
+      undefined,
+    );
+    expect(workspaceMocks.resolveUserStorageConnectionSecret).toHaveBeenCalledWith(
+      'owner-1',
+      'connection-1',
+      expect.any(Function),
+      'backblaze_b2',
+    );
   });
 });
