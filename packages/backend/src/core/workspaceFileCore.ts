@@ -69,8 +69,14 @@ function getB2Settings(workspace: any, connection: any): {
   applicationKey: string;
   bucketName: string;
 } {
-  const keyId = String(connection?.b2KeyId || connection?.keyId || '').trim();
-  const applicationKey = String(connection?.b2ApplicationKey || connection?.appKey || '').trim();
+  const keyId = String(connection?.b2KeyId || connection?.keyId || connection?.accessKeyId || '').trim();
+  const applicationKey = String(
+    connection?.b2ApplicationKey
+    || connection?.applicationKey
+    || connection?.appKey
+    || connection?.secretAccessKey
+    || '',
+  ).trim();
   const bucketName = String(connection?.b2BucketName || connection?.bucketName || workspace?.b2BucketName || '').trim();
   if (!keyId || !applicationKey || !bucketName) {
     throw new Error('The Backblaze workspace connection is missing its server-side credentials or bucket.');
