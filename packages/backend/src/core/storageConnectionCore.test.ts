@@ -4,7 +4,7 @@ import {
   resolveUserStorageConnectionSecret,
   toPublicStorageConnection,
 } from './storageConnectionCore.js';
-import { getOrCreateStorageConnectionEncryptionKey, getStorageConnectionEncryptionKey } from './systemCredentialsCore.js';
+import { getGoogleDriveOAuthConfiguration, getOrCreateStorageConnectionEncryptionKey, getStorageConnectionEncryptionKey } from './systemCredentialsCore.js';
 
 describe('canonical user storage connection security contract', () => {
   it('projects only safe connection metadata to browser callers', () => {
@@ -359,6 +359,61 @@ describe('canonical user storage connection security contract', () => {
     await expect(getStorageConnectionEncryptionKey(query as any))
       .rejects.toThrow(/version is not supported/i);
     expect(updates).toBe(0);
+  });
+
+
+  it('requires a dedicated Google OAuth state signing secret in system credentials', async () => {
+    const query = async (sql: string) => {
+      if (sql.includes('SELECT id, credentials')) {
+        return {
+          rows: [{
+            id: 'system',
+            credentials: {
+              googleDriveOAuth: {
+                clientId: 'system-client-id',
+                clientSecret: 'system-client-secret-with-sufficient-length',
+                redirectUri: 'https://storage.example.test/api/workspaces/storage/google/callback',
+                allowedReturnOrigins: ['https://aiko.example.test', 'https://kone.example.test'],
+              },
+            },
+          }],
+        };
+      }
+      return { rows: [] };
+    };
+
+    await expect(getGoogleDriveOAuthConfiguration(query as any))
+      .rejects.toThrow(/OAuth state signing secret/i);
+  });
+
+  it('uses only the explicit system-owned OAuth state signing secret', async () => {
+    const stateSecret = 'dedicated-state-signing-secret-with-more-than-32-characters';
+    const query = async (sql: string) => {
+      if (sql.includes('SELECT id, credentials')) {
+        return {
+          rows: [{
+            id: 'system',
+            credentials: {
+              googleDriveOAuth: {
+                clientId: 'system-client-id',
+                clientSecret: 'system-client-secret-with-sufficient-length',
+                stateSecret,
+                redirectUri: 'https://storage.example.test/api/workspaces/storage/google/callback',
+                allowedReturnOrigins: ['https://aiko.example.test', 'https://kone.example.test'],
+              },
+            },
+          }],
+        };
+      }
+      return { rows: [] };
+    };
+
+    await expect(getGoogleDriveOAuthConfiguration(query as any)).resolves.toMatchObject({
+      clientId: 'system-client-id',
+      clientSecret: 'system-client-secret-with-sufficient-length',
+      stateSecret,
+      allowedReturnOrigins: ['https://aiko.example.test', 'https://kone.example.test'],
+    });
   });
 
   it('installs one raw 32-byte AES-256 key with an atomic nested merge', async () => {
