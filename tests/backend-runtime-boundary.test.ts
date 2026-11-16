@@ -100,9 +100,14 @@ describe('Kloks portable and Node dependency graphs', () => {
   });
 
   it('keeps filesystem-backed graph services behind the explicit Node backend entrypoint', () => {
-    const result = graph('node.js');
-    expect(result.files.some((file) => file.endsWith('/services/workspaceGraphService.js'))).toBe(true);
-    expect(result.files.some((file) => file.endsWith('/krnl-services.node.js'))).toBe(true);
+    const portableSource = readFileSync(resolve(process.cwd(), 'packages/backend/src/krnl-services.ts'), 'utf8');
+    const nodeSource = readFileSync(resolve(process.cwd(), 'packages/backend/src/node.ts'), 'utf8');
+    const nodeServicesSource = readFileSync(resolve(process.cwd(), 'packages/backend/src/krnl-services.node.ts'), 'utf8');
+
+    expect(portableSource).not.toContain('workspaceGraphService');
+    expect(portableSource).not.toContain('StorageAdapterFactory');
+    expect(nodeSource).toContain("export * from './krnl-services.node.js';");
+    expect(nodeServicesSource).toContain("from './services/workspaceGraphService.js'");
   });
 
   it('publishes separate portable and Node adapter package exports', () => {
