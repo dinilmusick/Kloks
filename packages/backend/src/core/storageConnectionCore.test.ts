@@ -86,6 +86,7 @@ describe('canonical user storage connection security contract', () => {
   it('keeps the server-only secret resolver scoped to the supplied user profile', async () => {
     const query = async (sql: string, params?: unknown[]) => {
       if (sql.includes('"ultrst-users"')) {
+        if (params?.[0] === 'other-user') return { rows: [] };
         expect(params?.[0]).toBe('user-1');
         return {
           rows: [{
