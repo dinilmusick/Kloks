@@ -24,7 +24,12 @@ import {
   listUserStorageConnections,
   testBackblazeCredentials,
 } from './core/storageConnectionCore.js';
-import { getSrklAccounts, srklListBackblazeBuckets } from './srkl/SrklDiscoveryService.js';
+import { getPrimarySrklDeploymentUrl, getSrklAccounts, srklListBackblazeBuckets } from './srkl/SrklDiscoveryService.js';
+import {
+  createGoogleDriveAuthorizationRequest,
+  verifyGoogleDriveAuthorizationState,
+} from './core/googleDriveOAuthCore.js';
+import { completeGoogleDriveAuthorization, listGoogleDriveFoldersForConnection, selectGoogleDriveRootFolder } from './core/storageConnectionCore.js';
 import { findUserWorkspace, getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace } from './core/workspaceCore.js';
 import {
   formatCanonicalWorkspaceFolderName,
@@ -115,6 +120,56 @@ export const StorageServiceDefinition: ServiceDefinition = createServiceDefiniti
         listBackblazeBucketsForConnection(
           input.userId,
           input.connectionId,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    createGoogleDriveAuthorizationRequest: {
+      id: 'StorageService.createGoogleDriveAuthorizationRequest',
+      name: 'createGoogleDriveAuthorizationRequest',
+      handler: async (input: { userId: string; returnTo: string; callbackOrigin: string; env?: Record<string, unknown> }) =>
+        createGoogleDriveAuthorizationRequest(
+          input,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    verifyGoogleDriveAuthorizationState: {
+      id: 'StorageService.verifyGoogleDriveAuthorizationState',
+      name: 'verifyGoogleDriveAuthorizationState',
+      handler: async (input: { state: string; nonceCookie: string; callbackOrigin: string; env?: Record<string, unknown> }) =>
+        verifyGoogleDriveAuthorizationState(
+          input,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    completeGoogleDriveAuthorization: {
+      id: 'StorageService.completeGoogleDriveAuthorization',
+      name: 'completeGoogleDriveAuthorization',
+      handler: async (input: { userId: string; code: string; env?: Record<string, unknown> }) =>
+        completeGoogleDriveAuthorization(
+          input.userId,
+          input.code,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    listGoogleDriveFolders: {
+      id: 'StorageService.listGoogleDriveFolders',
+      name: 'listGoogleDriveFolders',
+      handler: async (input: { userId: string; connectionId: string; parentFolderId?: string; env?: Record<string, unknown> }) =>
+        listGoogleDriveFoldersForConnection(
+          input.userId,
+          input.connectionId,
+          input.parentFolderId,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    selectGoogleDriveRootFolder: {
+      id: 'StorageService.selectGoogleDriveRootFolder',
+      name: 'selectGoogleDriveRootFolder',
+      handler: async (input: { userId: string; connectionId: string; folderId: string; env?: Record<string, unknown> }) =>
+        selectGoogleDriveRootFolder(
+          input.userId,
+          input.connectionId,
+          input.folderId,
           (sql, params) => queryUnifiedDb(sql, params, input.env),
         ),
     },
@@ -359,6 +414,15 @@ export const SrklServiceDefinition: ServiceDefinition = createServiceDefinition(
       name: 'getAccounts',
       handler: async (input: { userId: string; service?: string; env?: Record<string, unknown> }) => getSrklAccounts(input.userId, input.service, (sql, params) => queryUnifiedDb(sql, params, input.env)),
     },
+    getPrimaryDeploymentUrl: {
+      id: 'SrklService.getPrimaryDeploymentUrl',
+      name: 'getPrimaryDeploymentUrl',
+      handler: async (input: { env?: Record<string, unknown> }) => ({
+        success: true,
+        deploymentUrl: await getPrimarySrklDeploymentUrl((sql, params) => queryUnifiedDb(sql, params, input.env)),
+      }),
+    },
+
     listBackblazeBuckets: {
       id: 'SrklService.listBackblazeBuckets',
       name: 'listBackblazeBuckets',
