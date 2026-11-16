@@ -391,7 +391,7 @@ async function migrateLegacyConnectionCollections(
 ): Promise<void> {
   const record = await findUserRecord(userId, query);
   if (!record) return;
-  let changed = false;
+  let changed = record.needsProfileMerge;
 
   for (const value of Object.values(record.profiles)) {
     if (!value || typeof value !== 'object') continue;
@@ -493,6 +493,7 @@ async function findUserRecord(userId: string, query: StorageQuery): Promise<{
   id: string;
   profiles: Record<string, any>;
   source: 'ultrst-users' | 'srkl_application_profiles';
+  needsProfileMerge: boolean;
 } | null> {
   if (!userId?.trim()) return null;
 
@@ -503,7 +504,9 @@ async function findUserRecord(userId: string, query: StorageQuery): Promise<{
     );
     if (result.rows[0]) {
       const userId = String(result.rows[0].id);
-      let profiles = parseProfiles(result.rows[0].app_profiles);
+      const canonicalProfiles = parseProfiles(result.rows[0].app_profiles);
+      let profiles = canonicalProfiles;
+      let needsProfileMerge = false;
       try {
         const legacy = await query(
           'SELECT app_profiles FROM "srkl_application_profiles" WHERE id = $1 OR email = $1 LIMIT 1',
@@ -511,12 +514,13 @@ async function findUserRecord(userId: string, query: StorageQuery): Promise<{
         );
         if (legacy.rows[0]) {
           profiles = mergeProfileDocuments(profiles, parseProfiles(legacy.rows[0].app_profiles));
+          needsProfileMerge = JSON.stringify(profiles) !== JSON.stringify(canonicalProfiles);
         }
       } catch (error) {
         if (!isMissingOptionalProfileTable(error)) throw error;
         // An absent legacy table is optional; operational failures are not.
       }
-      return { id: userId, profiles, source: 'ultrst-users' };
+      return { id: userId, profiles, source: 'ultrst-users', needsProfileMerge };
     }
   } catch (error) {
     if (!isMissingOptionalProfileTable(error)) throw error;
@@ -534,6 +538,7 @@ async function findUserRecord(userId: string, query: StorageQuery): Promise<{
         id: String(result.rows[0].id),
         profiles: parseProfiles(result.rows[0].app_profiles),
         source: 'srkl_application_profiles',
+        needsProfileMerge: false,
       };
     }
   } catch (error) {
