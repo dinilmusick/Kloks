@@ -32,7 +32,16 @@ import {
   createGoogleDriveAuthorizationRequest,
   verifyGoogleDriveAuthorizationState,
 } from './core/googleDriveOAuthCore.js';
-import { completeGoogleDriveAuthorization, listGoogleDriveFoldersForConnection, selectGoogleDriveRootFolder } from './core/storageConnectionCore.js';
+import {
+  completeGoogleDriveAuthorization,
+  deleteGoogleDriveFileForConnection,
+  listGoogleDriveFilesForConnection,
+  listGoogleDriveFoldersForConnection,
+  readGoogleDriveFileForConnection,
+  selectGoogleDriveRootFolder,
+  testGoogleDriveConnectionForUser,
+  writeGoogleDriveFileForConnection,
+} from './core/storageConnectionCore.js';
 import { findUserWorkspace, getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace } from './core/workspaceCore.js';
 import {
   formatCanonicalWorkspaceFolderName,
@@ -207,6 +216,63 @@ export const StorageServiceDefinition: ServiceDefinition = createServiceDefiniti
           (sql, params) => queryUnifiedDb(sql, params, input.env),
         ),
     },
+    testGoogleDriveConnection: {
+      id: 'StorageService.testGoogleDriveConnection',
+      name: 'testGoogleDriveConnection',
+      handler: async (input: { userId: string; connectionId: string; env?: Record<string, unknown> }) =>
+        testGoogleDriveConnectionForUser(
+          input.userId,
+          input.connectionId,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    writeGoogleDriveFile: {
+      id: 'StorageService.writeGoogleDriveFile',
+      name: 'writeGoogleDriveFile',
+      handler: async (input: { userId: string; connectionId: string; path: string; data: string | Uint8Array; contentType?: string; env?: Record<string, unknown> }) =>
+        writeGoogleDriveFileForConnection(
+          input.userId,
+          input.connectionId,
+          input.path,
+          input.data,
+          input.contentType,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    readGoogleDriveFile: {
+      id: 'StorageService.readGoogleDriveFile',
+      name: 'readGoogleDriveFile',
+      handler: async (input: { userId: string; connectionId: string; path: string; env?: Record<string, unknown> }) =>
+        readGoogleDriveFileForConnection(
+          input.userId,
+          input.connectionId,
+          input.path,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    deleteGoogleDriveFile: {
+      id: 'StorageService.deleteGoogleDriveFile',
+      name: 'deleteGoogleDriveFile',
+      handler: async (input: { userId: string; connectionId: string; path: string; env?: Record<string, unknown> }) =>
+        deleteGoogleDriveFileForConnection(
+          input.userId,
+          input.connectionId,
+          input.path,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    listGoogleDriveFiles: {
+      id: 'StorageService.listGoogleDriveFiles',
+      name: 'listGoogleDriveFiles',
+      handler: async (input: { userId: string; connectionId: string; path?: string; env?: Record<string, unknown> }) =>
+        listGoogleDriveFilesForConnection(
+          input.userId,
+          input.connectionId,
+          input.path || '',
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+
     listBackblazeBuckets: {
       id: 'StorageService.listBackblazeBuckets',
       name: 'listBackblazeBuckets',
