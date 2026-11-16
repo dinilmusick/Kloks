@@ -50,6 +50,46 @@ function requireVerifiedWorkspaceOwner(workspace: any, connection: any): string 
   return connectionOwner;
 }
 
+async function assertPersistedWorkspaceAssociation(
+  workspace: any,
+  connection: any,
+  env?: Record<string, unknown>,
+): Promise<void> {
+  const ownerId = requireVerifiedWorkspaceOwner(workspace, connection);
+  const folderPrefix = String(
+    workspace?.localFolderKey
+    || workspace?.localFolderName
+    || workspace?.workspacePath
+    || '',
+  ).replace(/^\.\//, '');
+  const persisted = await resolveUserWorkspaceStorageAssociation(
+    ownerId,
+    String(connection.id),
+    folderPrefix,
+    (sql, params) => queryUnifiedDb(sql, params, env),
+  );
+  if (!persisted || String(persisted.id) !== String(workspace?.id)) {
+    throw new Error('Cloud workspace synchronization requires the persisted workspace-to-connection association.');
+  }
+  if (String(persisted.storageProvider || '').toLowerCase() !== String(connection.provider || '').toLowerCase()) {
+    throw new Error('Persisted workspace provider does not match the resolved storage connection.');
+  }
+  if (connection.provider === 'backblaze_b2') {
+    const persistedBucket = String(persisted.b2BucketName || persisted.bucketName || '').trim();
+    const selectedBucket = String(workspace.b2BucketName || connection.b2BucketName || connection.bucketName || '').trim();
+    if (persistedBucket && selectedBucket && persistedBucket !== selectedBucket) {
+      throw new Error('Persisted workspace B2 bucket does not match the synchronization target.');
+    }
+  }
+  if (connection.provider === 'google_drive') {
+    const persistedRoot = String(persisted.googleRootFolderId || connection.googleRootFolderId || '').trim();
+    const selectedRoot = String(workspace.googleRootFolderId || connection.googleRootFolderId || '').trim();
+    if (persistedRoot && selectedRoot && persistedRoot !== selectedRoot) {
+      throw new Error('Persisted workspace Google Drive root does not match the synchronization target.');
+    }
+  }
+}
+
 export async function syncWorkspaceCreateToBucket(
   workspace: any,
   connection: any,
@@ -60,7 +100,7 @@ export async function syncWorkspaceCreateToBucket(
   if (!isPersistentCloudConnection(connection) || workspace?.storageConnectionId !== connection?.id) {
     throw new Error('Workspace initialization requires its exact, verified persistent storage connection.');
   }
-  requireVerifiedWorkspaceOwner(workspace, connection);
+  await assertPersistedWorkspaceAssociation(workspace, connection, env);
   if (String(workspace?.storageProvider || '').toLowerCase() !== provider) {
     throw new Error('Workspace initialization storage provider does not match its saved connection.');
   }
@@ -107,7 +147,7 @@ export async function syncWorkspaceDeleteToBucket(
   if (!workspace?.storageConnectionId || workspace.storageConnectionId !== connection.id) {
     throw new Error('Workspace deletion requires its exact, owner-resolved storage connection.');
   }
-  requireVerifiedWorkspaceOwner(workspace, connection);
+  await assertPersistedWorkspaceAssociation(workspace, connection, env);
   if (String(workspace?.storageProvider || '').toLowerCase() !== String(connection.provider || '').toLowerCase()) {
     throw new Error('Workspace deletion storage provider does not match its saved connection.');
   }
@@ -124,7 +164,7 @@ export async function syncWorkspaceDataToBucket(
   if (!workspace?.storageConnectionId || workspace.storageConnectionId !== connection.id) {
     throw new Error('Workspace data synchronization requires its exact, owner-resolved storage connection.');
   }
-  requireVerifiedWorkspaceOwner(workspace, connection);
+  await assertPersistedWorkspaceAssociation(workspace, connection, env);
   if (String(workspace?.storageProvider || '').toLowerCase() !== String(connection.provider || '').toLowerCase()) {
     throw new Error('Workspace data synchronization storage provider does not match its saved connection.');
   }
