@@ -57,6 +57,21 @@ describe('canonical system database URL contract', () => {
     expect(getUnifiedDbUrl()).toBe('postgresql://primary/db');
   });
 
+
+  it('preserves Node compatibility for partial service context while treating normalized bindings as authoritative', () => {
+    const previous = process.env.SYSTEM_DATABASE_URL;
+    process.env.SYSTEM_DATABASE_URL = 'postgresql://node-primary/db';
+    expect(getUnifiedDbUrl({ WORKSPACE_APP_ID: 'aiko' })).toBe('postgresql://node-primary/db');
+    expect(getUnifiedDbUrl({
+      WORKSPACE_APP_ID: 'kone',
+      SYSTEM_DATABASE_URL: undefined,
+      SYSTEM_DATABASE_URL_2: undefined,
+      SYSTEM_DATABASE_URL_3: undefined,
+    })).toBe('');
+    if (previous === undefined) delete process.env.SYSTEM_DATABASE_URL;
+    else process.env.SYSTEM_DATABASE_URL = previous;
+  });
+
   it('rejects legacy DATABASE_URL and SYSTEM_DATABASE_URL_1 aliases', () => {
     for (const key of keys) delete process.env[key];
     process.env.DATABASE_URL = 'postgresql://legacy/db';
