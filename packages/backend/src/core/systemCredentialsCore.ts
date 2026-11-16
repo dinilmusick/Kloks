@@ -150,6 +150,26 @@ function decodeStorageEncryptionKey(value: string): Uint8Array {
   return bytes;
 }
 
+/** Resolve an already-installed wrapping key. Decryption must never mint a replacement. */
+export async function getStorageConnectionEncryptionKey(
+  queryDb: SystemQuery,
+): Promise<string> {
+  const record = await getSystemCredentialsRecord(queryDb, 'system');
+  const storage = record.credentials?.storageConnections && typeof record.credentials.storageConnections === 'object'
+    ? record.credentials.storageConnections
+    : {};
+  const current = typeof storage.encryptionKey === 'string' ? storage.encryptionKey.trim() : '';
+  if (!current) {
+    throw new Error('[STORAGE_SECRET_CONFIGURATION_MISSING] The system-owned storage encryption key is missing; encrypted user connections were not modified.');
+  }
+  decodeStorageEncryptionKey(current);
+  const version = storage.encryptionKeyVersion == null ? 1 : Number(storage.encryptionKeyVersion);
+  if (version !== 1) {
+    throw new Error('[STORAGE_SECRET_CONFIGURATION_UNSUPPORTED] The canonical storage encryption key version is not supported.');
+  }
+  return current;
+}
+
 /**
  * System-owned AES-256 wrapping key for user-scoped storage provider secrets.
  * Existing keys are never silently replaced: doing so would make already
