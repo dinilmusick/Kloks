@@ -232,6 +232,8 @@ export async function updateWorkspace(userId: string, params: any, env?: Record<
     delete safeUpdates.b2BucketName;
     delete safeUpdates.b2Endpoint;
     delete safeUpdates.b2Region;
+    delete safeUpdates.googleRootFolderId;
+    delete safeUpdates.googleRootFolderName;
     delete safeUpdates.localFolderName;
     delete safeUpdates.localFolderKey;
     delete safeUpdates.workspacePath;
