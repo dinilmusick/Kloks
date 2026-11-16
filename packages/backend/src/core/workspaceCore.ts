@@ -7,7 +7,7 @@
 
 import { queryUnifiedDb } from './unifiedDb';
 import { listUserStorageConnections, resolveUserStorageConnectionSecret, testBackblazeCredentials, createGoogleDriveWorkspaceClient } from './storageConnectionCore.js';
-import { resolveWorkspaceConnection, syncWorkspaceCreateToBucket, syncWorkspaceDeleteToBucket } from './workspaceBucketSyncCore';
+import { syncWorkspaceCreateToBucket, syncWorkspaceDeleteToBucket } from './workspaceBucketSyncCore';
 
 function workspaceAppId(env?: Record<string, unknown>): string {
   const value = String(env?.WORKSPACE_APP_ID ?? 'depm').trim().toLowerCase();
@@ -20,21 +20,26 @@ function appProfile(profiles: Record<string, any>, appId: string): Record<string
 }
 async function resolveWorkspaceConnectionForUser(
   userId: string,
-  profiles: Record<string, any>,
+  _profiles: Record<string, any>,
   workspace: any,
   env?: Record<string, unknown>,
 ): Promise<Record<string, any> | null> {
-  const candidate = resolveWorkspaceConnection(profiles, workspace, workspaceAppId(env));
-  const connectionId = String(workspace?.storageConnectionId || candidate?.id || '').trim();
-  if (!connectionId) return null;
+  // Cloud workspaces must retain their own opaque connection association.
+  // Never substitute a user's primary/first connection for a missing ID.
+  const provider = String(workspace?.storageProvider || '').trim().toLowerCase();
+  const connectionId = String(workspace?.storageConnectionId || '').trim();
+  if (!connectionId || !['backblaze_b2', 'google_drive'].includes(provider)) return null;
+
   const connection = await resolveUserStorageConnectionSecret(
     userId,
     connectionId,
     (sql, params) => queryUnifiedDb(sql, params, env),
-    workspace?.storageProvider,
+    provider,
   );
-  return connection ? { ...connection, __ownerUserId: userId } : null;
+  if (!connection || connection.enabled === false || connection.provider !== provider) return null;
+  return { ...connection, __ownerUserId: userId };
 }
+
 export { loadWorkspaceData, saveWorkspaceData, renameAppInWorkspaceData } from './workspaceDataCore';
 export { getWorkspaceStorageDetails } from './workspaceStorageDetailsCore';
 
@@ -258,9 +263,14 @@ export async function deleteWorkspace(userId: string, wsId: string, env?: Record
   if (!app.workspaces) return { success: true, workspaces: [] };
 
   const targetWs = app.workspaces.find((w: any) => w.id === wsId);
+  const provider = String(targetWs?.storageProvider || '').toLowerCase();
+  const requiresOwnedCloudConnection = ['backblaze_b2', 'google_drive'].includes(provider);
   const conn = targetWs
     ? await resolveWorkspaceConnectionForUser(String(user.id), profiles, targetWs, env)
     : null;
+  if (targetWs && requiresOwnedCloudConnection && !conn) {
+    throw new Error('The workspace storage connection could not be resolved for its verified owner; deletion was not performed.');
+  }
 
   app.workspaces = app.workspaces.filter((w: any) => w.id !== wsId);
   if (app.activeWorkspaceId === wsId) {
