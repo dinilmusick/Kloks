@@ -381,6 +381,11 @@ export async function deleteWorkspace(userId: string, wsId: string, env?: Record
   if (targetWs && requiresOwnedCloudConnection && !conn) {
     throw new Error('The workspace storage connection could not be resolved for its verified owner; deletion was not performed.');
   }
+  // Complete the owner-bound cloud deletion before removing the durable
+  // workspace reference. Provider failures leave the workspace recoverable.
+  if (targetWs && conn) {
+    await syncWorkspaceDeleteToBucket(targetWs, conn, env);
+  }
 
   app.workspaces = app.workspaces.filter((w: any) => w.id !== wsId);
   if (app.activeWorkspaceId === wsId) {
@@ -391,8 +396,5 @@ export async function deleteWorkspace(userId: string, wsId: string, env?: Record
   }
 
   await queryUnifiedDb(`UPDATE "ultrst-users" SET app_profiles = $1, updated_at = NOW() WHERE id = $2`, [JSON.stringify(profiles), user.id], env);
-  if (targetWs && conn) {
-    await syncWorkspaceDeleteToBucket(targetWs, conn, env);
-  }
   return { success: true, workspaces: app.workspaces };
 }
