@@ -1,10 +1,11 @@
 /**
  * @file workspaceFileCore.ts
- * @description Universal Workspace File IO Abstraction.
- * Routes reads, writes, and deletions to Local Disk or Backblaze B2 Object Storage (< 200 lines).
+ * @description Fetch-compatible workspace file IO for B2, Google Drive, and local storage.
+ * Node filesystem modules are loaded only by guarded dynamic imports; the Worker
+ * path uses the Web Fetch-based Kloks provider adapters.
  */
 
-import { b2UploadFile, b2DownloadFile, b2ListFileNames, b2DeleteFileVersion, b2DeleteFolder } from './b2DirectCore';
+import { b2UploadFile, b2DownloadFile, b2ListFileNames, b2DeleteFileVersion, b2DeleteFolder } from './b2DirectCore.js';
 import { createGoogleDriveWorkspaceClient } from './storageConnectionCore.js';
 import { queryUnifiedDb } from './unifiedDb.js';
 
@@ -31,15 +32,20 @@ async function getPath(): Promise<any> {
 }
 
 export function getWorkspaceFolderPrefix(workspace: any): string {
-  return workspace.localFolderKey || workspace.localFolderName || (workspace.workspacePath ? workspace.workspacePath.replace(/^\.\//, '') : workspace.id);
+  return workspace.localFolderKey
+    || workspace.localFolderName
+    || (workspace.workspacePath ? workspace.workspacePath.replace(/^\.\//, '') : workspace.id);
 }
 
 export function isB2Workspace(workspace: any, connection: any): boolean {
-  return (
-    connection?.provider === 'backblaze_b2' ||
-    connection?.provider === 'BACKBLAZE_B2' ||
-    workspace?.storageProvider === 'backblaze_b2'
-  );
+  return connection?.provider === 'backblaze_b2'
+    || connection?.provider === 'BACKBLAZE_B2'
+    || workspace?.storageProvider === 'backblaze_b2';
+}
+
+export function isGoogleDriveWorkspace(workspace: any, connection: any): boolean {
+  return connection?.provider === 'google_drive'
+    || workspace?.storageProvider === 'google_drive';
 }
 
 async function getGoogleDriveClient(
@@ -60,8 +66,18 @@ async function getGoogleDriveClient(
   );
 }
 
-function isGoogleDriveWorkspace(workspace: any, connection: any): boolean {
-  return connection?.provider === 'google_drive' || workspace?.storageProvider === 'google_drive';
+function getB2Settings(workspace: any, connection: any): {
+  keyId: string;
+  applicationKey: string;
+  bucketName: string;
+} {
+  const keyId = String(connection?.b2KeyId || connection?.keyId || '').trim();
+  const applicationKey = String(connection?.b2ApplicationKey || connection?.appKey || '').trim();
+  const bucketName = String(connection?.b2BucketName || connection?.bucketName || workspace?.b2BucketName || '').trim();
+  if (!keyId || !applicationKey || !bucketName) {
+    throw new Error('The Backblaze workspace connection is missing its server-side credentials or bucket.');
+  }
+  return { keyId, applicationKey, bucketName };
 }
 
 export async function writeWorkspaceFile(
@@ -73,65 +89,34 @@ export async function writeWorkspaceFile(
   env?: Record<string, unknown>,
 ): Promise<void> {
   const cleanRel = relativePath.replace(/^\/+/, '');
-  const prefix = getWorkspaceFolderPrefix(workspace);
-  const buffer = typeof content === 'string' ? new TextEncoder().encode(content) : content;
+  const folderPrefix = getWorkspaceFolderPrefix(workspace);
+  const bytes = typeof content === 'string' ? new TextEncoder().encode(content) : content;
 
   if (isGoogleDriveWorkspace(workspace, connection)) {
     const drive = await getGoogleDriveClient(workspace, connection, env);
-    await drive.write(cleanRel, buffer, contentType);
-    return;
-  }
-
-  if (isGoogleDriveWorkspace(workspace, connection)) {
-    const drive = await getGoogleDriveClient(workspace, connection, env);
-    try { return await drive.read(cleanRel); } catch (error) {
-      if (error instanceof Error && /not found|HTTP 404/i.test(error.message)) return null;
-      throw error;
-    }
-  }
-
-  if (isGoogleDriveWorkspace(workspace, connection)) {
-    const drive = await getGoogleDriveClient(workspace, connection, env);
-    await drive.delete(cleanRel);
-    return true;
-  }
-
-  if (isGoogleDriveWorkspace(workspace, connection)) {
-    const drive = await getGoogleDriveClient(workspace, connection, env);
-    const files = await drive.list(subPrefix);
-    return files.map((file) => ({
-      fileName: file.path,
-      sizeBytes: file.size,
-      uploadTimestamp: file.modifiedAt,
-    }));
-  }
-
-  if (isGoogleDriveWorkspace(workspace, connection)) {
-    const drive = await getGoogleDriveClient(workspace, connection, env);
-    const files = await drive.list('');
-    for (const file of files) {
-      if (!file.isFolder) await drive.delete(file.path);
-    }
+    await drive.write(cleanRel, bytes, contentType);
     return;
   }
 
   if (isB2Workspace(workspace, connection)) {
-    const keyId = connection.b2KeyId || connection.keyId;
-    const appKey = connection.b2ApplicationKey || connection.appKey;
-    const bucketName = connection.b2BucketName || connection.bucketName || workspace.b2BucketName;
-    if (!bucketName) throw new Error('The Backblaze workspace has no selected bucket.');
-    const fullKey = `${prefix}/${cleanRel}`;
-    await b2UploadFile(keyId, appKey, bucketName, fullKey, buffer, contentType);
+    const config = getB2Settings(workspace, connection);
+    await b2UploadFile(
+      config.keyId,
+      config.applicationKey,
+      config.bucketName,
+      `${folderPrefix}/${cleanRel}`,
+      bytes,
+      contentType,
+    );
     return;
   }
 
-  // Local filesystem fallback
   const fs = await getFs();
   const path = await getPath();
-  if (!fs || !path) throw new Error('Local filesystem operations not supported in this runtime.');
-  const localDir = path.resolve(process.cwd(), prefix, path.dirname(cleanRel));
+  if (!fs || !path) throw new Error('Local filesystem operations are not supported in this runtime.');
+  const localDir = path.resolve(process.cwd(), folderPrefix, path.dirname(cleanRel));
   await fs.mkdir(localDir, { recursive: true });
-  await fs.writeFile(path.resolve(process.cwd(), prefix, cleanRel), buffer);
+  await fs.writeFile(path.resolve(process.cwd(), folderPrefix, cleanRel), bytes);
 }
 
 export async function readWorkspaceFile(
@@ -141,25 +126,30 @@ export async function readWorkspaceFile(
   env?: Record<string, unknown>,
 ): Promise<Uint8Array | null> {
   const cleanRel = relativePath.replace(/^\/+/, '');
-  const prefix = getWorkspaceFolderPrefix(workspace);
+  const folderPrefix = getWorkspaceFolderPrefix(workspace);
 
-  if (isB2Workspace(workspace, connection)) {
-    const keyId = connection.b2KeyId || connection.keyId;
-    const appKey = connection.b2ApplicationKey || connection.appKey;
-    const bucketName = connection.b2BucketName || connection.bucketName || workspace.b2BucketName;
-    if (!bucketName) throw new Error('The Backblaze workspace has no selected bucket.');
-    const fullKey = `${prefix}/${cleanRel}`;
-    return await b2DownloadFile(keyId, appKey, bucketName, fullKey);
+  if (isGoogleDriveWorkspace(workspace, connection)) {
+    const drive = await getGoogleDriveClient(workspace, connection, env);
+    try {
+      return await drive.read(cleanRel);
+    } catch (error) {
+      if (error instanceof Error && /not found|HTTP 404/i.test(error.message)) return null;
+      throw error;
+    }
   }
 
-  // Local filesystem fallback
+  if (isB2Workspace(workspace, connection)) {
+    const config = getB2Settings(workspace, connection);
+    return b2DownloadFile(config.keyId, config.applicationKey, config.bucketName, `${folderPrefix}/${cleanRel}`);
+  }
+
   const fs = await getFs();
   const path = await getPath();
   if (!fs || !path) return null;
-  const fullPath = path.resolve(process.cwd(), prefix, cleanRel);
+  const fullPath = path.resolve(process.cwd(), folderPrefix, cleanRel);
   try {
-    const buf = await fs.readFile(fullPath);
-    return new Uint8Array(buf);
+    const file = await fs.readFile(fullPath);
+    return new Uint8Array(file);
   } catch {
     return null;
   }
@@ -172,27 +162,28 @@ export async function deleteWorkspaceFile(
   env?: Record<string, unknown>,
 ): Promise<boolean> {
   const cleanRel = relativePath.replace(/^\/+/, '');
-  const prefix = getWorkspaceFolderPrefix(workspace);
+  const folderPrefix = getWorkspaceFolderPrefix(workspace);
+
+  if (isGoogleDriveWorkspace(workspace, connection)) {
+    const drive = await getGoogleDriveClient(workspace, connection, env);
+    await drive.delete(cleanRel);
+    return true;
+  }
 
   if (isB2Workspace(workspace, connection)) {
-    const keyId = connection.b2KeyId || connection.keyId;
-    const appKey = connection.b2ApplicationKey || connection.appKey;
-    const bucketName = connection.b2BucketName || connection.bucketName || workspace.b2BucketName;
-    if (!bucketName) throw new Error('The Backblaze workspace has no selected bucket.');
-    const fullKey = `${prefix}/${cleanRel}`;
-    const files = await b2ListFileNames(keyId, appKey, bucketName, fullKey);
-    const match = files.find((f) => f.fileName === fullKey);
-    if (match) {
-      await b2DeleteFileVersion(keyId, appKey, match.fileName, match.fileId);
-      return true;
-    }
-    return false;
+    const config = getB2Settings(workspace, connection);
+    const fullKey = `${folderPrefix}/${cleanRel}`;
+    const files = await b2ListFileNames(config.keyId, config.applicationKey, config.bucketName, fullKey);
+    const match = files.find((file: any) => file.fileName === fullKey);
+    if (!match) return false;
+    await b2DeleteFileVersion(config.keyId, config.applicationKey, match.fileName, match.fileId);
+    return true;
   }
 
   const fs = await getFs();
   const path = await getPath();
   if (!fs || !path) return false;
-  const fullPath = path.resolve(process.cwd(), prefix, cleanRel);
+  const fullPath = path.resolve(process.cwd(), folderPrefix, cleanRel);
   try {
     await fs.unlink(fullPath);
     return true;
@@ -208,18 +199,27 @@ export async function listWorkspaceFiles(
   env?: Record<string, unknown>,
 ): Promise<Array<{ fileName: string; sizeBytes: number; uploadTimestamp?: number }>> {
   const folderPrefix = getWorkspaceFolderPrefix(workspace);
-  const targetPrefix = subPrefix ? `${folderPrefix}/${subPrefix.replace(/^\/+/, '')}` : `${folderPrefix}/`;
+
+  if (isGoogleDriveWorkspace(workspace, connection)) {
+    const drive = await getGoogleDriveClient(workspace, connection, env);
+    const files = await drive.list(subPrefix);
+    return files.map((file) => ({
+      fileName: file.path,
+      sizeBytes: file.size,
+      uploadTimestamp: file.modifiedAt,
+    }));
+  }
 
   if (isB2Workspace(workspace, connection)) {
-    const keyId = connection.b2KeyId || connection.keyId;
-    const appKey = connection.b2ApplicationKey || connection.appKey;
-    const bucketName = connection.b2BucketName || connection.bucketName || workspace.b2BucketName;
-    if (!bucketName) throw new Error('The Backblaze workspace has no selected bucket.');
-    const rawFiles = await b2ListFileNames(keyId, appKey, bucketName, targetPrefix);
-    return rawFiles.map((f) => ({
-      fileName: f.fileName.slice(folderPrefix.length + 1),
-      sizeBytes: f.contentLength,
-      uploadTimestamp: f.uploadTimestamp,
+    const config = getB2Settings(workspace, connection);
+    const targetPrefix = subPrefix
+      ? `${folderPrefix}/${subPrefix.replace(/^\/+/, '')}`
+      : `${folderPrefix}/`;
+    const files = await b2ListFileNames(config.keyId, config.applicationKey, config.bucketName, targetPrefix);
+    return files.map((file: any) => ({
+      fileName: String(file.fileName || '').slice(folderPrefix.length + 1),
+      sizeBytes: Number(file.contentLength || 0),
+      uploadTimestamp: file.uploadTimestamp,
     }));
   }
 
@@ -233,10 +233,10 @@ export async function listWorkspaceFiles(
     for (const entry of entries) {
       if (entry.isFile()) {
         const full = path.join(entry.parentPath || baseDir, entry.name);
-        const st = await fs.stat(full);
+        const stat = await fs.stat(full);
         result.push({
           fileName: path.relative(path.resolve(process.cwd(), folderPrefix), full),
-          sizeBytes: st.size,
+          sizeBytes: stat.size,
         });
       }
     }
@@ -251,20 +251,24 @@ export async function deleteWorkspaceFolder(
   connection: any,
   env?: Record<string, unknown>,
 ): Promise<void> {
-  const prefix = getWorkspaceFolderPrefix(workspace);
+  const folderPrefix = getWorkspaceFolderPrefix(workspace);
+
+  if (isGoogleDriveWorkspace(workspace, connection)) {
+    // The selected Drive root is user-owned and must not be recursively
+    // deleted when an application workspace is removed.
+    return;
+  }
+
   if (isB2Workspace(workspace, connection)) {
-    const keyId = connection.b2KeyId || connection.keyId;
-    const appKey = connection.b2ApplicationKey || connection.appKey;
-    const bucketName = connection.b2BucketName || connection.bucketName || workspace.b2BucketName;
-    if (!bucketName) throw new Error('The Backblaze workspace has no selected bucket.');
-    await b2DeleteFolder(keyId, appKey, bucketName, prefix);
+    const config = getB2Settings(workspace, connection);
+    await b2DeleteFolder(config.keyId, config.applicationKey, config.bucketName, folderPrefix);
     return;
   }
 
   const fs = await getFs();
   const path = await getPath();
   if (!fs || !path) return;
-  const localDir = path.resolve(process.cwd(), prefix);
+  const localDir = path.resolve(process.cwd(), folderPrefix);
   try {
     await fs.rm(localDir, { recursive: true, force: true });
   } catch {}
