@@ -124,6 +124,13 @@ function decodeBase64Url(value: string): Uint8Array {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
+/** Copy into an ArrayBuffer-owned view for modern Web Crypto BufferSource types. */
+function toCryptoBufferSource(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
+}
+
 function extractConnectionSecretPayload(connection: Record<string, any>): Record<string, any> {
   const payload: Record<string, any> = {};
   for (const field of STORAGE_SECRET_FIELDS) {
@@ -168,7 +175,7 @@ async function encryptConnectionSecretPayload(
   const wrappingKey = await getOrCreateStorageConnectionEncryptionKey(query);
   const key = await crypto.subtle.importKey(
     'raw',
-    decodeBase64Url(wrappingKey),
+    toCryptoBufferSource(decodeBase64Url(wrappingKey)),
     { name: 'AES-GCM' },
     false,
     ['encrypt'],
@@ -178,9 +185,9 @@ async function encryptConnectionSecretPayload(
     'ultrst-storage-connection:v1:' + userId + ':' + connection.id + ':' + connection.provider,
   );
   const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv, additionalData },
+    { name: 'AES-GCM', iv: toCryptoBufferSource(iv), additionalData: toCryptoBufferSource(additionalData) },
     key,
-    new TextEncoder().encode(JSON.stringify(payload)),
+    toCryptoBufferSource(new TextEncoder().encode(JSON.stringify(payload))),
   );
 
   const safe: Record<string, any> = { ...connection };
@@ -227,11 +234,11 @@ async function hydrateConnectionSecrets(
       const plaintext = await crypto.subtle.decrypt(
         {
           name: 'AES-GCM',
-          iv: decodeBase64Url(envelope.iv),
-          additionalData,
+          iv: toCryptoBufferSource(decodeBase64Url(envelope.iv)),
+          additionalData: toCryptoBufferSource(additionalData),
         },
         key,
-        decodeBase64Url(envelope.ciphertext),
+        toCryptoBufferSource(decodeBase64Url(envelope.ciphertext)),
       );
       const parsed = JSON.parse(new TextDecoder().decode(plaintext));
       if (!parsed || typeof parsed !== 'object') throw new Error('invalid payload');
