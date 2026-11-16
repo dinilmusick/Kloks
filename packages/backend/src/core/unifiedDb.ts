@@ -1,7 +1,7 @@
 /**
  * @file unifiedDb.ts
- * @description Isomorphic Database Client using Neon Serverless HTTP driver for Qwnsr.
- * Operates identically across Node.js, Vercel Serverless, and Cloudflare Workers.
+ * @description Isomorphic Database Client using Neon Serverless HTTP driver.
+ * Resolves the canonical SYSTEM_DATABASE_URL primary plus numbered fallbacks.
  */
 
 let neon: any;
@@ -17,45 +17,24 @@ export function cleanDbUrl(url?: unknown): string {
 }
 
 export function getUnifiedDbUrl(env?: Record<string, unknown>): string {
-  const fromBindings = [
-    env?.SYSTEM_DATABASE_URL_1,
-    env?.SYSTEM_DATABASE_URL_2,
-    env?.SYSTEM_DATABASE_URL_3,
-  ].map(cleanDbUrl).find(Boolean);
+  const keys = ['SYSTEM_DATABASE_URL', 'SYSTEM_DATABASE_URL_1', 'SYSTEM_DATABASE_URL_2', 'SYSTEM_DATABASE_URL_3'];
+  const fromBindings = keys.map((key) => cleanDbUrl(env?.[key])).find(Boolean);
   if (fromBindings) return fromBindings;
-
-  if (typeof process !== 'undefined' && process.env) {
-    return [
-      process.env.SYSTEM_DATABASE_URL_1,
-      process.env.SYSTEM_DATABASE_URL_2,
-      process.env.SYSTEM_DATABASE_URL_3,
-    ].map(cleanDbUrl).find(Boolean) || '';
-  }
+  if (typeof process !== 'undefined' && process.env) return keys.map((key) => cleanDbUrl(process.env[key])).find(Boolean) || '';
   return '';
 }
 
-export async function queryUnifiedDb<T = any>(
-  sqlText: string,
-  params: any[] = [],
-  env?: Record<string, unknown>
-): Promise<UnifiedQueryResult<T>> {
+export async function queryUnifiedDb<T = any>(sqlText: string, params: any[] = [], env?: Record<string, unknown>): Promise<UnifiedQueryResult<T>> {
   const dbUrl = getUnifiedDbUrl(env);
-  if (!dbUrl) {
-    throw new Error('[UnifiedDB] No database URL configured in environment.');
-  }
-
+  if (!dbUrl) throw new Error('[UnifiedDB] No database URL configured in environment.');
   if (!neon) {
     const mod = await import('@neondatabase/serverless');
     neon = mod.neon;
   }
-
   const sql = neon(dbUrl);
   try {
     const rows = (await ((sql as any).query ? (sql as any).query(sqlText, params) : (sql as any)(sqlText, params))) as T[];
-    return {
-      rows: Array.isArray(rows) ? rows : [],
-      rowCount: Array.isArray(rows) ? rows.length : 0,
-    };
+    return { rows: Array.isArray(rows) ? rows : [], rowCount: Array.isArray(rows) ? rows.length : 0 };
   } catch (err: any) {
     console.error('[UnifiedDB] Query execution error:', err.message);
     throw err;
