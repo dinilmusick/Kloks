@@ -1,6 +1,6 @@
 {
   "name": "@kloks/backend",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Kloks Backend Services \u2014 Auth, Storage, Workspace, Control Plane, API, Connectivity & Execution built on KrnlTS",
   "type": "module",
   "private": false,
