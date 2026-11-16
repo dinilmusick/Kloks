@@ -178,7 +178,7 @@ export async function getOrCreateStorageConnectionEncryptionKey(
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  const generated = btoa(binary).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/g, '');
+  const generated = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
   decodeStorageEncryptionKey(generated);
 
   // Atomic compare-and-set. PostgreSQL serializes conflicting row updates;
