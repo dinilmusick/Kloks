@@ -40,10 +40,11 @@ describe('canonical user storage connection security contract', () => {
     };
     const query = async (sql: string, params: unknown[] = []) => {
       if (sql.includes('FROM "ultrst-users"')) {
-        return { rows: [{ id: 'owner-1', app_profiles: canonicalProfiles }] };
+        return { rows: [{ id: 'owner-1', email: 'owner@example.test', app_profiles: canonicalProfiles }] };
       }
       if (sql.includes('FROM "srkl_application_profiles"')) {
-        return { rows: [{ id: 'owner-1', app_profiles: legacyProfiles }] };
+        expect(params[1]).toBe('owner@example.test');
+        return { rows: [{ id: 'owner-1', email: 'owner@example.test', app_profiles: legacyProfiles }] };
       }
       if (sql.startsWith('UPDATE "ultrst-users"')) {
         canonicalProfiles = JSON.parse(String(params[0]));
