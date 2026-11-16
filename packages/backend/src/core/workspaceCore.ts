@@ -173,6 +173,12 @@ export async function getWorkspaces(userId?: string, env?: Record<string, unknow
 }
 
 export async function createWorkspace(userId: string, wsData: any, env?: Record<string, unknown>) {
+  // Merge legacy SRKL app_profiles before any workspace mutation so a stale
+  // canonical snapshot cannot replace legacy-only workspace references.
+  await listUserStorageConnections(
+    userId,
+    (sql, params) => queryUnifiedDb(sql, params, env),
+  );
   const uRes = await queryUnifiedDb(`SELECT * FROM "ultrst-users" WHERE id = $1`, [userId], env);
   const user = uRes.rows[0];
   if (!user) throw new Error('User account not found.');
@@ -306,6 +312,12 @@ export async function createWorkspace(userId: string, wsData: any, env?: Record<
   return { success: true, workspace: newWs, workspaces: app.workspaces };
 }
 export async function updateWorkspace(userId: string, params: any, env?: Record<string, unknown>) {
+  // Merge legacy SRKL app_profiles before any workspace mutation so a stale
+  // canonical snapshot cannot replace legacy-only workspace references.
+  await listUserStorageConnections(
+    userId,
+    (sql, params) => queryUnifiedDb(sql, params, env),
+  );
   const uRes = await queryUnifiedDb(`SELECT * FROM "ultrst-users" WHERE id = $1`, [userId], env);
   const user = uRes.rows[0];
   if (!user) throw new Error('User not found.');
@@ -346,6 +358,12 @@ export async function updateWorkspace(userId: string, params: any, env?: Record<
 }
 
 export async function deleteWorkspace(userId: string, wsId: string, env?: Record<string, unknown>) {
+  // Merge legacy SRKL app_profiles before any workspace mutation so a stale
+  // canonical snapshot cannot replace legacy-only workspace references.
+  await listUserStorageConnections(
+    userId,
+    (sql, params) => queryUnifiedDb(sql, params, env),
+  );
   const uRes = await queryUnifiedDb(`SELECT * FROM "ultrst-users" WHERE id = $1`, [userId], env);
   const user = uRes.rows[0];
   if (!user) throw new Error('User not found.');
