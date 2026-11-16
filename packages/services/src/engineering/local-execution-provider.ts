@@ -3,14 +3,14 @@ import {spawn} from "node:child_process";
 export interface LocalExecutionRequest {command: string; cwd?: string; environment?: Readonly<Record<string, string>>; timeoutMs?: number;}
 export interface LocalExecutionResult {executionId: string; status: "succeeded" | "failed" | "timed-out"; exitCode?: number; stdout: string; stderr: string;}
 
-// Child commands get a deterministic PATH and only caller-supplied values.
-// Never inherit ambient host variables: deployments commonly place access
+// Preserve only PATH so requested executables remain discoverable. Never
+// inherit other ambient host variables: deployments commonly place access
 // tokens, database URLs, and signing keys in process.env.
 function buildExecutionEnvironment(
   explicit: Readonly<Record<string, string>> = {},
 ): NodeJS.ProcessEnv {
   return {
-    PATH: "/usr/local/bin:/usr/bin:/bin",
+    PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
     ...explicit,
   };
 }
