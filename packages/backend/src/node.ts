@@ -22,6 +22,8 @@ export * from './services/node.js';
 export * from './core/index.js';
 export * from './server/index.js';
 export * from './krnl-services.js';
+// Node-only graph persistence uses the explicitly selected filesystem adapter.
+export * from './krnl-services.node.js';
 export * from './resourceEngine/index.js';
 export * from './resolver/systemDatabaseUrl.js';
 
