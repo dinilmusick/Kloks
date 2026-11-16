@@ -109,13 +109,12 @@ export async function writeWorkspaceFile(
   contentType = 'application/json',
   env?: Record<string, unknown>,
 ): Promise<void> {
-  const cleanRel = relativePath.replace(/^\/+/, '');
-  const folderPrefix = getWorkspaceFolderPrefix(workspace);
+  const targetPath = getWorkspaceFilePath(workspace, relativePath);
   const bytes = typeof content === 'string' ? new TextEncoder().encode(content) : content;
 
   if (isGoogleDriveWorkspace(workspace, connection)) {
     const drive = await getGoogleDriveClient(workspace, connection, env);
-    await drive.write(`${folderPrefix}/${cleanRel}`, bytes, contentType);
+    await drive.write(targetPath, bytes, contentType);
     return;
   }
 
@@ -125,7 +124,7 @@ export async function writeWorkspaceFile(
       config.keyId,
       config.applicationKey,
       config.bucketName,
-      `${folderPrefix}/${cleanRel}`,
+      targetPath,
       bytes,
       contentType,
     );
@@ -133,7 +132,7 @@ export async function writeWorkspaceFile(
   }
 
   if (!localWorkspaceFileAdapter) throw new Error('Local filesystem operations require the explicit Kloks Node backend adapter.');
-  await localWorkspaceFileAdapter.write(`${folderPrefix}/${cleanRel}`, bytes);
+  await localWorkspaceFileAdapter.write(targetPath, bytes);
 }
 
 export async function readWorkspaceFile(
@@ -142,13 +141,12 @@ export async function readWorkspaceFile(
   relativePath: string,
   env?: Record<string, unknown>,
 ): Promise<Uint8Array | null> {
-  const cleanRel = relativePath.replace(/^\/+/, '');
-  const folderPrefix = getWorkspaceFolderPrefix(workspace);
+  const targetPath = getWorkspaceFilePath(workspace, relativePath);
 
   if (isGoogleDriveWorkspace(workspace, connection)) {
     const drive = await getGoogleDriveClient(workspace, connection, env);
     try {
-      return await drive.read(`${folderPrefix}/${cleanRel}`);
+      return await drive.read(targetPath);
     } catch (error) {
       if (error instanceof Error && /not found|HTTP 404/i.test(error.message)) return null;
       throw error;
@@ -157,11 +155,11 @@ export async function readWorkspaceFile(
 
   if (isB2Workspace(workspace, connection)) {
     const config = getB2Settings(workspace, connection);
-    return b2DownloadFile(config.keyId, config.applicationKey, config.bucketName, `${folderPrefix}/${cleanRel}`);
+    return b2DownloadFile(config.keyId, config.applicationKey, config.bucketName, targetPath);
   }
 
   if (!localWorkspaceFileAdapter) return null;
-  return localWorkspaceFileAdapter.read(`${folderPrefix}/${cleanRel}`);
+  return localWorkspaceFileAdapter.read(targetPath);
 }
 
 export async function deleteWorkspaceFile(
@@ -170,18 +168,17 @@ export async function deleteWorkspaceFile(
   relativePath: string,
   env?: Record<string, unknown>,
 ): Promise<boolean> {
-  const cleanRel = relativePath.replace(/^\/+/, '');
-  const folderPrefix = getWorkspaceFolderPrefix(workspace);
+  const targetPath = getWorkspaceFilePath(workspace, relativePath);
 
   if (isGoogleDriveWorkspace(workspace, connection)) {
     const drive = await getGoogleDriveClient(workspace, connection, env);
-    await drive.delete(`${folderPrefix}/${cleanRel}`);
+    await drive.delete(targetPath);
     return true;
   }
 
   if (isB2Workspace(workspace, connection)) {
     const config = getB2Settings(workspace, connection);
-    const fullKey = `${folderPrefix}/${cleanRel}`;
+    const fullKey = targetPath;
     const files = await b2ListFileNames(config.keyId, config.applicationKey, config.bucketName, fullKey);
     const match = files.find((file: any) => file.fileName === fullKey);
     if (!match) return false;
@@ -190,7 +187,7 @@ export async function deleteWorkspaceFile(
   }
 
   if (!localWorkspaceFileAdapter) return false;
-  return localWorkspaceFileAdapter.delete(`${folderPrefix}/${cleanRel}`);
+  return localWorkspaceFileAdapter.delete(targetPath);
 }
 
 export async function listWorkspaceFiles(
@@ -200,10 +197,11 @@ export async function listWorkspaceFiles(
   env?: Record<string, unknown>,
 ): Promise<Array<{ fileName: string; sizeBytes: number; uploadTimestamp?: number }>> {
   const folderPrefix = getWorkspaceFolderPrefix(workspace);
+  const cleanSubPrefix = normalizeWorkspaceStoragePath(subPrefix, true);
+  const targetPrefix = cleanSubPrefix ? `${folderPrefix}/${cleanSubPrefix}` : folderPrefix;
 
   if (isGoogleDriveWorkspace(workspace, connection)) {
     const drive = await getGoogleDriveClient(workspace, connection, env);
-    const targetPrefix = [folderPrefix, subPrefix.replace(/^\/+|\/+$/g, '')].filter(Boolean).join('/');
     const files = await drive.list(targetPrefix);
     return files.map((file) => ({
       fileName: file.path.startsWith(folderPrefix + '/')
@@ -216,10 +214,8 @@ export async function listWorkspaceFiles(
 
   if (isB2Workspace(workspace, connection)) {
     const config = getB2Settings(workspace, connection);
-    const targetPrefix = subPrefix
-      ? `${folderPrefix}/${subPrefix.replace(/^\/+/, '')}`
-      : `${folderPrefix}/`;
-    const files = await b2ListFileNames(config.keyId, config.applicationKey, config.bucketName, targetPrefix);
+    const b2TargetPrefix = cleanSubPrefix ? `${targetPrefix}/` : `${folderPrefix}/`;
+    const files = await b2ListFileNames(config.keyId, config.applicationKey, config.bucketName, b2TargetPrefix);
     return files.map((file: any) => ({
       fileName: String(file.fileName || '').slice(folderPrefix.length + 1),
       sizeBytes: Number(file.contentLength || 0),
@@ -228,7 +224,7 @@ export async function listWorkspaceFiles(
   }
 
   if (!localWorkspaceFileAdapter) return [];
-  const files = await localWorkspaceFileAdapter.list(`${folderPrefix}/${subPrefix}`);
+  const files = await localWorkspaceFileAdapter.list(targetPrefix);
   return files.map((file) => ({
     ...file,
     fileName: file.fileName.startsWith(`${folderPrefix}/`)
