@@ -122,20 +122,52 @@ export async function getWorkspaces(userId?: string, env?: Record<string, unknow
   if (!userId) {
     return { success: true, workspaces: [], activeWorkspaceId: null, storage_connections: [] };
   }
-  const res = await queryUnifiedDb(`SELECT * FROM "ultrst-users" WHERE id = $1 OR email = $1 LIMIT 1`, [userId], env);
-  const userRow = res.rows[0];
+
+  let userRow: Record<string, any> | undefined;
+  try {
+    const canonical = await queryUnifiedDb(
+      `SELECT * FROM "ultrst-users" WHERE id = $1 OR email = $1 LIMIT 1`,
+      [userId],
+      env,
+    );
+    userRow = canonical.rows[0];
+  } catch (error) {
+    if (!isMissingProfileRelation(error)) throw error;
+  }
+
+  const publicConnections = await listUserStorageConnections(
+    String(userRow?.id || userId),
+    (sql, params) => queryUnifiedDb(sql, params, env),
+  );
+
+  if (userRow) {
+    const refreshed = await queryUnifiedDb(
+      `SELECT * FROM "ultrst-users" WHERE id = $1 LIMIT 1`,
+      [userRow.id],
+      env,
+    );
+    if (refreshed.rows[0]) userRow = refreshed.rows[0];
+  } else {
+    try {
+      const legacy = await queryUnifiedDb(
+        `SELECT * FROM "srkl_application_profiles" WHERE id = $1 OR email = $1 LIMIT 1`,
+        [userId],
+        env,
+      );
+      userRow = legacy.rows[0];
+    } catch (error) {
+      if (!isMissingProfileRelation(error)) throw error;
+    }
+  }
+
   if (!userRow) {
-    return { success: true, workspaces: [], activeWorkspaceId: null, storage_connections: [] };
+    return { success: true, workspaces: [], activeWorkspaceId: null, storage_connections: publicConnections };
   }
 
   const profiles = typeof userRow.app_profiles === 'string' ? JSON.parse(userRow.app_profiles) : (userRow.app_profiles || {});
   const app = appProfile(profiles, workspaceAppId(env));
   const workspaces = Array.isArray(app.workspaces) ? app.workspaces : [];
   const activeWorkspaceId = app.activeWorkspaceId || null;
-  const publicConnections = await listUserStorageConnections(
-    String(userRow.id),
-    (sql, params) => queryUnifiedDb(sql, params, env),
-  );
 
   return { success: true, workspaces, activeWorkspaceId, storage_connections: publicConnections };
 }
