@@ -15,6 +15,12 @@ import {
 } from '@ultrst-armada/krnl';
 import { loginSystemUser, resolveUserFromToken } from './auth/UnifiedAuthCore.js';
 import { queryUnifiedDb } from './core/unifiedDb.js';
+import {
+  deleteUserWorkspaceStorageFile,
+  listUserWorkspaceStorageFiles,
+  readUserWorkspaceStorageFile,
+  writeUserWorkspaceStorageFile,
+} from './core/storageConnectionRuntimeCore.js';
 type UserRole = 'admin' | 'user';
 import { b2ListBuckets } from './storage/B2DirectClient.js';
 import {
@@ -282,6 +288,39 @@ export const StorageServiceDefinition: ServiceDefinition = createServiceDefiniti
           input.path || '',
           (sql, params) => queryUnifiedDb(sql, params, input.env),
         ),
+    },
+    writeWorkspaceStorageFile: {
+      id: 'StorageService.writeWorkspaceStorageFile',
+      name: 'writeWorkspaceStorageFile',
+      handler: async (input: {
+        userId: string; connectionId: string; folderPrefix: string; relativePath: string;
+        content: string | Uint8Array; contentType?: string; bucketName?: string; rootFolderId?: string;
+        env?: Record<string, unknown>;
+      }) => writeUserWorkspaceStorageFile(input),
+    },
+    readWorkspaceStorageFile: {
+      id: 'StorageService.readWorkspaceStorageFile',
+      name: 'readWorkspaceStorageFile',
+      handler: async (input: {
+        userId: string; connectionId: string; folderPrefix: string; relativePath: string;
+        bucketName?: string; rootFolderId?: string; env?: Record<string, unknown>;
+      }) => readUserWorkspaceStorageFile(input),
+    },
+    deleteWorkspaceStorageFile: {
+      id: 'StorageService.deleteWorkspaceStorageFile',
+      name: 'deleteWorkspaceStorageFile',
+      handler: async (input: {
+        userId: string; connectionId: string; folderPrefix: string; relativePath: string;
+        bucketName?: string; rootFolderId?: string; env?: Record<string, unknown>;
+      }) => deleteUserWorkspaceStorageFile(input),
+    },
+    listWorkspaceStorageFiles: {
+      id: 'StorageService.listWorkspaceStorageFiles',
+      name: 'listWorkspaceStorageFiles',
+      handler: async (input: {
+        userId: string; connectionId: string; folderPrefix: string; subPrefix?: string;
+        bucketName?: string; rootFolderId?: string; env?: Record<string, unknown>;
+      }) => listUserWorkspaceStorageFiles(input),
     },
 
     listBackblazeBuckets: {
