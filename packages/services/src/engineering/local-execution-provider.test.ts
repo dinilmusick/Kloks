@@ -25,20 +25,19 @@ describe("LocalExecutionProvider", () => {
     vi.stubEnv("GOOGLE_CLIENT_SECRET", "host-google-secret-marker");
 
     const result = await new LocalExecutionProvider().execute({
-      command: "node -e \"process.stdout.write(JSON.stringify({ github: process.env.GITHUB_TOKEN || null, npm: process.env.NPM_TOKEN || null, database: process.env.SYSTEM_DATABASE_URL || null, google: process.env.GOOGLE_CLIENT_SECRET || null, explicit: process.env.EXPLICIT_BUILD_FLAG || null }))\"",
+      command: "printf '%s\\n' \"${GITHUB_TOKEN-absent}\" \"${NPM_TOKEN-absent}\" \"${SYSTEM_DATABASE_URL-absent}\" \"${GOOGLE_CLIENT_SECRET-absent}\" \"${EXPLICIT_BUILD_FLAG-absent}\"",
       environment: { EXPLICIT_BUILD_FLAG: "caller-approved" },
       timeoutMs: 10_000,
     });
 
     expect(result.status).toBe("succeeded");
-    const output = JSON.parse(result.stdout);
-    expect(output).toEqual({
-      github: null,
-      npm: null,
-      database: null,
-      google: null,
-      explicit: "caller-approved",
-    });
+    expect(result.stdout.trim().split("\\n")).toEqual([
+      "absent",
+      "absent",
+      "absent",
+      "absent",
+      "caller-approved",
+    ]);
     expect(result.stdout).not.toContain("host-github-token-marker");
     expect(result.stdout).not.toContain("host-npm-token-marker");
     expect(result.stdout).not.toContain("host-google-secret-marker");
