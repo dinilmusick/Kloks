@@ -665,6 +665,55 @@ export async function resolveUserStorageConnectionSecret(
     || null;
 }
 
+function normalizeWorkspaceAssociationPrefix(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const normalized = value.trim().replaceAll('\\\\', '/').replace(/^\.\//, '');
+  const segments = normalized.split('/');
+  if (segments.some((segment) => !segment || segment === '.' || segment === '..')) return null;
+  return segments.join('/');
+}
+
+/**
+ * Resolve the persisted workspace association for an owner-bound connection.
+ * The folder prefix is a lookup constraint only; the returned workspace data
+ * is sourced from the saved user profile and is never constructed from caller
+ * supplied storage roots.
+ */
+export async function resolveUserWorkspaceStorageAssociation(
+  userId: string,
+  connectionId: string,
+  folderPrefix: string,
+  query: StorageQuery = DEFAULT_QUERY,
+): Promise<Record<string, any> | null> {
+  if (!userId?.trim() || !connectionId?.trim()) return null;
+  const requestedPrefix = normalizeWorkspaceAssociationPrefix(folderPrefix);
+  if (!requestedPrefix) return null;
+
+  const record = await findUserRecord(userId, query);
+  if (!record) return null;
+  const workspaces = Object.values(record.profiles).flatMap((profile: any) =>
+    profile && typeof profile === 'object' && Array.isArray(profile.workspaces)
+      ? profile.workspaces
+      : [],
+  );
+  const matches = workspaces.filter((workspace: any) => {
+    if (!workspace || typeof workspace !== 'object') return false;
+    if (String(workspace.storageConnectionId || '').trim() !== connectionId) return false;
+    const provider = String(workspace.storageProvider || '').toLowerCase();
+    if (provider && !['backblaze_b2', 'google_drive'].includes(provider)) return false;
+    const storedPrefix = normalizeWorkspaceAssociationPrefix(
+      workspace.localFolderKey
+      || workspace.localFolderName
+      || workspace.workspacePath
+      || workspace.id,
+    );
+    return storedPrefix === requestedPrefix;
+  });
+
+  if (matches.length !== 1) return null;
+  return { ...matches[0], __ownerUserId: record.id };
+}
+
 async function persistStorageConnection(
   userId: string,
   connection: Record<string, any>,
