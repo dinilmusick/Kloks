@@ -53,10 +53,28 @@ async function resolveWorkspaceContext(
   if (!connection || connection.enabled === false) {
     throw new Error('The selected storage connection is unavailable for this user.');
   }
-  const folderPrefix = safeRelativePath(String(input.folderPrefix || '').replace(/^\/+|\/+$/g, ''));
+  const folderPrefix = safeRelativePath(String(input.folderPrefix || '').replace(/^\\/+|\\/+$/g, ''));
   if (!folderPrefix) throw new Error('Workspace storage folder prefix is required.');
   if (!['backblaze_b2', 'google_drive'].includes(String(connection.provider))) {
     throw new Error('Only canonical Backblaze B2 and Google Drive connections are supported by this shared file service.');
+  }
+
+  // A request may confirm the selected provider root, but cannot replace it.
+  // The authoritative bucket/root values are read from the owner-bound saved
+  // connection so callers cannot redirect operations to another resource.
+  const savedBucketName = String(connection.b2BucketName || connection.bucketName || '').trim();
+  const savedRootFolderId = String(connection.googleRootFolderId || '').trim();
+  if (connection.provider === 'backblaze_b2') {
+    if (!savedBucketName) throw new Error('The selected B2 connection has no persisted workspace bucket.');
+    if (input.bucketName && input.bucketName !== savedBucketName) {
+      throw new Error('The requested B2 bucket does not match the selected storage connection.');
+    }
+  }
+  if (connection.provider === 'google_drive') {
+    if (!savedRootFolderId) throw new Error('The selected Google Drive connection has no persisted workspace root folder.');
+    if (input.rootFolderId && input.rootFolderId !== savedRootFolderId) {
+      throw new Error('The requested Google Drive root does not match the selected storage connection.');
+    }
   }
 
   const workspace = {
@@ -66,20 +84,14 @@ async function resolveWorkspaceContext(
     storageConnectionId: connection.id,
     localFolderKey: folderPrefix,
     workspacePath: './' + folderPrefix,
-    ...(input.bucketName ? { b2BucketName: input.bucketName } : {}),
-    ...(input.rootFolderId ? { googleRootFolderId: input.rootFolderId } : {}),
+    ...(connection.provider === 'backblaze_b2' ? { b2BucketName: savedBucketName } : {}),
+    ...(connection.provider === 'google_drive' ? { googleRootFolderId: savedRootFolderId } : {}),
   };
   return {
     workspace,
     connection: {
       ...connection,
       __ownerUserId: userId,
-      ...(input.bucketName && connection.provider === 'backblaze_b2'
-        ? { b2BucketName: input.bucketName, bucketName: input.bucketName }
-        : {}),
-      ...(input.rootFolderId && connection.provider === 'google_drive'
-        ? { googleRootFolderId: input.rootFolderId }
-        : {}),
     },
   };
 }
