@@ -5,7 +5,10 @@
  */
 
 import { queryUnifiedDb } from './unifiedDb.js';
-import { resolveUserStorageConnectionSecret } from './storageConnectionCore.js';
+import {
+  resolveUserStorageConnectionSecret,
+  resolveUserWorkspaceStorageAssociation,
+} from './storageConnectionCore.js';
 import {
   deleteWorkspaceFile,
   listWorkspaceFiles,
@@ -53,21 +56,42 @@ async function resolveWorkspaceContext(
   if (!connection || connection.enabled === false) {
     throw new Error('The selected storage connection is unavailable for this user.');
   }
-  const folderPrefix = safeRelativePath(String(input.folderPrefix || '').replace(/^\/+|\/+$/g, ''));
+  const folderPrefix = safeRelativePath(String(input.folderPrefix || '').replace(/^\\/+|\\/+$/g, ''));
   if (!folderPrefix) throw new Error('Workspace storage folder prefix is required.');
   if (!['backblaze_b2', 'google_drive'].includes(String(connection.provider))) {
     throw new Error('Only canonical Backblaze B2 and Google Drive connections are supported by this shared file service.');
   }
 
-  // A request may confirm the selected provider root, but cannot replace it.
-  // The authoritative bucket/root values are read from the owner-bound saved
-  // connection so callers cannot redirect operations to another resource.
-  const savedBucketName = String(connection.b2BucketName || connection.bucketName || '').trim();
-  const savedRootFolderId = String(connection.googleRootFolderId || '').trim();
+  const persistedWorkspace = await resolveUserWorkspaceStorageAssociation(
+    userId,
+    connectionId,
+    folderPrefix,
+    query,
+  );
+  if (!persistedWorkspace) {
+    throw new Error('The selected workspace is not associated with this owner and storage connection.');
+  }
+  const workspaceProvider = String(persistedWorkspace.storageProvider || '').toLowerCase();
+  if (workspaceProvider !== String(connection.provider).toLowerCase()) {
+    throw new Error('The persisted workspace provider does not match the selected storage connection.');
+  }
+
+  // Provider roots are read from the persisted workspace first and the
+  // owner-bound connection second. Request fields may only confirm them.
+  const savedBucketName = String(
+    persistedWorkspace.b2BucketName
+    || persistedWorkspace.bucketName
+    || connection.b2BucketName
+    || connection.bucketName
+    || '',
+  ).trim();
+  const savedRootFolderId = String(
+    connection.googleRootFolderId || '',
+  ).trim();
   if (connection.provider === 'backblaze_b2') {
-    if (!savedBucketName) throw new Error('The selected B2 connection has no persisted workspace bucket.');
+    if (!savedBucketName) throw new Error('The selected workspace has no persisted B2 bucket.');
     if (input.bucketName && input.bucketName !== savedBucketName) {
-      throw new Error('The requested B2 bucket does not match the selected storage connection.');
+      throw new Error('The requested B2 bucket does not match the persisted workspace association.');
     }
   }
   if (connection.provider === 'google_drive') {
@@ -78,12 +102,13 @@ async function resolveWorkspaceContext(
   }
 
   const workspace = {
-    id: 'storage-' + connectionId,
-    name: 'Workspace',
+    ...persistedWorkspace,
+    id: String(persistedWorkspace.id),
+    name: String(persistedWorkspace.name || 'Workspace'),
     storageProvider: connection.provider,
     storageConnectionId: connection.id,
     localFolderKey: folderPrefix,
-    workspacePath: './' + folderPrefix,
+    workspacePath: String(persistedWorkspace.workspacePath || './' + folderPrefix),
     ...(connection.provider === 'backblaze_b2' ? { b2BucketName: savedBucketName } : {}),
     ...(connection.provider === 'google_drive' ? { googleRootFolderId: savedRootFolderId } : {}),
   };
