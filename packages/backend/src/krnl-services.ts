@@ -20,6 +20,7 @@ import { b2ListBuckets } from './storage/B2DirectClient.js';
 import {
   createBackblazeStorageConnection,
   deleteUserStorageConnection,
+  getGoogleDriveAccountIdentityForUser,
   getStorageProviderCapabilities,
   listBackblazeBucketsForConnection,
   listUserStorageConnections,
@@ -213,6 +214,16 @@ export const StorageServiceDefinition: ServiceDefinition = createServiceDefiniti
           input.userId,
           input.connectionId,
           input.folderId,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    getGoogleDriveAccountIdentity: {
+      id: 'StorageService.getGoogleDriveAccountIdentity',
+      name: 'getGoogleDriveAccountIdentity',
+      handler: async (input: { userId: string; connectionId: string; env?: Record<string, unknown> }) =>
+        getGoogleDriveAccountIdentityForUser(
+          input.userId,
+          input.connectionId,
           (sql, params) => queryUnifiedDb(sql, params, input.env),
         ),
     },
