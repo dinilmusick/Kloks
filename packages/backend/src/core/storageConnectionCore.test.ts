@@ -275,6 +275,41 @@ describe('canonical user storage connection security contract', () => {
   });
 
 
+
+  it('does not mint a replacement system key when decrypting an existing envelope', async () => {
+    let keyWrites = 0;
+    const profiles = {
+      srkl: {
+        storage_connections: [{
+          id: 'encrypted-b2',
+          provider: 'backblaze_b2',
+          label: 'Encrypted B2',
+          secretCiphertext: {
+            version: 1,
+            algorithm: 'AES-GCM-256',
+            iv: 'AAAAAAAAAAAAAAAA',
+            ciphertext: 'AAAAAAAAAAAAAAAAAAAAAA',
+          },
+        }],
+      },
+    };
+    const query = async (sql: string) => {
+      if (sql.includes('FROM "ultrst-users"')) {
+        return { rows: [{ id: 'user-1', app_profiles: profiles }] };
+      }
+      if (sql.includes('FROM "srkl_application_profiles"')) return { rows: [] };
+      if (sql.includes('FROM public."ultrst-credentials"')) {
+        return { rows: [{ id: 'system', credentials: {} }] };
+      }
+      if (sql.includes('UPDATE public."ultrst-credentials"')) keyWrites += 1;
+      return { rows: [] };
+    };
+
+    await expect(resolveUserStorageConnectionSecret('user-1', 'encrypted-b2', query as any))
+      .rejects.toThrow(/storage encryption key is missing/i);
+    expect(keyWrites).toBe(0);
+  });
+
   it('installs one raw 32-byte AES-256 key with an atomic nested merge', async () => {
     let systemCredentials: Record<string, any> = {
       googleDriveOAuth: {
