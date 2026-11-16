@@ -14,6 +14,18 @@ function normalizeUrl(value: unknown): string {
   return value.trim().replace(/^["']|["']$/g, '').trim();
 }
 
+/** Return unique configured URLs in primary-then-fallback order. */
+export function resolveSystemDatabaseUrlCandidates(
+  env: SystemDatabaseEnvironment = {},
+): string[] {
+  const urls = [
+    normalizeUrl(env.SYSTEM_DATABASE_URL),
+    normalizeUrl(env.SYSTEM_DATABASE_URL_2),
+    normalizeUrl(env.SYSTEM_DATABASE_URL_3),
+  ];
+  return [...new Set(urls.filter(Boolean))];
+}
+
 /** Resolve the primary system database URL, followed by the supported failover URLs. */
 export function tryResolveSystemDatabaseUrl(
   env: SystemDatabaseEnvironment = {},
