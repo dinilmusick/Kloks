@@ -31,7 +31,7 @@ vi.mock('./workspaceBucketSyncCore.js', async (importOriginal) => {
   };
 });
 
-import { findUserWorkspace, getWorkspaces } from './workspaceCore.js';
+import { deleteWorkspace, findUserWorkspace, getWorkspaces } from './workspaceCore.js';
 
 
 describe('workspace application scoping', () => {
@@ -142,6 +142,17 @@ describe('verified owner workspace lookup', () => {
       workspaces: [{ id: 'legacy-workspace', name: 'Migrated' }],
       activeWorkspaceId: 'legacy-workspace',
     });
+  });
+
+  it('keeps the workspace profile when remote cloud deletion fails', async () => {
+    workspaceMocks.syncWorkspaceDeleteToBucket.mockRejectedValue(new Error('provider delete failed'));
+
+    await expect(deleteWorkspace('owner-1', 'workspace-1'))
+      .rejects.toThrow(/provider delete failed/i);
+
+    expect(workspaceMocks.syncWorkspaceDeleteToBucket).toHaveBeenCalled();
+    expect(workspaceMocks.queryUnifiedDb.mock.calls.some(([sql]) => String(sql).startsWith('UPDATE "ultrst-users"')))
+      .toBe(false);
   });
 
   it('does not resolve workspace IDs without a verified owner identity', async () => {
