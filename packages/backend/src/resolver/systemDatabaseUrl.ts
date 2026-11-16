@@ -44,3 +44,38 @@ export function resolveSystemDatabaseUrl(
     'DATABASE_URL and SYSTEM_DATABASE_URL_1 are not supported configuration aliases.',
   );
 }
+
+
+/**
+ * Normalize the canonical system bindings at a Fetch entrypoint boundary.
+ * This helper is intentionally runtime-neutral: Node callers pass process.env
+ * as runtimeEnvironment; Workers pass their bindings as env and no Node
+ * environment. It copies only system-owned configuration keys from the
+ * runtime environment and preserves all application-provided env bindings.
+ */
+export function normalizeSystemEnvironment<T extends Record<string, unknown>>(
+  env: T = {} as T,
+  runtimeEnvironment: Record<string, unknown> = {},
+  requestUrl?: string,
+): T & Record<string, unknown> {
+  const normalized: Record<string, unknown> = { ...env };
+
+  for (const key of ['SYSTEM_DATABASE_URL', 'SYSTEM_DATABASE_URL_2', 'SYSTEM_DATABASE_URL_3']) {
+    const value = normalizeUrl(env[key]) || normalizeUrl(runtimeEnvironment[key]);
+    if (value) normalized[key] = value;
+    else if (Object.prototype.hasOwnProperty.call(env, key)) normalized[key] = undefined;
+  }
+
+  const configuredAppUrl = normalizeUrl(env.APP_URL) || normalizeUrl(runtimeEnvironment.APP_URL);
+  if (configuredAppUrl) {
+    normalized.APP_URL = configuredAppUrl;
+  } else if (requestUrl) {
+    try {
+      normalized.APP_URL = new URL(requestUrl).origin;
+    } catch {
+      // Invalid request URLs are not allowed to replace configured system state.
+    }
+  }
+
+  return normalized as T & Record<string, unknown>;
+}
