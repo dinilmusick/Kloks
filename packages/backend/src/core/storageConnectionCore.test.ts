@@ -4,7 +4,7 @@ import {
   resolveUserStorageConnectionSecret,
   toPublicStorageConnection,
 } from './storageConnectionCore.js';
-import { getOrCreateStorageConnectionEncryptionKey } from './systemCredentialsCore.js';
+import { getOrCreateStorageConnectionEncryptionKey, getStorageConnectionEncryptionKey } from './systemCredentialsCore.js';
 
 describe('canonical user storage connection security contract', () => {
   it('projects only safe connection metadata to browser callers', () => {
@@ -308,6 +308,26 @@ describe('canonical user storage connection security contract', () => {
     await expect(resolveUserStorageConnectionSecret('user-1', 'encrypted-b2', query as any))
       .rejects.toThrow(/storage encryption key is missing/i);
     expect(keyWrites).toBe(0);
+  });
+
+
+  it('rejects unsupported system key versions without replacing the installed key', async () => {
+    const installedKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+    let updates = 0;
+    const query = async (sql: string) => {
+      if (sql.includes('SELECT id, credentials')) {
+        return { rows: [{
+          id: 'system',
+          credentials: { storageConnections: { encryptionKey: installedKey, encryptionKeyVersion: 2 } },
+        }] };
+      }
+      if (sql.includes('UPDATE public."ultrst-credentials"')) updates += 1;
+      return { rows: [] };
+    };
+
+    await expect(getStorageConnectionEncryptionKey(query as any))
+      .rejects.toThrow(/version is not supported/i);
+    expect(updates).toBe(0);
   });
 
   it('installs one raw 32-byte AES-256 key with an atomic nested merge', async () => {
