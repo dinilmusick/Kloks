@@ -576,16 +576,29 @@ export async function deleteUserStorageConnection(
     throw new Error('Storage connection was not found for this user.');
   }
 
-  const referenced = Object.entries(record.profiles).some(([appId, profile]) =>
-    appId !== 'srkl'
-    && profile && typeof profile === 'object'
-    && Array.isArray((profile as any).workspaces)
-    && (profile as any).workspaces.some((workspace: any) => workspace.storageConnectionId === connectionId),
-  );
-  const srklWorkspaces = record.profiles.srkl?.workspaces;
-  const srklReferenced = Array.isArray(srklWorkspaces)
-    && srklWorkspaces.some((workspace: any) => workspace.storageConnectionId === connectionId);
-  if (referenced || srklReferenced) {
+  const isReferenced = (profiles: Record<string, any>): boolean =>
+    Object.values(profiles).some((profile) =>
+      profile && typeof profile === 'object'
+      && Array.isArray((profile as any).workspaces)
+      && (profile as any).workspaces.some((workspace: any) => workspace.storageConnectionId === connectionId),
+    );
+
+  let referenced = isReferenced(record.profiles);
+  // Existing SRKL installations may still hold workspace associations in the
+  // compatibility table even after the user connection registry is read from
+  // ultrst-users. Never delete an ID while either profile source references it.
+  if (!referenced) {
+    try {
+      const legacy = await query(
+        'SELECT app_profiles FROM "srkl_application_profiles" WHERE id = $1 LIMIT 1',
+        [record.id],
+      );
+      if (legacy.rows[0]) referenced = isReferenced(parseProfiles(legacy.rows[0].app_profiles));
+    } catch {
+      // Compatibility table no longer exists.
+    }
+  }
+  if (referenced) {
     throw new Error('This storage connection is associated with a workspace. Change the workspace storage before deleting the connection.');
   }
 
