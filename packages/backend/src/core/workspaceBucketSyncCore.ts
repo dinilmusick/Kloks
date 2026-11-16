@@ -41,13 +41,13 @@ function isPersistentCloudConnection(connection: any): boolean {
 function requireVerifiedWorkspaceOwner(workspace: any, connection: any): string {
   const connectionOwner = String(connection?.__ownerUserId || '').trim();
   const workspaceOwner = String(workspace?.__ownerUserId || '').trim();
-  if (!connectionOwner && !workspaceOwner) {
+  if (!connectionOwner) {
     throw new Error('Cloud workspace synchronization requires a connection resolved for a verified owner.');
   }
-  if (connectionOwner && workspaceOwner && connectionOwner !== workspaceOwner) {
+  if (workspaceOwner && connectionOwner !== workspaceOwner) {
     throw new Error('Cloud workspace synchronization owner does not match the persisted workspace owner.');
   }
-  return connectionOwner || workspaceOwner;
+  return connectionOwner;
 }
 
 export async function syncWorkspaceCreateToBucket(
