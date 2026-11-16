@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   queryUnifiedDb: vi.fn(),
   resolveUserStorageConnectionSecret: vi.fn(),
+  listUserStorageConnections: vi.fn(),
   syncWorkspaceDataToBucket: vi.fn(),
   readWorkspaceFile: vi.fn(),
 }));
@@ -12,6 +13,7 @@ vi.mock('./unifiedDb.js', () => ({
 }));
 vi.mock('./storageConnectionCore.js', () => ({
   resolveUserStorageConnectionSecret: mocks.resolveUserStorageConnectionSecret,
+  listUserStorageConnections: mocks.listUserStorageConnections,
 }));
 vi.mock('./workspaceBucketSyncCore.js', () => ({
   syncWorkspaceDataToBucket: mocks.syncWorkspaceDataToBucket,
@@ -52,6 +54,7 @@ describe('workspace data cloud synchronization ownership', () => {
       }
       return { rows: [] };
     });
+    mocks.listUserStorageConnections.mockResolvedValue([]);
     mocks.resolveUserStorageConnectionSecret.mockResolvedValue(connection);
     mocks.syncWorkspaceDataToBucket.mockResolvedValue(undefined);
   });
