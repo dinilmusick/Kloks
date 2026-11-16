@@ -212,6 +212,7 @@ describe('canonical user storage connection security contract', () => {
     };
     const query = async (sql: string, params: unknown[] = []) => {
       if (sql.includes('FROM "ultrst-users"')) {
+        if (params[0] === 'user-2') return { rows: [{ id: 'user-2', app_profiles: profiles }] };
         if (params[0] !== 'user-1') return { rows: [] };
         return { rows: [{ id: 'user-1', app_profiles: profiles }] };
       }
@@ -322,6 +323,15 @@ describe('canonical user storage connection security contract', () => {
       googleEmail: 'owner@example.test',
     });
     expect(await resolveUserStorageConnectionSecret('different-user', 'b2-legacy', query as any)).toBeNull();
+    await expect(resolveUserStorageConnectionSecret('user-2', 'b2-legacy', query as any))
+      .rejects.toThrow(/could not be decrypted/i);
+
+    // Rebinding an otherwise valid envelope to another opaque connection ID
+    // must fail AES-GCM authentication even for the same owner.
+    profiles = structuredClone(profiles);
+    profiles.aiko.storage_connections[0].id = 'tampered-connection-id';
+    await expect(resolveUserStorageConnectionSecret('user-1', 'tampered-connection-id', query as any))
+      .rejects.toThrow(/could not be decrypted/i);
   });
 
 
