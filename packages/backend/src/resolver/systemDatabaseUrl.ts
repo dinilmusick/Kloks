@@ -1,49 +1,46 @@
 /**
  * @file systemDatabaseUrl.ts
- * @description Centralized SYSTEM_DATABASE_URL resolver adhering to SKIPO Invariant §16.
- * Precedence: SYSTEM_DATABASE_URL_1 (primary) > SYSTEM_DATABASE_URL_2 (fallback #1) > SYSTEM_DATABASE_URL_3 (fallback #2).
- * Strictly forbids fallback to generic DATABASE_URL.
- */
-
-/**
- * Resolves the active system database URL following the strict 1 -> 2 -> 3 precedence.
- * Throws a deterministic descriptive error if no system database URL is configured.
+ * @description The canonical system database URL contract for all runtime targets.
  *
- * @param env - Environment record (defaults to process.env in Node runtime)
- * @returns Validated system database connection string
+ * SYSTEM_DATABASE_URL is the primary and required deployment binding.
+ * SYSTEM_DATABASE_URL_2 and SYSTEM_DATABASE_URL_3 are ordered failover URLs.
+ * Generic DATABASE_URL and the retired SYSTEM_DATABASE_URL_1 alias are not accepted.
  */
-export function resolveSystemDatabaseUrl(
-  env: Record<string, string | undefined> = typeof process !== 'undefined' ? process.env : {}
-): string {
-  const url =
-    (env['SYSTEM_DATABASE_URL'] && env['SYSTEM_DATABASE_URL'].trim()) ||
-    (env['SYSTEM_DATABASE_URL_1'] && env['SYSTEM_DATABASE_URL_1'].trim()) ||
-    (env['SYSTEM_DATABASE_URL_2'] && env['SYSTEM_DATABASE_URL_2'].trim()) ||
-    (env['SYSTEM_DATABASE_URL_3'] && env['SYSTEM_DATABASE_URL_3'].trim());
 
-  if (!url) {
-    throw new Error(
-      '[SKIPO DATABASE_INVARIANT] Missing system database configuration.\n' +
-      '  Set SYSTEM_DATABASE_URL (primary), SYSTEM_DATABASE_URL_2 (fallback #1),\n' +
-      '  or SYSTEM_DATABASE_URL_3 (fallback #2).\n' +
-      '  Generic DATABASE_URL is obsolete and strictly forbidden in this architecture.'
-    );
-  }
+export type SystemDatabaseEnvironment = Record<string, unknown>;
 
-  return url;
+function normalizeUrl(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  return value.trim().replace(/^["']|["']$/g, '').trim();
 }
 
-/**
- * Safe version that returns null instead of throwing if unconfigured.
- */
-export function tryResolveSystemDatabaseUrl(
-  env: Record<string, string | undefined> = typeof process !== 'undefined' ? process.env : {}
-): string | null {
-  const url =
-    (env['SYSTEM_DATABASE_URL'] && env['SYSTEM_DATABASE_URL'].trim()) ||
-    (env['SYSTEM_DATABASE_URL_1'] && env['SYSTEM_DATABASE_URL_1'].trim()) ||
-    (env['SYSTEM_DATABASE_URL_2'] && env['SYSTEM_DATABASE_URL_2'].trim()) ||
-    (env['SYSTEM_DATABASE_URL_3'] && env['SYSTEM_DATABASE_URL_3'].trim());
+function getRuntimeEnvironment(): SystemDatabaseEnvironment {
+  if (typeof process !== 'undefined' && process.env) return process.env;
+  return {};
+}
 
-  return url || null;
+/** Resolve the primary system database URL, followed by the supported failover URLs. */
+export function tryResolveSystemDatabaseUrl(
+  env: SystemDatabaseEnvironment = getRuntimeEnvironment(),
+): string | null {
+  return (
+    normalizeUrl(env.SYSTEM_DATABASE_URL) ||
+    normalizeUrl(env.SYSTEM_DATABASE_URL_2) ||
+    normalizeUrl(env.SYSTEM_DATABASE_URL_3) ||
+    null
+  );
+}
+
+/** Resolve the configured system database or return a deterministic configuration error. */
+export function resolveSystemDatabaseUrl(
+  env: SystemDatabaseEnvironment = getRuntimeEnvironment(),
+): string {
+  const url = tryResolveSystemDatabaseUrl(env);
+  if (url) return url;
+
+  throw new Error(
+    '[SKIPO DATABASE_INVARIANT] Missing system database configuration. ' +
+    'Set SYSTEM_DATABASE_URL (primary), SYSTEM_DATABASE_URL_2, or SYSTEM_DATABASE_URL_3. ' +
+    'DATABASE_URL and SYSTEM_DATABASE_URL_1 are not supported configuration aliases.',
+  );
 }
