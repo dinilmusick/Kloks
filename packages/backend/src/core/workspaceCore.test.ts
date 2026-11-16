@@ -31,7 +31,7 @@ vi.mock('./workspaceBucketSyncCore.js', async (importOriginal) => {
   };
 });
 
-import { findUserWorkspace } from './workspaceCore.js';
+import { findUserWorkspace, getWorkspaces } from './workspaceCore.js';
 
 
 describe('workspace application scoping', () => {
@@ -112,6 +112,35 @@ describe('verified owner workspace lookup', () => {
       provider: 'backblaze_b2',
       enabled: true,
       b2BucketName: 'production-bucket',
+    });
+  });
+
+  it('returns migrated legacy workspaces on the first canonical workspace read', async () => {
+    let migrated = false;
+    workspaceMocks.listUserStorageConnections.mockImplementation(async () => {
+      migrated = true;
+      return [];
+    });
+    workspaceMocks.queryUnifiedDb.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM "ultrst-users"')) {
+        return {
+          rows: [{
+            id: 'owner-1',
+            app_profiles: {
+              depm: {
+                workspaces: migrated ? [{ id: 'legacy-workspace', name: 'Migrated' }] : [],
+                activeWorkspaceId: 'legacy-workspace',
+              },
+            },
+          }],
+        };
+      }
+      return { rows: [] };
+    });
+
+    await expect(getWorkspaces('owner-1')).resolves.toMatchObject({
+      workspaces: [{ id: 'legacy-workspace', name: 'Migrated' }],
+      activeWorkspaceId: 'legacy-workspace',
     });
   });
 
