@@ -136,6 +136,29 @@ describe('canonical user storage connection security contract', () => {
           },
         ],
       },
+      kone: {
+        workspaces: [{ id: 'kone-workspace', storageProvider: 'backblaze_b2', storageConnectionId: 'kone-b2' }],
+        unrelatedProfileSetting: { retained: true },
+      },
+      srkl: {
+        workspaces: [{ id: 'srkl-workspace', storageProvider: 'backblaze_b2', storageConnectionId: 'srkl-legacy-b2' }],
+        activeWorkspaceId: 'srkl-workspace',
+      },
+    };
+    let legacyProfiles: Record<string, any> = {
+      srkl: {
+        workspaces: [{ id: 'legacy-vault', storageProvider: 'backblaze_b2', storageConnectionId: 'srkl-legacy-b2' }],
+        activeWorkspaceId: 'legacy-vault',
+        storage_connections: [{
+          id: 'srkl-legacy-b2',
+          provider: 'backblaze_b2',
+          label: 'Legacy SRKL B2',
+          b2KeyId: 'legacy-srkl-key-id',
+          b2ApplicationKey: 'legacy-srkl-secret',
+          b2BucketName: 'srkl-vault',
+        }],
+      },
+      legacyApp: { preferences: { preserve: true } },
     };
     let systemCredentials: Record<string, any> = {};
     const query = async (sql: string, params: unknown[] = []) => {
@@ -143,7 +166,9 @@ describe('canonical user storage connection security contract', () => {
         if (params[0] !== 'user-1') return { rows: [] };
         return { rows: [{ id: 'user-1', app_profiles: profiles }] };
       }
-      if (sql.includes('FROM "srkl_application_profiles"')) return { rows: [] };
+      if (sql.includes('FROM "srkl_application_profiles"')) {
+        return { rows: [{ app_profiles: legacyProfiles }] };
+      }
       if (sql.includes('FROM public."ultrst-credentials"')) {
         return {
           rows: [{
@@ -174,6 +199,10 @@ describe('canonical user storage connection security contract', () => {
         }
         return { rows: [] };
       }
+      if (sql.includes('UPDATE "srkl_application_profiles"')) {
+        legacyProfiles = JSON.parse(String(params[0]));
+        return { rows: [] };
+      }
       if (sql.includes('UPDATE "ultrst-users"')) {
         profiles = JSON.parse(String(params[0]));
         return { rows: [] };
@@ -182,7 +211,7 @@ describe('canonical user storage connection security contract', () => {
     };
 
     const publicConnections = await listUserStorageConnections('user-1', query as any);
-    expect(publicConnections).toHaveLength(2);
+    expect(publicConnections).toHaveLength(3);
     expect(JSON.stringify(publicConnections)).not.toContain('legacy-key-id');
     expect(JSON.stringify(publicConnections)).not.toContain('legacy-b2-secret');
     expect(JSON.stringify(publicConnections)).not.toContain('legacy-google-access');
@@ -205,6 +234,30 @@ describe('canonical user storage connection security contract', () => {
     expect(persisted[0]).not.toHaveProperty('b2ApplicationKey');
     expect(persisted[1]).not.toHaveProperty('googleAccessToken');
     expect(persisted[1]).not.toHaveProperty('googleRefreshToken');
+    expect(profiles.kone.workspaces[0]).toMatchObject({
+      id: 'kone-workspace',
+      storageConnectionId: 'kone-b2',
+    });
+    expect(profiles.kone.unrelatedProfileSetting).toEqual({ retained: true });
+    expect(profiles.srkl.workspaces[0]).toMatchObject({
+      id: 'srkl-workspace',
+      storageConnectionId: 'srkl-legacy-b2',
+    });
+    expect(legacyProfiles.srkl.workspaces[0]).toMatchObject({
+      id: 'legacy-vault',
+      storageConnectionId: 'srkl-legacy-b2',
+    });
+    expect(legacyProfiles.legacyApp.preferences).toEqual({ preserve: true });
+    expect(legacyProfiles.srkl.storage_connections[0]).toHaveProperty('secretCiphertext.algorithm', 'AES-GCM-256');
+    expect(JSON.stringify(legacyProfiles)).not.toContain('legacy-srkl-key-id');
+    expect(JSON.stringify(legacyProfiles)).not.toContain('legacy-srkl-secret');
+
+    const legacyB2 = await resolveUserStorageConnectionSecret('user-1', 'srkl-legacy-b2', query as any);
+    expect(legacyB2).toMatchObject({
+      b2KeyId: 'legacy-srkl-key-id',
+      b2ApplicationKey: 'legacy-srkl-secret',
+      b2BucketName: 'srkl-vault',
+    });
 
     const b2 = await resolveUserStorageConnectionSecret('user-1', 'b2-legacy', query as any);
     expect(b2).toMatchObject({
