@@ -138,9 +138,21 @@ export async function queryUnifiedDb<T = any>(
     }
   }
 
-  // Never log database URLs, SQL text, or query parameters.
-  const message = lastError instanceof Error ? lastError.message : 'unknown database error';
-  console.error('[UnifiedDB] Query execution failed:', message);
-  throw lastError instanceof Error ? lastError : new Error(message);
+  // Database driver errors can contain SQL fragments or parameter values.
+  // Preserve only the stable SQLSTATE for diagnostics and optional-table logic.
+  const rawCode = String(
+    (lastError as { code?: unknown; cause?: { code?: unknown } } | null)?.code
+    || (lastError as { cause?: { code?: unknown } } | null)?.cause?.code
+    || '',
+  ).toUpperCase();
+  const safeCode = /^[A-Z0-9]{5}$/.test(rawCode) ? rawCode : '';
+  console.error('[UnifiedDB] Query execution failed.', safeCode ? { code: safeCode } : undefined);
+  const sanitizedError = new Error(
+    safeCode
+      ? `[UnifiedDB] Query execution failed (database code ${safeCode}).`
+      : '[UnifiedDB] Query execution failed.',
+  );
+  if (safeCode) Object.assign(sanitizedError, { code: safeCode });
+  throw sanitizedError;
 
 }
