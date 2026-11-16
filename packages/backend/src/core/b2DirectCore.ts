@@ -66,8 +66,8 @@ export async function authorizeB2(keyId: string, applicationKey: string): Promis
   const auth: B2AuthData = {
     accountId: data.accountId,
     authorizationToken: data.authorizationToken,
-    apiUrl: apiUrl.replace(/\\/+$/, ''),
-    downloadUrl: downloadUrl.replace(/\\/+$/, ''),
+    apiUrl: apiUrl.replace(/\/+$/, ''),
+    downloadUrl: downloadUrl.replace(/\/+$/, ''),
     s3ApiUrl: data.apiInfo?.storageApi?.s3ApiUrl || data.s3ApiUrl,
     allowed: data.apiInfo?.storageApi?.allowed || data.allowed,
   };
@@ -120,7 +120,7 @@ export async function b2ListBuckets(keyId: string, applicationKey: string, bucke
 }
 
 export async function getB2BucketId(keyId: string, applicationKey: string, bucketName: string): Promise<string> {
-  const cacheKey = `${keyId.trim()}:${bucketName.trim()}`;
+  const cacheKey = `${keyId.trim()}:${applicationKey.trim()}:${bucketName.trim()}`;
   if (bucketIdCache.has(cacheKey)) return bucketIdCache.get(cacheKey)!;
 
   const buckets = await b2ListBuckets(keyId, applicationKey, undefined, bucketName);
