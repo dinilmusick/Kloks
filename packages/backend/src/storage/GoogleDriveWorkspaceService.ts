@@ -88,7 +88,11 @@ function quoteDriveQuery(value: string): string {
 }
 
 async function parseJson(response: Response): Promise<any> {
-  return response.json().catch(() => ({}));
+  try {
+    return await response.json();
+  } catch {
+    throw new Error('Google Drive returned an invalid JSON response.');
+  }
 }
 
 async function persistTokensSafely(
@@ -338,7 +342,10 @@ export class GoogleDriveWorkspaceService {
       url.searchParams.set('includeItemsFromAllDrives', 'true');
       if (pageToken) url.searchParams.set('pageToken', pageToken);
       const data = await parseJson(await this.api(url.toString()));
-      if (Array.isArray(data.files)) files.push(...data.files);
+      if (!Array.isArray(data.files)) {
+        throw new Error('Google Drive file listing returned an invalid response.');
+      }
+      files.push(...data.files);
       pageToken = typeof data.nextPageToken === 'string' ? data.nextPageToken : '';
     } while (pageToken);
     return files;
