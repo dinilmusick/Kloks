@@ -23,16 +23,17 @@ describe('canonical Backblaze B2 workspace client', () => {
       .mockResolvedValueOnce(new Response(marker, { status: 403 }));
     vi.stubGlobal('fetch', fetcher);
 
-    await expect(authorizeB2(
-      `auth-key-${crypto.randomUUID()}`,
-      `auth-secret-${crypto.randomUUID()}`,
-    )).rejects.toThrow('Backblaze B2 authorization failed with HTTP 403.');
-
+    let message = '';
     try {
-      await authorizeB2('unused-key', 'unused-secret');
+      await authorizeB2(
+        `auth-key-${crypto.randomUUID()}`,
+        `auth-secret-${crypto.randomUUID()}`,
+      );
     } catch (error) {
-      expect(error instanceof Error ? error.message : String(error)).not.toContain(marker);
+      message = error instanceof Error ? error.message : String(error);
     }
+    expect(message).toBe('Backblaze B2 authorization failed with HTTP 403.');
+    expect(message).not.toContain(marker);
   });
 
   it('returns only a bucket explicitly identified by restricted-key authorization metadata', async () => {
