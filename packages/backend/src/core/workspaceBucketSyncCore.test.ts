@@ -70,6 +70,17 @@ describe('owner-bound workspace bucket synchronization', () => {
     );
   });
 
+  it('rejects a workspace object that differs from the persisted workspace record', async () => {
+    mocks.resolveUserWorkspaceStorageAssociation.mockResolvedValue({
+      ...workspace,
+      id: 'another-workspace',
+    });
+
+    await expect(syncWorkspaceCreateToBucket(workspace, connection))
+      .rejects.toThrow(/persisted workspace-to-connection association/i);
+    expect(mocks.writeWorkspaceFile).not.toHaveBeenCalled();
+  });
+
   it('rejects a provider mismatch before workspace initialization', async () => {
     await expect(syncWorkspaceCreateToBucket({
       ...workspace,
