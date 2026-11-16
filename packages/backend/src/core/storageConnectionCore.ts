@@ -213,7 +213,7 @@ async function hydrateConnectionSecrets(
       throw new Error('The saved storage connection has an unsupported encrypted credential format.');
     }
     try {
-      const wrappingKey = await getOrCreateStorageConnectionEncryptionKey(query);
+      const wrappingKey = await getStorageConnectionEncryptionKey(query);
       const key = await crypto.subtle.importKey(
         'raw',
         decodeBase64Url(wrappingKey),
