@@ -138,3 +138,19 @@ export async function listUserWorkspaceStorageFiles(
   const context = await resolveWorkspaceContext(input, makeQuery(input.env));
   return listWorkspaceFiles(context.workspace, context.connection, input.subPrefix || '', input.env);
 }
+
+
+export async function deleteUserWorkspaceStorageFolder(
+  input: {
+    userId: string;
+    connectionId: string;
+    folderPrefix: string;
+    bucketName?: string;
+    rootFolderId?: string;
+    env?: Record<string, unknown>;
+  },
+): Promise<void> {
+  const context = await resolveWorkspaceContext(input, makeQuery(input.env));
+  const { deleteWorkspaceFolder } = await import('./workspaceFileCore.js');
+  await deleteWorkspaceFolder(context.workspace, context.connection, input.env);
+}
