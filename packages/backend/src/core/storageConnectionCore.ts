@@ -759,7 +759,7 @@ export async function resolveUserWorkspaceStorageAssociation(
       : [],
   );
   const matches = workspaces.filter((workspace: any) => {
-    if (!workspace || typeof workspace !== 'object') return false;
+    if (!workspace || typeof workspace !== 'object' || !String(workspace.id || '').trim()) return false;
     if (String(workspace.storageConnectionId || '').trim() !== connectionId) return false;
     const provider = String(workspace.storageProvider || '').toLowerCase();
     if (provider && !['backblaze_b2', 'google_drive'].includes(provider)) return false;
