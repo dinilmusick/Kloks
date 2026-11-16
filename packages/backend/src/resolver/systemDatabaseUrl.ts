@@ -14,14 +14,9 @@ function normalizeUrl(value: unknown): string {
   return value.trim().replace(/^["']|["']$/g, '').trim();
 }
 
-function getRuntimeEnvironment(): SystemDatabaseEnvironment {
-  if (typeof process !== 'undefined' && process.env) return process.env;
-  return {};
-}
-
 /** Resolve the primary system database URL, followed by the supported failover URLs. */
 export function tryResolveSystemDatabaseUrl(
-  env: SystemDatabaseEnvironment = getRuntimeEnvironment(),
+  env: SystemDatabaseEnvironment = {},
 ): string | null {
   return (
     normalizeUrl(env.SYSTEM_DATABASE_URL) ||
@@ -48,10 +43,9 @@ export function resolveSystemDatabaseUrl(
 
 /**
  * Normalize the canonical system bindings at a Fetch entrypoint boundary.
- * This helper is intentionally runtime-neutral: Node callers pass process.env
- * as runtimeEnvironment; Workers pass their bindings as env and no Node
- * environment. It copies only system-owned configuration keys from the
- * runtime environment and preserves all application-provided env bindings.
+ * This helper is intentionally runtime-neutral: Node callers pass their
+ * environment explicitly; Workers pass platform bindings. It copies only
+ * system-owned configuration keys and preserves application-provided bindings.
  */
 export function normalizeSystemEnvironment<T extends Record<string, unknown>>(
   env: T = {} as T,
