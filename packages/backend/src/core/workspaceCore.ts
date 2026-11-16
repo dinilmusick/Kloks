@@ -18,6 +18,23 @@ function appProfile(profiles: Record<string, any>, appId: string): Record<string
   if (!profiles[appId] || typeof profiles[appId] !== 'object') profiles[appId] = {};
   return profiles[appId];
 }
+async function resolveWorkspaceConnectionForUser(
+  userId: string,
+  profiles: Record<string, any>,
+  workspace: any,
+  env?: Record<string, unknown>,
+): Promise<Record<string, any> | null> {
+  const candidate = resolveWorkspaceConnection(profiles, workspace, workspaceAppId(env));
+  const connectionId = String(workspace?.storageConnectionId || candidate?.id || '').trim();
+  if (!connectionId) return null;
+  const connection = await resolveUserStorageConnectionSecret(
+    userId,
+    connectionId,
+    (sql, params) => queryUnifiedDb(sql, params, env),
+    workspace?.storageProvider,
+  );
+  return connection ? { ...connection, __ownerUserId: userId } : null;
+}
 export { loadWorkspaceData, saveWorkspaceData, renameAppInWorkspaceData } from './workspaceDataCore';
 export { getWorkspaceStorageDetails } from './workspaceStorageDetailsCore';
 
@@ -29,19 +46,8 @@ export async function findUserWorkspace(workspaceId: string, env?: Record<string
     const workspaces = Array.isArray(app.workspaces) ? app.workspaces : [];
     const ws = workspaces.find((w: any) => w.id === workspaceId);
     if (ws) {
-      const resolved = resolveWorkspaceConnection(profiles, ws, workspaceAppId(env));
-      const conn = resolved || (ws.storageConnectionId
-        ? await resolveUserStorageConnectionSecret(
-            String(user.id),
-            String(ws.storageConnectionId),
-            (sql, params) => queryUnifiedDb(sql, params, env),
-          )
-        : null);
-      return {
-        user,
-        workspace: ws,
-        connection: conn ? { ...conn, __ownerUserId: String(user.id) } : null,
-      };
+      const conn = await resolveWorkspaceConnectionForUser(String(user.id), profiles, ws, env);
+      return { user, workspace: ws, connection: conn };
     }
   }
   return { user: null, workspace: null, connection: null };
@@ -250,7 +256,9 @@ export async function deleteWorkspace(userId: string, wsId: string, env?: Record
   if (!app.workspaces) return { success: true, workspaces: [] };
 
   const targetWs = app.workspaces.find((w: any) => w.id === wsId);
-  const conn = targetWs ? resolveWorkspaceConnection(profiles, targetWs, workspaceAppId(env)) : null;
+  const conn = targetWs
+    ? await resolveWorkspaceConnectionForUser(String(user.id), profiles, targetWs, env)
+    : null;
 
   app.workspaces = app.workspaces.filter((w: any) => w.id !== wsId);
   if (app.activeWorkspaceId === wsId) {
