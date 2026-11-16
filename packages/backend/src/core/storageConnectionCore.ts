@@ -16,7 +16,7 @@ import {
   type GoogleDriveWorkspaceTokens,
 } from '../storage/GoogleDriveWorkspaceService.js';
 import { queryUnifiedDb } from './unifiedDb.js';
-import { getGoogleDriveOAuthConfiguration, getOrCreateStorageConnectionEncryptionKey } from './systemCredentialsCore.js';
+import { getGoogleDriveOAuthConfiguration, getOrCreateStorageConnectionEncryptionKey, getStorageConnectionEncryptionKey } from './systemCredentialsCore.js';
 
 export type StorageProviderId = 'backblaze_b2' | 'google_drive';
 
