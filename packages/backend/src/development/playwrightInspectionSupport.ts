@@ -32,7 +32,10 @@ export type BrowserLike = {
 };
 
 type PlaywrightModule = { chromium: { launch(options: object): Promise<BrowserLike> } };
-const require = createRequire(import.meta.url);
+const playwrightRuntimeRoot = process.env.PLAYWRIGHT_RUNTIME_PATH?.replace(/\\/+$/, '');
+const require = createRequire(
+  playwrightRuntimeRoot ? `${playwrightRuntimeRoot}/package.json` : import.meta.url,
+);
 
 export function findSystemChromiumExecutable(): string | undefined {
   if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH && existsSync(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH)) {
