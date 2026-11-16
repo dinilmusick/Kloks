@@ -422,6 +422,7 @@ export class GoogleDriveWorkspaceService {
     while (pending.length && visited.size < 128) {
       const current = pending.shift()!;
       if (current === rootId) return;
+      if (current === 'root' && rootId !== 'root') break;
       if (visited.has(current)) continue;
       visited.add(current);
       const folder = await this.resolveFolder(current);
