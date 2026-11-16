@@ -7,9 +7,16 @@
 import { findUserWorkspace } from './workspaceCore';
 import { b2ListBuckets, b2ListFileNames } from './b2DirectCore';
 
-export async function getWorkspaceStorageDetails(workspaceId: string, env?: Record<string, unknown>) {
+export async function getWorkspaceStorageDetails(
+  workspaceId: string,
+  env?: Record<string, unknown>,
+  verifiedUserId?: string,
+) {
   if (!workspaceId) return { success: false, error: 'workspaceId is required' };
-  const { workspace, connection } = await findUserWorkspace(workspaceId, env);
+  const ownerId = String(verifiedUserId || '').trim();
+  if (!ownerId) return { success: false, error: 'A verified workspace owner is required.' };
+  const { workspace, connection } = await findUserWorkspace(workspaceId, env, ownerId);
+  if (!workspace) return { success: false, error: 'Workspace was not found for this owner.' };
 
   const folderPrefix = workspace?.localFolderKey || workspace?.localFolderName || (workspace?.workspacePath ? workspace.workspacePath.replace(/^\.\//, '') : workspaceId);
 
