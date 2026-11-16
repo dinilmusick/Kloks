@@ -657,7 +657,7 @@ export async function deleteUserStorageConnection(
 ): Promise<PublicStorageConnection[]> {
   const record = await findUserRecord(userId, query);
   if (!record) throw new Error('User profile was not found.');
-  const connections = await mergeLegacySrklConnections(record.id, record.profiles, query);
+  const connections = await mergeLegacySrklConnections(record.id, record.profiles, query, record.email);
   if (!connections.some((connection) => connection.id === connectionId)) {
     throw new Error('Storage connection was not found for this user.');
   }
@@ -1037,7 +1037,7 @@ export async function completeGoogleDriveAuthorization(
 
   const record = await findUserRecord(userId, query);
   if (!record) throw new Error('A canonical user profile was not found for this Google Drive connection.');
-  const connections = await mergeLegacySrklConnections(record.id, record.profiles, query);
+  const connections = await mergeLegacySrklConnections(record.id, record.profiles, query, record.email);
   const existing = connections.find((item) =>
     item.provider === 'google_drive'
     && (item.googleAccountId === identity.accountId
