@@ -56,4 +56,3 @@ describe('workspace storage path containment', () => {
     expect(() => normalizeWorkspaceStoragePath('')).toThrow(/relative path/i);
   });
 });
-
