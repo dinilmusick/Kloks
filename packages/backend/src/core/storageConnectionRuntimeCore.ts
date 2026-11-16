@@ -86,7 +86,7 @@ async function resolveWorkspaceContext(
     || '',
   ).trim();
   const savedRootFolderId = String(
-    connection.googleRootFolderId || '',
+    persistedWorkspace.googleRootFolderId || connection.googleRootFolderId || '',
   ).trim();
   if (connection.provider === 'backblaze_b2') {
     if (!savedBucketName) throw new Error('The selected workspace has no persisted B2 bucket.');
@@ -97,7 +97,7 @@ async function resolveWorkspaceContext(
   if (connection.provider === 'google_drive') {
     if (!savedRootFolderId) throw new Error('The selected Google Drive connection has no persisted workspace root folder.');
     if (input.rootFolderId && input.rootFolderId !== savedRootFolderId) {
-      throw new Error('The requested Google Drive root does not match the selected storage connection.');
+      throw new Error('The requested Google Drive root does not match the persisted workspace association.');
     }
   }
 
