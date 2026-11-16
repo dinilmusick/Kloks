@@ -29,12 +29,29 @@ export function configureLocalWorkspaceFileAdapter(
   localWorkspaceFileAdapter = adapter;
 }
 
-export function getWorkspaceFolderPrefix(workspace: any): string {
-  return workspace.localFolderKey
-    || workspace.localFolderName
-    || (workspace.workspacePath ? workspace.workspacePath.replace(/^\.\//, '') : workspace.id);
+export function normalizeWorkspaceStoragePath(value: string, allowEmpty = false): string {
+  const normalized = String(value || '').replace(/\\/g, '/');
+  if (!normalized && allowEmpty) return '';
+  if (!normalized || normalized.startsWith('/') || /^[A-Za-z]:(?:$|\/)/.test(normalized) || normalized.includes('\0')) {
+    throw new Error('Storage path must be a safe workspace-relative path.');
+  }
+  const segments = normalized.split('/');
+  if (segments.some((segment) => !segment || segment === '.' || segment === '..')) {
+    throw new Error('Storage path must not contain empty, current-directory, or parent-directory segments.');
+  }
+  return segments.join('/');
 }
 
+export function getWorkspaceFolderPrefix(workspace: any): string {
+  const raw = workspace?.localFolderKey
+    || workspace?.localFolderName
+    || (workspace?.workspacePath ? workspace.workspacePath.replace(/^\.\//, '') : workspace?.id);
+  return normalizeWorkspaceStoragePath(String(raw || ''));
+}
+
+function getWorkspaceFilePath(workspace: any, relativePath: string): string {
+  return `${getWorkspaceFolderPrefix(workspace)}/${normalizeWorkspaceStoragePath(relativePath)}`;
+}
 export function isB2Workspace(workspace: any, connection: any): boolean {
   return connection?.provider === 'backblaze_b2'
     || connection?.provider === 'BACKBLAZE_B2'
