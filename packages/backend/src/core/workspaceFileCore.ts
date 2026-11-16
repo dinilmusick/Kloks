@@ -9,26 +9,24 @@ import { b2UploadFile, b2DownloadFile, b2ListFileNames, b2DeleteFileVersion, b2D
 import { createGoogleDriveWorkspaceClient } from './storageConnectionCore.js';
 import { queryUnifiedDb } from './unifiedDb.js';
 
-declare const process: any;
-
-async function getFs(): Promise<any> {
-  if (typeof process !== 'undefined' && process.versions?.node) {
-    try {
-      const mod = await import('node:fs');
-      return mod.promises || mod.default?.promises || mod;
-    } catch {}
-  }
-  return null;
+/**
+ * Local filesystem adapter injection. The portable module has no Node imports;
+ * the explicit /backend/node entrypoint installs the Node implementation.
+ */
+export interface LocalWorkspaceFileAdapter {
+  write(path: string, content: Uint8Array): Promise<void>;
+  read(path: string): Promise<Uint8Array | null>;
+  delete(path: string): Promise<boolean>;
+  list(path: string): Promise<Array<{ fileName: string; sizeBytes: number }>>;
+  deleteFolder(path: string): Promise<void>;
 }
 
-async function getPath(): Promise<any> {
-  if (typeof process !== 'undefined' && process.versions?.node) {
-    try {
-      const mod = await import('node:path');
-      return mod.default || mod;
-    } catch {}
-  }
-  return null;
+let localWorkspaceFileAdapter: LocalWorkspaceFileAdapter | null = null;
+
+export function configureLocalWorkspaceFileAdapter(
+  adapter: LocalWorkspaceFileAdapter | null,
+): void {
+  localWorkspaceFileAdapter = adapter;
 }
 
 export function getWorkspaceFolderPrefix(workspace: any): string {
@@ -111,12 +109,8 @@ export async function writeWorkspaceFile(
     return;
   }
 
-  const fs = await getFs();
-  const path = await getPath();
-  if (!fs || !path) throw new Error('Local filesystem operations are not supported in this runtime.');
-  const localDir = path.resolve(process.cwd(), folderPrefix, path.dirname(cleanRel));
-  await fs.mkdir(localDir, { recursive: true });
-  await fs.writeFile(path.resolve(process.cwd(), folderPrefix, cleanRel), bytes);
+  if (!localWorkspaceFileAdapter) throw new Error('Local filesystem operations require the explicit Kloks Node backend adapter.');
+  await localWorkspaceFileAdapter.write(`${folderPrefix}/${cleanRel}`, bytes);
 }
 
 export async function readWorkspaceFile(
@@ -143,16 +137,8 @@ export async function readWorkspaceFile(
     return b2DownloadFile(config.keyId, config.applicationKey, config.bucketName, `${folderPrefix}/${cleanRel}`);
   }
 
-  const fs = await getFs();
-  const path = await getPath();
-  if (!fs || !path) return null;
-  const fullPath = path.resolve(process.cwd(), folderPrefix, cleanRel);
-  try {
-    const file = await fs.readFile(fullPath);
-    return new Uint8Array(file);
-  } catch {
-    return null;
-  }
+  if (!localWorkspaceFileAdapter) return null;
+  return localWorkspaceFileAdapter.read(`${folderPrefix}/${cleanRel}`);
 }
 
 export async function deleteWorkspaceFile(
@@ -180,16 +166,8 @@ export async function deleteWorkspaceFile(
     return true;
   }
 
-  const fs = await getFs();
-  const path = await getPath();
-  if (!fs || !path) return false;
-  const fullPath = path.resolve(process.cwd(), folderPrefix, cleanRel);
-  try {
-    await fs.unlink(fullPath);
-    return true;
-  } catch {
-    return false;
-  }
+  if (!localWorkspaceFileAdapter) return false;
+  return localWorkspaceFileAdapter.delete(`${folderPrefix}/${cleanRel}`);
 }
 
 export async function listWorkspaceFiles(
@@ -223,27 +201,14 @@ export async function listWorkspaceFiles(
     }));
   }
 
-  const fs = await getFs();
-  const path = await getPath();
-  if (!fs || !path) return [];
-  const baseDir = path.resolve(process.cwd(), folderPrefix, subPrefix);
-  try {
-    const entries = await fs.readdir(baseDir, { withFileTypes: true, recursive: true });
-    const result: Array<{ fileName: string; sizeBytes: number }> = [];
-    for (const entry of entries) {
-      if (entry.isFile()) {
-        const full = path.join(entry.parentPath || baseDir, entry.name);
-        const stat = await fs.stat(full);
-        result.push({
-          fileName: path.relative(path.resolve(process.cwd(), folderPrefix), full),
-          sizeBytes: stat.size,
-        });
-      }
-    }
-    return result;
-  } catch {
-    return [];
-  }
+  if (!localWorkspaceFileAdapter) return [];
+  const files = await localWorkspaceFileAdapter.list(`${folderPrefix}/${subPrefix}`);
+  return files.map((file) => ({
+    ...file,
+    fileName: file.fileName.startsWith(`${folderPrefix}/`)
+      ? file.fileName.slice(folderPrefix.length + 1)
+      : file.fileName,
+  }));
 }
 
 export async function deleteWorkspaceFolder(
@@ -265,11 +230,5 @@ export async function deleteWorkspaceFolder(
     return;
   }
 
-  const fs = await getFs();
-  const path = await getPath();
-  if (!fs || !path) return;
-  const localDir = path.resolve(process.cwd(), folderPrefix);
-  try {
-    await fs.rm(localDir, { recursive: true, force: true });
-  } catch {}
+  if (localWorkspaceFileAdapter) await localWorkspaceFileAdapter.deleteFolder(folderPrefix);
 }
