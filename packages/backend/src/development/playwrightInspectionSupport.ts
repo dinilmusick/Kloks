@@ -32,11 +32,6 @@ export type BrowserLike = {
 };
 
 type PlaywrightModule = { chromium: { launch(options: object): Promise<BrowserLike> } };
-const playwrightRuntimeRoot = process.env.PLAYWRIGHT_RUNTIME_PATH?.replace(/\\/+$/, '');
-const require = createRequire(
-  playwrightRuntimeRoot ? `${playwrightRuntimeRoot}/package.json` : import.meta.url,
-);
-
 export function findSystemChromiumExecutable(): string | undefined {
   if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH && existsSync(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH)) {
     return process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
@@ -58,7 +53,11 @@ export function findSystemChromiumExecutable(): string | undefined {
 }
 
 export function loadPlaywright(): PlaywrightModule {
-  try { return require('playwright') as PlaywrightModule; }
+  const runtimeRoot = process.env.PLAYWRIGHT_RUNTIME_PATH;
+  const requireFromRuntime = runtimeRoot
+    ? createRequire(`${runtimeRoot}/package.json`)
+    : createRequire(import.meta.url);
+  try { return requireFromRuntime('playwright') as PlaywrightModule; }
   catch { throw new Error('Playwright is required for browser inspection. Install the optional "playwright" package and Chromium browser.'); }
 }
 
