@@ -17,6 +17,7 @@ import { loginSystemUser, resolveUserFromToken } from './auth/UnifiedAuthCore.js
 import { queryUnifiedDb } from './core/unifiedDb.js';
 import {
   deleteUserWorkspaceStorageFile,
+  deleteUserWorkspaceStorageFolder,
   listUserWorkspaceStorageFiles,
   readUserWorkspaceStorageFile,
   writeUserWorkspaceStorageFile,
@@ -313,6 +314,14 @@ export const StorageServiceDefinition: ServiceDefinition = createServiceDefiniti
         userId: string; connectionId: string; folderPrefix: string; relativePath: string;
         bucketName?: string; rootFolderId?: string; env?: Record<string, unknown>;
       }) => deleteUserWorkspaceStorageFile(input),
+    },
+    deleteWorkspaceStorageFolder: {
+      id: 'StorageService.deleteWorkspaceStorageFolder',
+      name: 'deleteWorkspaceStorageFolder',
+      handler: async (input: {
+        userId: string; connectionId: string; folderPrefix: string;
+        bucketName?: string; rootFolderId?: string; env?: Record<string, unknown>;
+      }) => deleteUserWorkspaceStorageFolder(input),
     },
     listWorkspaceStorageFiles: {
       id: 'StorageService.listWorkspaceStorageFiles',
