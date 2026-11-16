@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { authorizeB2, b2UploadFile } from './B2DirectClient.js';
+import {
+  authorizeB2,
+  b2DownloadFile,
+  b2ListBuckets,
+  b2ListFileNames,
+  b2UploadFile,
+} from './B2DirectClient.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -64,5 +70,57 @@ describe('Fetch-native Backblaze B2 client security and portability', () => {
     expect(headers.get('Content-Length')).toBeNull();
     expect(headers.get('X-Bz-Content-Sha1')).toMatch(/^[a-f0-9]{40}$/);
     expect(uploadCall[1]?.body).toBeInstanceOf(Uint8Array);
+  });
+
+  it('does not convert failed bucket discovery into an empty bucket collection', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        authorizationToken: 'account-token',
+        apiUrl: 'https://api.example.test',
+        downloadUrl: 'https://download.example.test',
+        accountId: 'account-1',
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response('secret provider diagnostic', { status: 403 }));
+    vi.stubGlobal('fetch', fetcher);
+
+    await expect(b2ListBuckets('bucket-list-key', 'bucket-list-secret'))
+      .rejects.toThrow('B2 bucket discovery failed with HTTP 403.');
+  });
+
+  it('does not convert failed file listing into an empty file collection', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        authorizationToken: 'account-token',
+        apiUrl: 'https://api.example.test',
+        downloadUrl: 'https://download.example.test',
+        accountId: 'account-1',
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        buckets: [{ bucketName: 'workspace-bucket', bucketId: 'bucket-1' }],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response('secret provider diagnostic', { status: 500 }));
+    vi.stubGlobal('fetch', fetcher);
+
+    await expect(b2ListFileNames('file-list-key', 'file-list-secret', 'workspace-bucket', 'root/'))
+      .rejects.toThrow('B2 file listing failed with HTTP 500.');
+  });
+
+  it('returns null only for a missing file and preserves other download failures', async () => {
+    const makeFetcher = (status: number) => vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        authorizationToken: `account-token-${status}`,
+        apiUrl: 'https://api.example.test',
+        downloadUrl: 'https://download.example.test',
+        accountId: 'account-1',
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response('provider diagnostic', { status }));
+    vi.stubGlobal('fetch', makeFetcher(403));
+
+    await expect(b2DownloadFile('download-key-403', 'download-secret-403', 'bucket', 'root/file'))
+      .rejects.toThrow('B2 file download failed with HTTP 403.');
+
+    vi.stubGlobal('fetch', makeFetcher(404));
+    await expect(b2DownloadFile('download-key-404', 'download-secret-404', 'bucket', 'root/file'))
+      .resolves.toBeNull();
   });
 });
