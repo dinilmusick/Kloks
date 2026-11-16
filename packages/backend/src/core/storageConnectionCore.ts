@@ -589,7 +589,7 @@ export async function listUserStorageConnections(
     .filter((connection): connection is PublicStorageConnection => Boolean(connection));
 }
 
-/** Server-only credential resolver./** Server-only credential resolver. Never return this object from an HTTP API. */
+/** Server-only credential resolver. Never return this object from an HTTP API. */
 export async function resolveUserStorageConnectionSecret(
   userId: string,
   connectionId?: string,
@@ -615,7 +615,7 @@ async function persistStorageConnection(
   await persistStorageConnectionCollection(userId, next, query);
 }
 
-export async function testBackblazeCredentials(export async function testBackblazeCredentials(
+export async function testBackblazeCredentials(
   keyId: string,
   applicationKey: string,
 ): Promise<{ success: boolean; accountId?: string; buckets: Array<{ id: string; name: string; type?: string }>; error?: string }> {
