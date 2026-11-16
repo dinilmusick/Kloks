@@ -7,6 +7,24 @@ import {
 import { getGoogleDriveOAuthConfiguration, getOrCreateStorageConnectionEncryptionKey, getStorageConnectionEncryptionKey } from './systemCredentialsCore.js';
 
 describe('canonical user storage connection security contract', () => {
+  it('does not swallow operational failures while reading the legacy profile store', async () => {
+    const query = async (sql: string) => {
+      if (sql.includes('FROM "ultrst-users"')) {
+        return { rows: [{ id: 'user-1', app_profiles: { aiko: { preferences: { keep: true } } } }] };
+      }
+      if (sql.includes('FROM "srkl_application_profiles"')) {
+        throw Object.assign(new Error('permission denied for table srkl_application_profiles'), {
+          code: '42501',
+        });
+      }
+      return { rows: [] };
+    };
+
+    await expect(listUserStorageConnections('user-1', query as any))
+      .rejects.toThrow(/permission denied/i);
+  });
+
+
   it('projects only safe connection metadata to browser callers', () => {
     const raw = {
       id: 'conn-b2-1',
