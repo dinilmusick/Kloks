@@ -983,7 +983,9 @@ export async function createGoogleDriveWorkspaceClient(
   rootFolderId?: string,
 ): Promise<GoogleDriveWorkspaceService> {
   const connection = await resolveUserStorageConnectionSecret(userId, connectionId, query, 'google_drive');
-  if (!connection) throw new Error('Google Drive connection was not found for this user.');
+  if (!connection || connection.enabled === false) {
+    throw new Error('Google Drive connection was not found or is disabled for this user.');
+  }
 
   const system = await getSystemGoogleOAuthConfiguration(query);
   const tokens: GoogleDriveWorkspaceTokens = {
@@ -997,17 +999,25 @@ export async function createGoogleDriveWorkspaceClient(
     throw new Error('Google Drive connection has no saved authorization tokens. Reconnect the Google account.');
   }
 
-  return new GoogleDriveWorkspaceService({
+  const connectionRootFolderId = String(connection.googleRootFolderId || 'root');
+  const selectedRootFolderId = String(rootFolderId || connectionRootFolderId);
+  const createService = (selectedRoot: string) => new GoogleDriveWorkspaceService({
     clientId: system.clientId,
     clientSecret: system.clientSecret,
     redirectUri: system.redirectUri,
     tokens,
-    rootFolderId: rootFolderId || String(connection.googleRootFolderId || 'root'),
+    rootFolderId: selectedRoot,
     googleAccountId: String(connection.googleAccountId || ''),
     persistTokens: async (nextTokens) => {
       await persistGoogleDriveTokens(userId, connectionId, nextTokens, query);
     },
   });
+
+  if (selectedRootFolderId !== connectionRootFolderId) {
+    const rootVerifier = createService(connectionRootFolderId);
+    await rootVerifier.assertFolderWithinRoot(selectedRootFolderId);
+  }
+  return createService(selectedRootFolderId);
 }
 
 /** Complete the system-configured OAuth exchange and save the resulting user connection. */
