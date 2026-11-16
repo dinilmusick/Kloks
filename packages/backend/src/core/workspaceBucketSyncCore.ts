@@ -49,7 +49,7 @@ export async function syncWorkspaceCreateToBucket(
     throw new Error('Workspace initialization requires its exact, verified persistent storage connection.');
   }
 
-  const metadata = {
+  const metadata: Record<string, unknown> = {
     id: workspace.id,
     name: workspace.name,
     createdAt: workspace.createdAt,
