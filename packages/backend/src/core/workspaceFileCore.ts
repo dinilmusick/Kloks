@@ -246,7 +246,12 @@ export async function deleteWorkspaceFolder(
     const drive = await getGoogleDriveClient(workspace, connection, env);
     const removeTree = async (relativePath: string): Promise<void> => {
       let entries: Array<{ path: string; isFolder?: boolean }> = [];
-      try { entries = await drive.list(relativePath); } catch { return; }
+      try {
+        entries = await drive.list(relativePath);
+      } catch (error) {
+        if (error instanceof Error && /not found|HTTP 404/i.test(error.message)) return;
+        throw error;
+      }
       for (const entry of entries) {
         if (entry.isFolder) await removeTree(entry.path);
         else await drive.delete(entry.path);
