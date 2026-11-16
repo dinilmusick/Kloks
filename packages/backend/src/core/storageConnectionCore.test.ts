@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  deleteUserStorageConnection,
   listUserStorageConnections,
   resolveUserStorageConnectionSecret,
   resolveUserWorkspaceStorageAssociation,
@@ -59,6 +60,43 @@ describe('canonical user storage connection security contract', () => {
       'workspaces/production',
       query as any,
     )).resolves.toBeNull();
+  });
+
+  it('does not delete a connection when legacy workspace-reference verification fails', async () => {
+    let legacyReads = 0;
+    let writes = 0;
+    const query = async (sql: string) => {
+      if (sql.includes('FROM "ultrst-users"')) {
+        return {
+          rows: [{
+            id: 'user-1',
+            app_profiles: {
+              srkl: {
+                storage_connections: [{
+                  id: 'connection-1',
+                  provider: 'backblaze_b2',
+                  label: 'B2',
+                }],
+                workspaces: [],
+              },
+            },
+          }],
+        };
+      }
+      if (sql.includes('FROM "srkl_application_profiles"')) {
+        legacyReads += 1;
+        if (legacyReads === 1) return { rows: [] };
+        throw Object.assign(new Error('permission denied for table srkl_application_profiles'), {
+          code: '42501',
+        });
+      }
+      if (/^\\s*(UPDATE|DELETE)\\b/i.test(sql)) writes += 1;
+      return { rows: [] };
+    };
+
+    await expect(deleteUserStorageConnection('user-1', 'connection-1', query as any))
+      .rejects.toThrow(/permission denied/i);
+    expect(writes).toBe(0);
   });
 
   it('does not swallow operational failures while reading the legacy profile store', async () => {
