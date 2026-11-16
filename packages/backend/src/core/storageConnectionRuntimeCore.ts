@@ -53,7 +53,7 @@ async function resolveWorkspaceContext(
   if (!connection || connection.enabled === false) {
     throw new Error('The selected storage connection is unavailable for this user.');
   }
-  const folderPrefix = safeRelativePath(String(input.folderPrefix || '').replace(/^\\/+|\\/+$/g, ''));
+  const folderPrefix = safeRelativePath(String(input.folderPrefix || '').replace(/^\/+|\/+$/g, ''));
   if (!folderPrefix) throw new Error('Workspace storage folder prefix is required.');
   if (!['backblaze_b2', 'google_drive'].includes(String(connection.provider))) {
     throw new Error('Only canonical Backblaze B2 and Google Drive connections are supported by this shared file service.');
