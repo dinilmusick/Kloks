@@ -112,7 +112,7 @@ describe('canonical user storage connection security contract', () => {
           }],
         };
       }
-      if (sql.includes('"ultrst-users"')) {
+      if (sql.startsWith('SELECT') && sql.includes('"ultrst-users"')) {
         if (params?.[0] === 'other-user') return { rows: [] };
         expect(params?.[0]).toBe('user-1');
         return {
@@ -198,6 +198,7 @@ describe('canonical user storage connection security contract', () => {
         return { rows: [{ id: 'user-1', app_profiles: profiles }] };
       }
       if (sql.includes('FROM "srkl_application_profiles"')) {
+        if (params[0] !== 'user-1') return { rows: [] };
         return { rows: [{ app_profiles: legacyProfiles }] };
       }
       if (sql.includes('FROM public."ultrst-credentials"')) {
