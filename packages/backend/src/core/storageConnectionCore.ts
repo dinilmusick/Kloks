@@ -223,7 +223,7 @@ async function hydrateConnectionSecrets(
       const wrappingKey = await getStorageConnectionEncryptionKey(query);
       const key = await crypto.subtle.importKey(
         'raw',
-        decodeBase64Url(wrappingKey),
+        toCryptoBufferSource(decodeBase64Url(wrappingKey)),
         { name: 'AES-GCM' },
         false,
         ['decrypt'],
