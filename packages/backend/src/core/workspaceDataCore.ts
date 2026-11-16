@@ -6,8 +6,30 @@
  */
 
 import { queryUnifiedDb } from './unifiedDb';
-import { resolveWorkspaceConnection, syncWorkspaceDataToBucket } from './workspaceBucketSyncCore';
+import { syncWorkspaceDataToBucket } from './workspaceBucketSyncCore';
+import { resolveUserStorageConnectionSecret } from './storageConnectionCore.js';
 import { readWorkspaceFile } from './workspaceFileCore';
+
+async function resolveWorkspaceConnectionForOwner(
+  user: Record<string, any>,
+  workspace: Record<string, any>,
+  env?: Record<string, unknown>,
+) {
+  const userId = String(user?.id || '').trim();
+  const connectionId = String(workspace?.storageConnectionId || '').trim();
+  const provider = String(workspace?.storageProvider || '').toLowerCase();
+  if (!userId || !connectionId || !['backblaze_b2', 'google_drive'].includes(provider)) return null;
+  const connection = await resolveUserStorageConnectionSecret(
+    userId,
+    connectionId,
+    (sql, params) => queryUnifiedDb(sql, params, env),
+    provider,
+  );
+  if (!connection || connection.enabled === false || String(connection.provider || '').toLowerCase() !== provider) {
+    return null;
+  }
+  return { ...connection, __ownerUserId: userId };
+}
 
 async function resolveUserRow(userId?: string, env?: Record<string, unknown>) {
   if (userId) {
@@ -32,7 +54,7 @@ export async function loadWorkspaceData(userId?: string, workspaceId?: string, e
   if (isEmptyData) {
     const ws = (depm.workspaces || []).find((w: any) => w.id === workspaceId);
     if (ws) {
-      const conn = resolveWorkspaceConnection(profiles, ws);
+      const conn = await resolveWorkspaceConnectionForOwner(user, ws, env);
       if (conn) {
         try {
           const fileBuf = await readWorkspaceFile(ws, conn, 'ecosystem.json');
@@ -142,8 +164,19 @@ export async function saveWorkspaceData(
 
   const ws = Array.isArray(profiles.depm?.workspaces) ? profiles.depm.workspaces.find((w: any) => w.id === workspaceId) : null;
   if (ws) {
-    const conn = resolveWorkspaceConnection(profiles, ws);
-    await syncWorkspaceDataToBucket(ws, conn, data, env);
+    const provider = String(ws.storageProvider || '').toLowerCase();
+    if (provider === 'backblaze_b2' || provider === 'google_drive') {
+      const conn = await resolveWorkspaceConnectionForOwner(user, ws, env);
+      if (!conn) {
+        throw new Error('Workspace data synchronization requires its exact owner-owned storage connection.');
+      }
+      await syncWorkspaceDataToBucket(
+        { ...ws, __ownerUserId: String(user.id) },
+        conn,
+        data,
+        env,
+      );
+    }
   }
 
   return { success: true, workspaceId, workspace: data };
