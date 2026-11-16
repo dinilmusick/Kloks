@@ -17,8 +17,9 @@ describe('canonical user storage connection security contract', () => {
       localFolderKey: 'workspaces/production',
       b2BucketName: 'production-bucket',
     };
-    const query = async (sql: string) => {
+    const query = async (sql: string, params: unknown[] = []) => {
       if (sql.includes('FROM "ultrst-users"')) {
+        if (params[0] !== 'owner-1') return { rows: [] };
         return {
           rows: [{
             id: 'owner-1',
@@ -57,10 +58,7 @@ describe('canonical user storage connection security contract', () => {
       'connection-1',
       'workspaces/production',
       query as any,
-    )).resolves.toMatchObject({
-      id: 'workspace-1',
-      __ownerUserId: 'owner-1',
-    });
+    )).resolves.toBeNull();
   });
 
   it('does not swallow operational failures while reading the legacy profile store', async () => {
