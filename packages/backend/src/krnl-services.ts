@@ -17,6 +17,13 @@ import { loginSystemUser, resolveUserFromToken } from './auth/UnifiedAuthCore.js
 import { queryUnifiedDb } from './core/unifiedDb.js';
 type UserRole = 'admin' | 'user';
 import { b2ListBuckets } from './storage/B2DirectClient.js';
+import {
+  createBackblazeStorageConnection,
+  getStorageProviderCapabilities,
+  listBackblazeBucketsForConnection,
+  listUserStorageConnections,
+  testBackblazeCredentials,
+} from './core/storageConnectionCore.js';
 import { getSrklAccounts, srklListBackblazeBuckets } from './srkl/SrklDiscoveryService.js';
 import { findUserWorkspace, getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace } from './core/workspaceCore.js';
 import {
@@ -68,6 +75,49 @@ export const StorageServiceDefinition: ServiceDefinition = createServiceDefiniti
   name: 'StorageService',
   version: '1.0.0',
   operations: {
+    getProviderCapabilities: {
+      id: 'StorageService.getProviderCapabilities',
+      name: 'getProviderCapabilities',
+      handler: async (input: { env?: Record<string, unknown> }) =>
+        getStorageProviderCapabilities((sql, params) => queryUnifiedDb(sql, params, input.env)),
+    },
+    getConnections: {
+      id: 'StorageService.getConnections',
+      name: 'getConnections',
+      handler: async (input: { userId: string; env?: Record<string, unknown> }) =>
+        listUserStorageConnections(input.userId, (sql, params) => queryUnifiedDb(sql, params, input.env)),
+    },
+    testBackblazeCredentials: {
+      id: 'StorageService.testBackblazeCredentials',
+      name: 'testBackblazeCredentials',
+      handler: async (input: { keyId: string; applicationKey: string }) =>
+        testBackblazeCredentials(input.keyId, input.applicationKey),
+    },
+    createBackblazeConnection: {
+      id: 'StorageService.createBackblazeConnection',
+      name: 'createBackblazeConnection',
+      handler: async (input: {
+        userId: string;
+        label?: string;
+        keyId: string;
+        applicationKey: string;
+        bucketName: string;
+        region?: string;
+        endpoint?: string;
+        env?: Record<string, unknown>;
+      }) =>
+        createBackblazeStorageConnection(input, (sql, params) => queryUnifiedDb(sql, params, input.env)),
+    },
+    listBackblazeConnectionBuckets: {
+      id: 'StorageService.listBackblazeConnectionBuckets',
+      name: 'listBackblazeConnectionBuckets',
+      handler: async (input: { userId: string; connectionId: string; env?: Record<string, unknown> }) =>
+        listBackblazeBucketsForConnection(
+          input.userId,
+          input.connectionId,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
     listBackblazeBuckets: {
       id: 'StorageService.listBackblazeBuckets',
       name: 'listBackblazeBuckets',
