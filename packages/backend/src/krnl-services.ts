@@ -213,14 +213,20 @@ export const DatabaseServiceDefinition: ServiceDefinition = createServiceDefinit
     query: {
       id: 'DatabaseService.query',
       name: 'query',
-      handler: async (input: { sql: string; params?: unknown[] }) => {
-        return { rows: [], sql: input.sql, executedAt: Date.now() };
-      },
+      handler: async (input: { sql: string; params?: unknown[]; env?: Record<string, unknown> }) =>
+        queryUnifiedDb(input.sql, input.params || [], input.env),
     },
     isHealthy: {
       id: 'DatabaseService.isHealthy',
       name: 'isHealthy',
-      handler: async () => ({ healthy: true }),
+      handler: async (input: { env?: Record<string, unknown> }) => {
+        try {
+          await queryUnifiedDb('SELECT 1 AS ok', [], input.env);
+          return { healthy: true };
+        } catch {
+          return { healthy: false, reason: 'SYSTEM_DATABASE_UNAVAILABLE' };
+        }
+      },
     },
   },
 });
