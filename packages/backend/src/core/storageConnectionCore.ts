@@ -206,14 +206,18 @@ export async function listUserStorageConnections(
 /** Server-only credential resolver. Never return this object from an HTTP API. */
 export async function resolveUserStorageConnectionSecret(
   userId: string,
-  connectionId: string,
+  connectionId?: string,
   query: StorageQuery = DEFAULT_QUERY,
+  provider?: string,
 ): Promise<Record<string, any> | null> {
-  if (!connectionId) return null;
   const record = await findUserRecord(userId, query);
   if (!record) return null;
   const raw = await mergeLegacySrklConnections(record.id, record.profiles, query);
-  return raw.find((item) => item.id === connectionId) || null;
+  const eligible = provider ? raw.filter((item) => item.provider === provider) : raw;
+  if (connectionId) return eligible.find((item) => item.id === connectionId) || null;
+  return eligible.find((item) => item.role === 'primary' && item.enabled !== false)
+    || eligible.find((item) => item.enabled !== false)
+    || null;
 }
 
 async function persistStorageConnection(
@@ -362,8 +366,7 @@ export async function createBackblazeStorageConnection(
   );
   if (duplicate) return toPublicStorageConnection(duplicate)!;
 
-  const connectionsInProfile = connectionCollections(record.profiles).flat();
-  connection.role = connectionsInProfile.length === 0 ? 'primary' : 'redundant_clone';
+  connection.role = currentConnections.length === 0 ? 'primary' : 'redundant_clone';
   await persistStorageConnection(record.id, connection, query);
   return toPublicStorageConnection(connection)!;
 }
