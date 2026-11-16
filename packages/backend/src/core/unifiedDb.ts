@@ -19,13 +19,21 @@ export function cleanDbUrl(url?: unknown): string {
 }
 
 /**
- * A supplied runtime binding is authoritative. Do not silently fall back to
- * process.env when an explicit Worker binding object was provided: that can
- * conceal a missing deployment secret with a stale Node compatibility value.
+ * Fully normalized Worker/Fetch env objects carry all three canonical keys,
+ * even when unset. Such an object is authoritative and must not be masked by
+ * process.env. Partial service context objects (for example {WORKSPACE_APP_ID})
+ * retain the Node compatibility fallback used by existing callers.
  */
 export function getUnifiedDbUrl(env?: Record<string, unknown>): string {
-  if (env !== undefined) return tryResolveSystemDatabaseUrl(env) || '';
-  return tryResolveSystemDatabaseUrl();
+  if (env !== undefined) {
+    const hasCanonicalBindings = [
+      'SYSTEM_DATABASE_URL',
+      'SYSTEM_DATABASE_URL_2',
+      'SYSTEM_DATABASE_URL_3',
+    ].some((key) => Object.prototype.hasOwnProperty.call(env, key));
+    if (hasCanonicalBindings) return tryResolveSystemDatabaseUrl(env) || '';
+  }
+  return tryResolveSystemDatabaseUrl() || '';
 }
 
 export async function queryUnifiedDb<T = any>(
