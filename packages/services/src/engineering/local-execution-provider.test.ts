@@ -31,7 +31,7 @@ describe("LocalExecutionProvider", () => {
     });
 
     expect(result.status).toBe("succeeded");
-    expect(result.stdout.trim().split("\\n")).toEqual([
+    expect(result.stdout.trim().split("\n")).toEqual([
       "absent",
       "absent",
       "absent",
