@@ -45,6 +45,7 @@ import {
   deleteGoogleDriveFileForConnection,
   listGoogleDriveFilesForConnection,
   listGoogleDriveFoldersForConnection,
+  persistGoogleDriveTokens,
   readGoogleDriveFileForConnection,
   selectGoogleDriveRootFolder,
   testGoogleDriveConnectionForUser,
@@ -202,6 +203,23 @@ export const StorageServiceDefinition: ServiceDefinition = createServiceDefiniti
           (sql, params) => queryUnifiedDb(sql, params, input.env),
         ),
     },
+    /** Server-only token persistence for the shared Google Drive adapter. */
+    persistGoogleDriveTokens: {
+      id: 'StorageService.persistGoogleDriveTokens',
+      name: 'persistGoogleDriveTokens',
+      handler: async (input: {
+        userId: string;
+        connectionId: string;
+        tokens: { accessToken: string; refreshToken?: string; expiresAt?: number; tokenType?: string };
+        env?: Record<string, unknown>;
+      }) => persistGoogleDriveTokens(
+        input.userId,
+        input.connectionId,
+        input.tokens,
+        (sql, params) => queryUnifiedDb(sql, params, input.env),
+      ),
+    },
+
     listGoogleDriveFolders: {
       id: 'StorageService.listGoogleDriveFolders',
       name: 'listGoogleDriveFolders',
