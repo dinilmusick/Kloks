@@ -132,6 +132,30 @@ export async function getGoogleDriveOAuthConfiguration(
  * It is stored only in the canonical system.ultrst-credentials record and
  * is never included in provider capability or user connection projections.
  */
+function decodeStorageEncryptionKey(value: string): Uint8Array {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(value)) {
+    throw new Error('[STORAGE_SECRET_CONFIGURATION_INVALID] The canonical storage encryption key is malformed.');
+  }
+  const base64 = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(44, '=');
+  let binary: string;
+  try {
+    binary = atob(base64);
+  } catch {
+    throw new Error('[STORAGE_SECRET_CONFIGURATION_INVALID] The canonical storage encryption key is malformed.');
+  }
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  if (bytes.length !== 32) {
+    throw new Error('[STORAGE_SECRET_CONFIGURATION_INVALID] The canonical storage encryption key must decode to exactly 32 bytes.');
+  }
+  return bytes;
+}
+
+/**
+ * System-owned AES-256 wrapping key for user-scoped storage provider secrets.
+ * Existing keys are never silently replaced: doing so would make already
+ * encrypted connections irrecoverable. The SQL update merges only this nested
+ * key into the latest JSONB row, so concurrent OAuth/config writes are retained.
+ */
 export async function getOrCreateStorageConnectionEncryptionKey(
   queryDb: SystemQuery,
 ): Promise<string> {
@@ -141,34 +165,53 @@ export async function getOrCreateStorageConnectionEncryptionKey(
     ? root.storageConnections
     : {};
   const current = typeof storage.encryptionKey === 'string' ? storage.encryptionKey.trim() : '';
-  if (current.length >= 43) return current;
+
+  if (current) {
+    decodeStorageEncryptionKey(current);
+    const version = storage.encryptionKeyVersion == null ? 1 : Number(storage.encryptionKeyVersion);
+    if (version !== 1) {
+      throw new Error('[STORAGE_SECRET_CONFIGURATION_UNSUPPORTED] The canonical storage encryption key version is not supported.');
+    }
+    return current;
+  }
 
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  const generated = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-  const credentials = {
-    ...root,
-    storageConnections: {
-      ...storage,
-      encryptionKey: generated,
-      encryptionKeyVersion: 1,
-    },
-  };
+  const generated = btoa(binary).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/g, '');
+  decodeStorageEncryptionKey(generated);
 
-  // Compare-and-set so two first-time connection requests cannot each encrypt
-  // data with a different key and then overwrite the winner's system secret.
+  // Atomic compare-and-set. PostgreSQL serializes conflicting row updates;
+  // the WHERE condition allows only the first initializer to install a key.
+  // JSONB merge preserves OAuth and every other concurrently-written setting.
   await queryDb(
     `UPDATE public."ultrst-credentials"
-     SET credentials = $1::jsonb, updated_at = NOW()
+     SET credentials = jsonb_set(
+       COALESCE(credentials, '{}'::jsonb),
+       '{storageConnections}',
+       COALESCE(credentials->'storageConnections', '{}'::jsonb)
+         || jsonb_build_object('encryptionKey', $1::text, 'encryptionKeyVersion', 1),
+       true
+     ),
+     updated_at = NOW()
      WHERE id = $2
        AND NULLIF(credentials #>> '{storageConnections,encryptionKey}', '') IS NULL`,
-    [JSON.stringify(credentials), 'system'],
+    [generated, 'system'],
   );
+
   const refreshed = await getSystemCredentialsRecord(queryDb, 'system');
-  const persisted = refreshed.credentials?.storageConnections?.encryptionKey;
-  if (typeof persisted !== 'string' || persisted.trim().length < 43) {
+  const persisted = typeof refreshed.credentials?.storageConnections?.encryptionKey === 'string'
+    ? refreshed.credentials.storageConnections.encryptionKey.trim()
+    : '';
+  if (!persisted) {
     throw new Error('[STORAGE_SECRET_CONFIGURATION_UNAVAILABLE] Unable to resolve the canonical storage encryption key.');
   }
-  return persisted.trim();
+  decodeStorageEncryptionKey(persisted);
+  const version = refreshed.credentials.storageConnections.encryptionKeyVersion == null
+    ? 1
+    : Number(refreshed.credentials.storageConnections.encryptionKeyVersion);
+  if (version !== 1) {
+    throw new Error('[STORAGE_SECRET_CONFIGURATION_UNSUPPORTED] The canonical storage encryption key version is not supported.');
+  }
+  return persisted;
 }
