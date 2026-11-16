@@ -620,8 +620,10 @@ export async function deleteUserStorageConnection(
         [record.id],
       );
       if (legacy.rows[0]) referenced = isReferenced(parseProfiles(legacy.rows[0].app_profiles));
-    } catch {
-      // Compatibility table no longer exists.
+    } catch (error) {
+      if (!isMissingOptionalProfileTable(error)) throw error;
+      // Only an absent compatibility table is optional; a failed read must
+      // never be interpreted as proof that a connection has no workspace refs.
     }
   }
   if (referenced) {
