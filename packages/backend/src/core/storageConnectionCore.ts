@@ -1086,7 +1086,7 @@ export async function listGoogleDriveFoldersForConnection(
 ): Promise<GoogleDriveWorkspaceFolder[]> {
   const drive = await createGoogleDriveWorkspaceClient(userId, connectionId, query);
   await drive.getAccountIdentity();
-  return drive.listFolders(parentFolderId || 'root');
+  return drive.listFolders(parentFolderId);
 }
 
 /** Validate and persist the selected Drive root against the user-owned connection. */
