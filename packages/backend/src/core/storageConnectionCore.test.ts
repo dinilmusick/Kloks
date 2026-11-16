@@ -9,6 +9,74 @@ import {
 import { getGoogleDriveOAuthConfiguration, getOrCreateStorageConnectionEncryptionKey, getStorageConnectionEncryptionKey } from './systemCredentialsCore.js';
 
 describe('canonical user storage connection security contract', () => {
+  it('migrates legacy app profiles and workspace references without replacing canonical fields', async () => {
+    let canonicalProfiles: Record<string, any> = {
+      aiko: {
+        preferences: { canonicalSetting: true },
+        workspaces: [{
+          id: 'workspace-1',
+          name: 'Canonical name',
+          storageProvider: 'backblaze_b2',
+          storageConnectionId: 'connection-1',
+          localFolderKey: 'workspaces/canonical',
+        }],
+      },
+    };
+    let legacyProfiles: Record<string, any> = {
+      aiko: {
+        preferences: { legacySetting: true },
+        workspaces: [
+          { id: 'workspace-1', legacyWorkspaceField: 'preserve-me' },
+          {
+            id: 'workspace-2',
+            name: 'Legacy workspace',
+            storageProvider: 'google_drive',
+            storageConnectionId: 'connection-2',
+            localFolderKey: 'workspaces/legacy',
+          },
+        ],
+      },
+      srkl: { unrelatedLegacySetting: { keep: true } },
+    };
+    const query = async (sql: string, params: unknown[] = []) => {
+      if (sql.includes('FROM "ultrst-users"')) {
+        return { rows: [{ id: 'owner-1', app_profiles: canonicalProfiles }] };
+      }
+      if (sql.includes('FROM "srkl_application_profiles"')) {
+        return { rows: [{ id: 'owner-1', app_profiles: legacyProfiles }] };
+      }
+      if (sql.startsWith('UPDATE "ultrst-users"')) {
+        canonicalProfiles = JSON.parse(String(params[0]));
+        return { rows: [] };
+      }
+      if (sql.startsWith('UPDATE "srkl_application_profiles"')) {
+        legacyProfiles = JSON.parse(String(params[0]));
+        return { rows: [] };
+      }
+      return { rows: [] };
+    };
+
+    await expect(listUserStorageConnections('owner-1', query as any)).resolves.toEqual([]);
+
+    expect(canonicalProfiles.aiko.preferences).toEqual({
+      legacySetting: true,
+      canonicalSetting: true,
+    });
+    expect(canonicalProfiles.aiko.workspaces).toEqual([
+      expect.objectContaining({
+        id: 'workspace-1',
+        name: 'Canonical name',
+        legacyWorkspaceField: 'preserve-me',
+      }),
+      expect.objectContaining({
+        id: 'workspace-2',
+        storageConnectionId: 'connection-2',
+      }),
+    ]);
+    expect(canonicalProfiles.srkl.unrelatedLegacySetting).toEqual({ keep: true });
+    expect(legacyProfiles.srkl.unrelatedLegacySetting).toEqual({ keep: true });
+  });
+
   it('resolves cloud workspace operations only through persisted owner and connection associations', async () => {
     const persistedWorkspace = {
       id: 'workspace-1',
