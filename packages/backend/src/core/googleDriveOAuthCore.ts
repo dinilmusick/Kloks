@@ -53,6 +53,12 @@ function base64UrlToBytes(value: string): Uint8Array {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
+function toCryptoBufferSource(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
+}
+
 async function stateSigningKey(secret: string, usages: KeyUsage[]): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     'raw',
@@ -77,7 +83,7 @@ async function verifyPayload(payload: string, signature: string, secret: string)
     return false;
   }
   const key = await stateSigningKey(secret, ['verify']);
-  return crypto.subtle.verify('HMAC', key, signatureBytes, encoder.encode(payload));
+  return crypto.subtle.verify('HMAC', key, toCryptoBufferSource(signatureBytes), encoder.encode(payload));
 }
 
 function safeOrigin(value: string, label: string): string {
