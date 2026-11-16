@@ -350,6 +350,74 @@ describe('Fetch-native canonical Google Drive workspace service', () => {
     expect(JSON.stringify(service.getConnectionMetadata())).not.toMatch(/accessToken|refreshToken|clientSecret|server-secret/i);
   });
 
+  it('rejects folder browsing outside the configured workspace root', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/files/outside-child')) {
+        return jsonResponse({
+          id: 'outside-child',
+          name: 'Outside child',
+          mimeType: 'application/vnd.google-apps.folder',
+          parents: ['outside-parent'],
+        });
+      }
+      if (url.pathname.endsWith('/files/outside-parent')) {
+        return jsonResponse({
+          id: 'outside-parent',
+          name: 'Outside parent',
+          mimeType: 'application/vnd.google-apps.folder',
+          parents: ['root'],
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    const service = new GoogleDriveWorkspaceService({
+      clientId: 'client-id',
+      redirectUri: 'https://app.example.test/callback',
+      rootFolderId: 'workspace-root',
+      tokens: { accessToken: 'access-token' },
+      fetcher,
+    });
+
+    await expect(service.listFolders('outside-child'))
+      .rejects.toThrow(/outside the configured workspace root/i);
+    expect(fetcher.mock.calls.some(([input]) => new URL(String(input)).searchParams.has('q'))).toBe(false);
+  });
+
+  it('allows folder browsing inside the configured workspace root', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/files/inside-child')) {
+        return jsonResponse({
+          id: 'inside-child',
+          name: 'Inside child',
+          mimeType: 'application/vnd.google-apps.folder',
+          parents: ['workspace-root'],
+        });
+      }
+      if (url.pathname.endsWith('/files')) {
+        return jsonResponse({ files: [{
+          id: 'nested-folder',
+          name: 'Nested',
+          mimeType: 'application/vnd.google-apps.folder',
+          parents: ['inside-child'],
+        }] });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    const service = new GoogleDriveWorkspaceService({
+      clientId: 'client-id',
+      redirectUri: 'https://app.example.test/callback',
+      rootFolderId: 'workspace-root',
+      tokens: { accessToken: 'access-token' },
+      fetcher,
+    });
+
+    await expect(service.listFolders('inside-child')).resolves.toMatchObject([
+      { id: 'nested-folder', name: 'Nested', parentIds: ['inside-child'] },
+    ]);
+  });
+
   it('rejects a different Google account from the one bound to the saved connection', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({
       user: { permissionId: 'different-account' },
