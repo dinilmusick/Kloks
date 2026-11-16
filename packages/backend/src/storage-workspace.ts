@@ -7,3 +7,12 @@ export type {
   GoogleDriveWorkspaceOptions,
   GoogleDriveWorkspaceTokens,
 } from './storage/GoogleDriveWorkspaceService.js';
+export {
+  createGoogleDriveAuthorizationRequest,
+  verifyGoogleDriveAuthorizationState,
+  completeGoogleDriveAuthorizationCallback,
+} from './core/googleDriveOAuthCore.js';
+export type {
+  GoogleDriveAuthorizationRequest,
+  GoogleDriveAuthorizationState,
+} from './core/googleDriveOAuthCore.js';
