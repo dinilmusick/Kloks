@@ -146,7 +146,7 @@ export async function getOrCreateStorageConnectionEncryptionKey(
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  const generated = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  const generated = btoa(binary).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/g, '');
   const credentials = {
     ...root,
     storageConnections: {
@@ -155,12 +155,20 @@ export async function getOrCreateStorageConnectionEncryptionKey(
       encryptionKeyVersion: 1,
     },
   };
-  const updated = await queryDb(
-    'UPDATE public."ultrst-credentials" SET credentials = $1::jsonb, updated_at = NOW() WHERE id = $2',
+
+  // Compare-and-set so two first-time connection requests cannot each encrypt
+  // data with a different key and then overwrite the winner's system secret.
+  await queryDb(
+    `UPDATE public."ultrst-credentials"
+     SET credentials = $1::jsonb, updated_at = NOW()
+     WHERE id = $2
+       AND NULLIF(credentials #>> '{storageConnections,encryptionKey}', '') IS NULL`,
     [JSON.stringify(credentials), 'system'],
   );
-  if (updated.rowCount === 0) {
-    throw new Error('[STORAGE_SECRET_CONFIGURATION_UNAVAILABLE] Unable to persist the canonical storage encryption key.');
+  const refreshed = await getSystemCredentialsRecord(queryDb, 'system');
+  const persisted = refreshed.credentials?.storageConnections?.encryptionKey;
+  if (typeof persisted !== 'string' || persisted.trim().length < 43) {
+    throw new Error('[STORAGE_SECRET_CONFIGURATION_UNAVAILABLE] Unable to resolve the canonical storage encryption key.');
   }
-  return generated;
+  return persisted.trim();
 }
