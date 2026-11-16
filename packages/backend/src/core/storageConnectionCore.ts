@@ -196,6 +196,108 @@ async function mergeLegacySrklConnections(
   return deduplicateRawConnections(local);
 }
 
+/** Internal server-only connection resolution for storage engines; never expose through HTTP. */
+export async function listUserStorageConnectionsWithSecrets(
+  userId: string,
+  query: StorageQuery = DEFAULT_QUERY,
+): Promise<Record<string, any>[]> {
+  const record = await findUserRecord(userId, query);
+  if (!record) return [];
+  return mergeLegacySrklConnections(record.id, record.profiles, query);
+}
+
+async function persistStorageConnectionCollection(
+  userId: string,
+  connections: Record<string, any>[],
+  query: StorageQuery,
+): Promise<void> {
+  const record = await findUserRecord(userId, query);
+  if (!record) throw new Error('A canonical user profile was not found for this storage connection.');
+  const profiles = record.profiles;
+  if (!profiles.srkl || typeof profiles.srkl !== 'object') profiles.srkl = {};
+  profiles.srkl.storage_connections = connections;
+
+  const table = record.source === 'ultrst-users' ? '"ultrst-users"' : '"srkl_application_profiles"';
+  await query(
+    `UPDATE ${table} SET app_profiles = $1, updated_at = NOW() WHERE id = $2`,
+    [JSON.stringify(profiles), record.id],
+  );
+  if (record.source === 'ultrst-users') {
+    try {
+      const legacy = await query(
+        'SELECT app_profiles FROM "srkl_application_profiles" WHERE id = $1 LIMIT 1',
+        [record.id],
+      );
+      if (legacy.rows[0]) {
+        const legacyProfiles = parseProfiles(legacy.rows[0].app_profiles);
+        if (!legacyProfiles.srkl || typeof legacyProfiles.srkl !== 'object') legacyProfiles.srkl = {};
+        legacyProfiles.srkl.storage_connections = connections;
+        await query(
+          'UPDATE "srkl_application_profiles" SET app_profiles = $1, updated_at = NOW() WHERE id = $2',
+          [JSON.stringify(legacyProfiles), record.id],
+        );
+      }
+    } catch {
+      // Older profiles without the compatibility table remain valid.
+    }
+  }
+}
+
+/** Set the primary marker without changing an existing workspace's explicit association. */
+export async function setPrimaryUserStorageConnection(
+  userId: string,
+  connectionId: string,
+  query: StorageQuery = DEFAULT_QUERY,
+): Promise<PublicStorageConnection[]> {
+  const connections = await listUserStorageConnectionsWithSecrets(userId, query);
+  if (!connections.some((connection) => connection.id === connectionId)) {
+    throw new Error('Storage connection was not found for this user.');
+  }
+  const updated = connections.map((connection) => ({
+    ...connection,
+    role: connection.id === connectionId ? 'primary' : 'redundant_clone',
+  }));
+  await persistStorageConnectionCollection(userId, updated, query);
+  return updated.map(toPublicStorageConnection).filter((item): item is PublicStorageConnection => Boolean(item));
+}
+
+/** Delete only unreferenced connections; workspace associations must never become dangling. */
+export async function deleteUserStorageConnection(
+  userId: string,
+  connectionId: string,
+  query: StorageQuery = DEFAULT_QUERY,
+): Promise<PublicStorageConnection[]> {
+  const record = await findUserRecord(userId, query);
+  if (!record) throw new Error('User profile was not found.');
+  const connections = await mergeLegacySrklConnections(record.id, record.profiles, query);
+  if (!connections.some((connection) => connection.id === connectionId)) {
+    throw new Error('Storage connection was not found for this user.');
+  }
+
+  const referenced = Object.entries(record.profiles).some(([appId, profile]) =>
+    appId !== 'srkl'
+    && profile && typeof profile === 'object'
+    && Array.isArray((profile as any).workspaces)
+    && (profile as any).workspaces.some((workspace: any) => workspace.storageConnectionId === connectionId),
+  );
+  const srklWorkspaces = record.profiles.srkl?.workspaces;
+  const srklReferenced = Array.isArray(srklWorkspaces)
+    && srklWorkspaces.some((workspace: any) => workspace.storageConnectionId === connectionId);
+  if (referenced || srklReferenced) {
+    throw new Error('This storage connection is associated with a workspace. Change the workspace storage before deleting the connection.');
+  }
+
+  let updated = connections.filter((connection) => connection.id !== connectionId);
+  if (!updated.some((connection) => connection.role === 'primary') && updated.length > 0) {
+    updated = updated.map((connection, index) => ({
+      ...connection,
+      role: index === 0 ? 'primary' : 'redundant_clone',
+    }));
+  }
+  await persistStorageConnectionCollection(userId, updated, query);
+  return updated.map(toPublicStorageConnection).filter((item): item is PublicStorageConnection => Boolean(item));
+}
+
 /** Browser-safe list of all existing connections owned by a verified user. */
 export async function listUserStorageConnections(
   userId: string,
