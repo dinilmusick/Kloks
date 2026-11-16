@@ -380,9 +380,15 @@ describe('canonical user storage connection security contract', () => {
     await expect(resolveUserStorageConnectionSecret('user-2', 'b2-legacy', query as any))
       .rejects.toThrow(/could not be decrypted/i);
 
+    const validOwnerProfiles = structuredClone(profiles);
+    profiles = structuredClone(validOwnerProfiles);
+    profiles.aiko.storage_connections[0].provider = 'google_drive';
+    await expect(resolveUserStorageConnectionSecret('user-1', 'b2-legacy', query as any))
+      .rejects.toThrow(/could not be decrypted/i);
+
     // Rebinding an otherwise valid envelope to another opaque connection ID
     // must fail AES-GCM authentication even for the same owner.
-    profiles = structuredClone(profiles);
+    profiles = structuredClone(validOwnerProfiles);
     profiles.aiko.storage_connections[0].id = 'tampered-connection-id';
     await expect(resolveUserStorageConnectionSecret('user-1', 'tampered-connection-id', query as any))
       .rejects.toThrow(/could not be decrypted/i);
