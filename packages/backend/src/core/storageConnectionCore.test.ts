@@ -2,11 +2,67 @@ import { describe, expect, it } from 'vitest';
 import {
   listUserStorageConnections,
   resolveUserStorageConnectionSecret,
+  resolveUserWorkspaceStorageAssociation,
   toPublicStorageConnection,
 } from './storageConnectionCore.js';
 import { getGoogleDriveOAuthConfiguration, getOrCreateStorageConnectionEncryptionKey, getStorageConnectionEncryptionKey } from './systemCredentialsCore.js';
 
 describe('canonical user storage connection security contract', () => {
+  it('resolves cloud workspace operations only through persisted owner and connection associations', async () => {
+    const persistedWorkspace = {
+      id: 'workspace-1',
+      name: 'Production workspace',
+      storageProvider: 'backblaze_b2',
+      storageConnectionId: 'connection-1',
+      localFolderKey: 'workspaces/production',
+      b2BucketName: 'production-bucket',
+    };
+    const query = async (sql: string) => {
+      if (sql.includes('FROM "ultrst-users"')) {
+        return {
+          rows: [{
+            id: 'owner-1',
+            app_profiles: { aiko: { workspaces: [persistedWorkspace] } },
+          }],
+        };
+      }
+      return { rows: [] };
+    };
+
+    await expect(resolveUserWorkspaceStorageAssociation(
+      'owner-1',
+      'connection-1',
+      'workspaces/production',
+      query as any,
+    )).resolves.toMatchObject({
+      id: 'workspace-1',
+      storageProvider: 'backblaze_b2',
+      storageConnectionId: 'connection-1',
+      __ownerUserId: 'owner-1',
+    });
+    await expect(resolveUserWorkspaceStorageAssociation(
+      'owner-1',
+      'another-connection',
+      'workspaces/production',
+      query as any,
+    )).resolves.toBeNull();
+    await expect(resolveUserWorkspaceStorageAssociation(
+      'owner-1',
+      'connection-1',
+      'workspaces/other',
+      query as any,
+    )).resolves.toBeNull();
+    await expect(resolveUserWorkspaceStorageAssociation(
+      'another-owner',
+      'connection-1',
+      'workspaces/production',
+      query as any,
+    )).resolves.toMatchObject({
+      id: 'workspace-1',
+      __ownerUserId: 'owner-1',
+    });
+  });
+
   it('does not swallow operational failures while reading the legacy profile store', async () => {
     const query = async (sql: string) => {
       if (sql.includes('FROM "ultrst-users"')) {
