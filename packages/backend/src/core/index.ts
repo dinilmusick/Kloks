@@ -1,4 +1,5 @@
 export * from './b2DirectCore.js';
+export * from './storageConnectionCore.js';
 export * from './unifiedDb.js';
 export * from './workspaceSyncEngine.js';
 export * from './SrklStorageService.js';
