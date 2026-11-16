@@ -4,6 +4,7 @@ import {
   resolveUserStorageConnectionSecret,
   toPublicStorageConnection,
 } from './storageConnectionCore.js';
+import { getOrCreateStorageConnectionEncryptionKey } from './systemCredentialsCore.js';
 
 describe('canonical user storage connection security contract', () => {
   it('projects only safe connection metadata to browser callers', () => {
@@ -160,7 +161,17 @@ describe('canonical user storage connection security contract', () => {
         return { rows: [] };
       }
       if (sql.includes('UPDATE public."ultrst-credentials"')) {
-        systemCredentials = JSON.parse(String(params[0]));
+        const key = String(params[0]);
+        if (!systemCredentials.storageConnections?.encryptionKey) {
+          systemCredentials = {
+            ...systemCredentials,
+            storageConnections: {
+              ...(systemCredentials.storageConnections || {}),
+              encryptionKey: key,
+              encryptionKeyVersion: 1,
+            },
+          };
+        }
         return { rows: [] };
       }
       if (sql.includes('UPDATE "ultrst-users"')) {
@@ -208,6 +219,67 @@ describe('canonical user storage connection security contract', () => {
       googleEmail: 'owner@example.test',
     });
     expect(await resolveUserStorageConnectionSecret('different-user', 'b2-legacy', query as any)).toBeNull();
+  });
+
+
+  it('installs one raw 32-byte AES-256 key with an atomic nested merge', async () => {
+    let systemCredentials: Record<string, any> = {
+      googleDriveOAuth: {
+        clientId: 'system-client-id',
+        clientSecret: 'system-client-secret',
+      },
+      unrelatedSystemSetting: { retained: true },
+    };
+    let updateCount = 0;
+    const query = async (sql: string, params: unknown[] = []) => {
+      if (sql.includes('SELECT id, credentials')) {
+        return { rows: [{ id: 'system', credentials: systemCredentials }] };
+      }
+      if (sql.includes('UPDATE public."ultrst-credentials"')) {
+        updateCount += 1;
+        // Model PostgreSQL's conditional row update: exactly one concurrent
+        // initializer wins; a later writer cannot replace the persisted key.
+        if (!systemCredentials.storageConnections?.encryptionKey) {
+          systemCredentials = {
+            ...systemCredentials,
+            storageConnections: {
+              ...(systemCredentials.storageConnections || {}),
+              encryptionKey: String(params[0]),
+              encryptionKeyVersion: 1,
+            },
+          };
+        }
+        return { rows: [] };
+      }
+      return { rows: [] };
+    };
+
+    const [first, second] = await Promise.all([
+      getOrCreateStorageConnectionEncryptionKey(query as any),
+      getOrCreateStorageConnectionEncryptionKey(query as any),
+    ]);
+    expect(first).toBe(second);
+    expect(first).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    const base64 = first.replace(/-/g, '+').replace(/_/g, '/').padEnd(44, '=');
+    expect(atob(base64)).toHaveLength(32);
+    expect(systemCredentials.googleDriveOAuth.clientId).toBe('system-client-id');
+    expect(systemCredentials.googleDriveOAuth.clientSecret).toBe('system-client-secret');
+    expect(systemCredentials.unrelatedSystemSetting).toEqual({ retained: true });
+    expect(systemCredentials.storageConnections.encryptionKeyVersion).toBe(1);
+    expect(updateCount).toBe(2);
+  });
+
+  it('refuses to replace a malformed existing wrapping key', async () => {
+    let updateCount = 0;
+    const query = async (sql: string) => {
+      if (sql.includes('SELECT id, credentials')) {
+        return { rows: [{ id: 'system', credentials: { storageConnections: { encryptionKey: 'not-a-valid-key' } } }] };
+      }
+      if (sql.includes('UPDATE public."ultrst-credentials"')) updateCount += 1;
+      return { rows: [] };
+    };
+    await expect(getOrCreateStorageConnectionEncryptionKey(query as any)).rejects.toThrow(/malformed/i);
+    expect(updateCount).toBe(0);
   });
 
 });
