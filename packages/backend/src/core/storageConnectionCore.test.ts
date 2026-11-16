@@ -186,7 +186,12 @@ describe('canonical user storage connection security contract', () => {
       },
       legacyApp: { preferences: { preserve: true } },
     };
-    let systemCredentials: Record<string, any> = {};
+    let systemCredentials: Record<string, any> = {
+      storageConnections: {
+        encryptionKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+        encryptionKeyVersion: 1,
+      },
+    };
     const query = async (sql: string, params: unknown[] = []) => {
       if (sql.includes('FROM "ultrst-users"')) {
         if (params[0] !== 'user-1') return { rows: [] };
