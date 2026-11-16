@@ -111,6 +111,14 @@ const STORAGE_SECRET_FIELDS = [
   'googleTokenType',
 ] as const;
 
+function isMissingOptionalProfileTable(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const candidate = error as { code?: unknown; message?: unknown };
+  if (candidate.code === '42P01' || candidate.code === 'PGRST205') return true;
+  const message = typeof candidate.message === 'string' ? candidate.message : '';
+  return /(?:relation|table).*(?:does not exist|not found)|schema cache.*(?:relation|table)/i.test(message);
+}
+
 function encodeBase64Url(bytes: Uint8Array): string {
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -323,8 +331,10 @@ async function writeUserProfiles(
           }), record.id],
         );
       }
-    } catch {
-      // The legacy compatibility table is absent after profile migration.
+    } catch (error) {
+      if (!isMissingOptionalProfileTable(error)) throw error;
+      // Only an absent compatibility table is optional; operational failures
+      // must abort the profile write rather than silently lose legacy state.
     }
   }
 
@@ -392,8 +402,9 @@ async function migrateLegacyConnectionCollections(
           );
         }
       }
-    } catch {
-      // The legacy SRKL table is not required after migration.
+    } catch (error) {
+      if (!isMissingOptionalProfileTable(error)) throw error;
+      // The legacy SRKL table is optional only when it is genuinely absent.
     }
   }
 
@@ -455,7 +466,8 @@ async function findUserRecord(userId: string, query: StorageQuery): Promise<{
         source: 'ultrst-users',
       };
     }
-  } catch {
+  } catch (error) {
+    if (!isMissingOptionalProfileTable(error)) throw error;
     // Some older installations have the SRKL profile table before the
     // shared user profile is available. Keep that record shape readable.
   }
@@ -472,7 +484,8 @@ async function findUserRecord(userId: string, query: StorageQuery): Promise<{
         source: 'srkl_application_profiles',
       };
     }
-  } catch {
+  } catch (error) {
+    if (!isMissingOptionalProfileTable(error)) throw error;
     // SRKL is optional for applications that use the shared storage service.
   }
   return null;
@@ -495,7 +508,8 @@ async function mergeLegacySrklConnections(
         ? legacyProfiles.srkl.storage_connections
         : []));
     }
-  } catch {
+  } catch (error) {
+    if (!isMissingOptionalProfileTable(error)) throw error;
     // Legacy table is intentionally optional after profile migration.
   }
   return deduplicateRawConnections(local);
