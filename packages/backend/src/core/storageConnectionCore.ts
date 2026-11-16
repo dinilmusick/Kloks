@@ -817,3 +817,14 @@ export async function listGoogleDriveFilesForConnection(
   const drive = await createGoogleDriveWorkspaceClient(userId, connectionId, query);
   return drive.list(path);
 }
+
+
+/** Return the authenticated user's Google account identity without exposing OAuth tokens. */
+export async function getGoogleDriveAccountIdentityForUser(
+  userId: string,
+  connectionId: string,
+  query: StorageQuery = DEFAULT_QUERY,
+): Promise<{ accountId: string; email?: string }> {
+  const drive = await createGoogleDriveWorkspaceClient(userId, connectionId, query);
+  return drive.getAccountIdentity();
+}
