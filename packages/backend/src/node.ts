@@ -21,6 +21,7 @@ export { validateServiceDefinition } from './architecture/types.js';
 export * from './services/node.js';
 // Install the Node-only local filesystem workspace adapter before exporting Node services.
 import './core/workspaceFileNodeAdapter.js';
+import './core/unifiedDbNodeAdapter.js';
 export * from './core/index.js';
 export * from './server/index.js';
 export * from './krnl-services.js';
