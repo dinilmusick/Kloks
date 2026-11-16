@@ -4,7 +4,7 @@
  * The normalized SYSTEM_DATABASE_URL contract is resolved in one shared location.
  */
 
-import { tryResolveSystemDatabaseUrl } from '../resolver/systemDatabaseUrl.js';
+import { resolveSystemDatabaseUrlCandidates, tryResolveSystemDatabaseUrl } from '../resolver/systemDatabaseUrl.js';
 
 let neon: any;
 type SystemEnvironmentResolver = () => Record<string, unknown>;
@@ -56,13 +56,55 @@ export function getUnifiedDbUrl(env?: Record<string, unknown>): string {
   return tryResolveSystemDatabaseUrl(effective) || '';
 }
 
+function isConnectionLevelFailure(error: unknown): boolean {
+  const value = error as { code?: unknown; cause?: { code?: unknown }; message?: unknown };
+  const code = String(value?.code || value?.cause?.code || '').toUpperCase();
+  if ([
+    'ECONNRESET',
+    'ECONNREFUSED',
+    'ENOTFOUND',
+    'EAI_AGAIN',
+    'ETIMEDOUT',
+    'EHOSTUNREACH',
+    'ENETUNREACH',
+    'UND_ERR_CONNECT_TIMEOUT',
+    '08000',
+    '08001',
+    '08003',
+    '08004',
+    '08006',
+    '08007',
+    '57P03',
+  ].includes(code)) return true;
+
+  const message = String(value?.message || error || '').toLowerCase();
+  return (
+    message.includes('fetch failed')
+    || message.includes('network error')
+    || message.includes('connection terminated unexpectedly')
+    || message.includes('socket hang up')
+    || message.includes('connect timeout')
+  );
+}
+
 export async function queryUnifiedDb<T = any>(
   sqlText: string,
   params: any[] = [],
   env?: Record<string, unknown>,
 ): Promise<UnifiedQueryResult<T>> {
-  const dbUrl = getUnifiedDbUrl(env);
-  if (!dbUrl) {
+  const supplied = env || {};
+  const hasCanonicalBindings = [
+    'SYSTEM_DATABASE_URL',
+    'SYSTEM_DATABASE_URL_2',
+    'SYSTEM_DATABASE_URL_3',
+  ].some((key) => Object.prototype.hasOwnProperty.call(supplied, key));
+  const effectiveEnv = env === undefined
+    ? defaultSystemEnvironment()
+    : hasCanonicalBindings
+      ? supplied
+      : { ...defaultSystemEnvironment(), ...supplied };
+  const databaseUrls = resolveSystemDatabaseUrlCandidates(effectiveEnv);
+  if (databaseUrls.length === 0) {
     throw new Error(
       '[UnifiedDB] Missing system database configuration. ' +
       'Set SYSTEM_DATABASE_URL; SYSTEM_DATABASE_URL_2 and SYSTEM_DATABASE_URL_3 are optional failover URLs.',
@@ -74,18 +116,31 @@ export async function queryUnifiedDb<T = any>(
     neon = mod.neon;
   }
 
-  const sql = neon(dbUrl);
-  try {
-    const rows = (await ((sql as any).query
-      ? (sql as any).query(sqlText, params)
-      : (sql as any)(sqlText, params))) as T[];
-    return {
-      rows: Array.isArray(rows) ? rows : [],
-      rowCount: Array.isArray(rows) ? rows.length : 0,
-    };
-  } catch (err: any) {
-    // Never log the connection string or query parameters (which may contain secrets).
-    console.error('[UnifiedDB] Query execution failed:', err?.message || 'unknown database error');
-    throw err;
+  let lastError: unknown;
+  for (let index = 0; index < databaseUrls.length; index += 1) {
+    const databaseUrl = databaseUrls[index];
+    try {
+      const sql = neon(databaseUrl);
+      const rows = (await ((sql as any).query
+        ? (sql as any).query(sqlText, params)
+        : (sql as any)(sqlText, params))) as T[];
+      return {
+        rows: Array.isArray(rows) ? rows : [],
+        rowCount: Array.isArray(rows) ? rows.length : 0,
+      };
+    } catch (error) {
+      lastError = error;
+      const hasNextFallback = index < databaseUrls.length - 1;
+      if (!hasNextFallback || !isConnectionLevelFailure(error)) {
+        // Do not mask SQL errors or retry writes against another database.
+        break;
+      }
+    }
   }
+
+  // Never log database URLs, SQL text, or query parameters.
+  const message = lastError instanceof Error ? lastError.message : 'unknown database error';
+  console.error('[UnifiedDB] Query execution failed:', message);
+  throw lastError instanceof Error ? lastError : new Error(message);
+
 }
