@@ -51,6 +51,19 @@ describe('canonical user storage connection security contract', () => {
     const calls: string[] = [];
     const query = async (sql: string) => {
       calls.push(sql);
+      if (sql.includes('FROM public."ultrst-credentials"')) {
+        return {
+          rows: [{
+            id: 'system',
+            credentials: {
+              storageConnections: {
+                encryptionKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+                encryptionKeyVersion: 1,
+              },
+            },
+          }],
+        };
+      }
       if (sql.includes('"ultrst-users"')) {
         return {
           rows: [{
@@ -86,6 +99,19 @@ describe('canonical user storage connection security contract', () => {
 
   it('keeps the server-only secret resolver scoped to the supplied user profile', async () => {
     const query = async (sql: string, params?: unknown[]) => {
+      if (sql.includes('FROM public."ultrst-credentials"')) {
+        return {
+          rows: [{
+            id: 'system',
+            credentials: {
+              storageConnections: {
+                encryptionKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+                encryptionKeyVersion: 1,
+              },
+            },
+          }],
+        };
+      }
       if (sql.includes('"ultrst-users"')) {
         if (params?.[0] === 'other-user') return { rows: [] };
         expect(params?.[0]).toBe('user-1');
