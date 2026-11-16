@@ -350,6 +350,15 @@ describe('Fetch-native canonical Google Drive workspace service', () => {
     expect(JSON.stringify(service.getConnectionMetadata())).not.toMatch(/accessToken|refreshToken|clientSecret|server-secret/i);
   });
 
+  it('fails closed when Drive returns malformed listing JSON', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response('not-json', { status: 200 }),
+    );
+    const service = createService(fetcher);
+
+    await expect(service.listFolders()).rejects.toThrow(/invalid JSON response/i);
+  });
+
   it('rejects folder browsing outside the configured workspace root', async () => {
     const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input) => {
       const url = new URL(String(input));
