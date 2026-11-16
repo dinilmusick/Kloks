@@ -21,6 +21,18 @@ type StorageQuery = (
 function makeQuery(env?: Record<string, unknown>): StorageQuery {
   return (sql, params) => queryUnifiedDb(sql, params, env);
 }
+function safeRelativePath(value: string): string {
+  const normalized = String(value || '').replace(/\\/g, '/').replace(/^\/+/, '');
+  const parts = normalized.split('/');
+  if (
+    !normalized
+    || normalized.includes('\0')
+    || parts.some((part) => !part || part === '.' || part === '..')
+  ) {
+    throw new Error('Storage file path must be a safe workspace-relative path.');
+  }
+  return normalized;
+}
 
 async function resolveWorkspaceContext(
   input: {
@@ -41,8 +53,11 @@ async function resolveWorkspaceContext(
   if (!connection || connection.enabled === false) {
     throw new Error('The selected storage connection is unavailable for this user.');
   }
-  const folderPrefix = String(input.folderPrefix || '').replace(/^\\/+|\\/+$/g, '');
+  const folderPrefix = safeRelativePath(String(input.folderPrefix || '').replace(/^\\/+|\\/+$/g, ''));
   if (!folderPrefix) throw new Error('Workspace storage folder prefix is required.');
+  if (!['backblaze_b2', 'google_drive'].includes(String(connection.provider))) {
+    throw new Error('Only canonical Backblaze B2 and Google Drive connections are supported by this shared file service.');
+  }
 
   const workspace = {
     id: 'storage-' + connectionId,
@@ -86,7 +101,7 @@ export async function writeUserWorkspaceStorageFile(
   await writeWorkspaceFile(
     context.workspace,
     context.connection,
-    input.relativePath,
+    safeRelativePath(input.relativePath),
     input.content,
     input.contentType || 'application/octet-stream',
     input.env,
@@ -106,7 +121,7 @@ export async function readUserWorkspaceStorageFile(
   },
 ): Promise<Uint8Array | null> {
   const context = await resolveWorkspaceContext(input, makeQuery(input.env));
-  return readWorkspaceFile(context.workspace, context.connection, input.relativePath, input.env);
+  return readWorkspaceFile(context.workspace, context.connection, safeRelativePath(input.relativePath), input.env);
 }
 
 export async function deleteUserWorkspaceStorageFile(
@@ -121,7 +136,7 @@ export async function deleteUserWorkspaceStorageFile(
   },
 ): Promise<boolean> {
   const context = await resolveWorkspaceContext(input, makeQuery(input.env));
-  return deleteWorkspaceFile(context.workspace, context.connection, input.relativePath, input.env);
+  return deleteWorkspaceFile(context.workspace, context.connection, safeRelativePath(input.relativePath), input.env);
 }
 
 export async function listUserWorkspaceStorageFiles(
@@ -136,7 +151,7 @@ export async function listUserWorkspaceStorageFiles(
   },
 ): Promise<Array<{ fileName: string; sizeBytes: number; uploadTimestamp?: number }>> {
   const context = await resolveWorkspaceContext(input, makeQuery(input.env));
-  return listWorkspaceFiles(context.workspace, context.connection, input.subPrefix || '', input.env);
+  return listWorkspaceFiles(context.workspace, context.connection, input.subPrefix ? safeRelativePath(input.subPrefix) : '', input.env);
 }
 
 
