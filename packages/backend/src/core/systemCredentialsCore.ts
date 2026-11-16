@@ -175,6 +175,13 @@ export async function getStorageConnectionEncryptionKey(
  * Existing keys are never silently replaced: doing so would make already
  * encrypted connections irrecoverable. The SQL update merges only this nested
  * key into the latest JSONB row, so concurrent OAuth/config writes are retained.
+ *
+ * Rotation is deliberately not automatic. A future rotation must retain the
+ * current key as a decrypt-only version, decrypt and re-encrypt every user
+ * connection envelope (including legacy SRKL profiles) under the new version,
+ * verify the complete migration, and only then retire the previous key. Until
+ * that migration exists, unsupported versions fail closed rather than losing
+ * access to stored credentials.
  */
 export async function getOrCreateStorageConnectionEncryptionKey(
   queryDb: SystemQuery,
