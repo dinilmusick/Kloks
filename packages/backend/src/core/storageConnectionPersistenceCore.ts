@@ -13,7 +13,8 @@ const SECRET_KEYS = [
   'b2KeyId', 'b2ApplicationKey', 'keyId', 'applicationKey', 'appKey',
   'accessKeyId', 'secretAccessKey', 'r2AccessKeyId', 'r2SecretAccessKey',
   's3AccessKeyId', 's3SecretAccessKey', 'googleAccessToken',
-  'googleAccessTokenExpiresAt', 'googleRefreshToken',
+  'googleAccessTokenExpiresAt', 'googleRefreshToken', 'token', 'accessToken',
+  'refreshToken', 'idToken', 'authorizationToken', 'clientSecret', 'googleClientSecret',
 ] as const;
 
 const PUBLIC_KEYS = [
@@ -69,6 +70,7 @@ function storageVaultKey(userId: string, env?: Record<string, unknown>): string 
 }
 
 function readSecrets(raw: Record<string, any>): Record<string, unknown> {
+  const source = { ...raw, ...(raw.credentials || {}), ...(raw.secrets || {}) };
   const secrets: Record<string, unknown> = {};
   const aliases: Record<string, string[]> = {
     b2KeyId: ['b2KeyId', 'keyId'],
@@ -80,7 +82,7 @@ function readSecrets(raw: Record<string, any>): Record<string, unknown> {
     googleRefreshToken: ['googleRefreshToken', 'refreshToken'],
   };
   for (const [target, candidates] of Object.entries(aliases)) {
-    const found = candidates.map((key) => raw[key]).find((value) => value !== undefined && value !== null && value !== '');
+    const found = candidates.map((key) => source[key]).find((value) => value !== undefined && value !== null && value !== '');
     if (found !== undefined) secrets[target] = found;
   }
   return secrets;
@@ -91,6 +93,9 @@ function stripSecrets(raw: Record<string, any>): Record<string, any> {
   for (const key of SECRET_KEYS) delete value[key];
   delete value.credentials;
   delete value.secrets;
+  delete value.credentialsEncrypted;
+  delete value.clientSecret;
+  delete value.googleClientSecret;
   return value;
 }
 
@@ -242,7 +247,7 @@ export async function getUserStorageConnections(
 ): Promise<StorageConnectionInternal[]> {
   if (!userId) return [];
   const userResult = await queryDb(
-    'SELECT id, email, app_profiles FROM "ultrst-users" WHERE id = $1 OR email = $1 LIMIT 1',
+    'SELECT id, email, app_profiles FROM "ultrst-users" WHERE id = $1 OR email = $2 LIMIT 1',
     [userId, userId],
   );
   const userRow = userResult.rows[0];
@@ -255,17 +260,19 @@ export async function getUserStorageConnections(
   const legacyConnections = legacyProfiles
     ? (connectionLists(legacyProfiles).flat())
     : [];
-  const rawConnections = mergeConnections(...canonical, legacyConnections);
+  const rawConnections = mergeConnections(legacyConnections, ...canonical);
 
   const persisted: Record<string, any>[] = [];
   const internal: StorageConnectionInternal[] = [];
-  let changed = canonical.length === 0 && legacyConnections.length > 0;
+  let changed = (canonical.length === 0 && legacyConnections.length > 0)
+    || legacyConnections.some((item) => !item.credentialsEncrypted && Object.keys(readSecrets(item)).length > 0)
+    || canonical.some((list) => list.some((item) => !item.credentialsEncrypted && Object.keys(readSecrets(item)).length > 0));
   for (const raw of rawConnections) {
     const encoded = await encodeStoredConnection(raw, String(userRow.id), env);
     const decoded = await decodeStoredConnection(encoded, String(userRow.id), env);
     persisted.push(encoded);
     internal.push(decoded);
-    if (!raw.credentialsEncrypted || Object.keys(readSecrets(raw)).length) changed = true;
+    if (raw.credentialsEncrypted !== encoded.credentialsEncrypted || (!raw.credentialsEncrypted && Object.keys(readSecrets(raw)).length)) changed = true;
   }
 
   if (changed || JSON.stringify(srkl.storage_connections || []) !== JSON.stringify(persisted)) {
