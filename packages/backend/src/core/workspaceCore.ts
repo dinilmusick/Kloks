@@ -6,6 +6,7 @@
  */
 
 import { queryUnifiedDb } from './unifiedDb';
+import { toPublicStorageConnection } from './storageConnectionCore.js';
 import { resolveWorkspaceConnection, syncWorkspaceCreateToBucket, syncWorkspaceDeleteToBucket } from './workspaceBucketSyncCore';
 
 function workspaceAppId(env?: Record<string, unknown>): string {
@@ -28,8 +29,7 @@ export async function findUserWorkspace(workspaceId: string, env?: Record<string
     const workspaces = Array.isArray(app.workspaces) ? app.workspaces : [];
     const ws = workspaces.find((w: any) => w.id === workspaceId);
     if (ws) {
-      const conns = app.storage_connections || profiles.srkl?.storage_connections || profiles.docustack?.storage_connections || [];
-      const conn = conns.find((c: any) => c.id === ws.storageConnectionId) || conns.find((c: any) => c.role === 'primary') || conns[0] || null;
+      const conn = resolveWorkspaceConnection(profiles, ws, workspaceAppId(env));
       return { user, workspace: ws, connection: conn };
     }
   }
@@ -51,8 +51,11 @@ export async function getWorkspaces(userId?: string, env?: Record<string, unknow
   const workspaces = Array.isArray(app.workspaces) ? app.workspaces : [];
   const activeWorkspaceId = app.activeWorkspaceId || null;
   const conns = app.storage_connections?.length ? app.storage_connections : (profiles.srkl?.storage_connections || []);
+  const publicConnections = conns
+    .map(toPublicStorageConnection)
+    .filter((connection): connection is NonNullable<typeof connection> => Boolean(connection));
 
-  return { success: true, workspaces, activeWorkspaceId, storage_connections: conns };
+  return { success: true, workspaces, activeWorkspaceId, storage_connections: publicConnections };
 }
 
 export async function createWorkspace(userId: string, wsData: any, env?: Record<string, unknown>) {
@@ -88,7 +91,7 @@ export async function createWorkspace(userId: string, wsData: any, env?: Record<
   app.activeWorkspaceId = wsId;
 
   await queryUnifiedDb(`UPDATE "ultrst-users" SET app_profiles = $1, updated_at = NOW() WHERE id = $2`, [JSON.stringify(profiles), user.id], env);
-  const conn = resolveWorkspaceConnection(profiles, newWs);
+  const conn = resolveWorkspaceConnection(profiles, newWs, appId);
   await syncWorkspaceCreateToBucket(newWs, conn, env);
   return { success: true, workspace: newWs, workspaces };
 }
@@ -141,7 +144,7 @@ export async function deleteWorkspace(userId: string, wsId: string, env?: Record
   if (!app.workspaces) return { success: true, workspaces: [] };
 
   const targetWs = app.workspaces.find((w: any) => w.id === wsId);
-  const conn = targetWs ? resolveWorkspaceConnection(profiles, targetWs) : null;
+  const conn = targetWs ? resolveWorkspaceConnection(profiles, targetWs, workspaceAppId(env)) : null;
 
   app.workspaces = app.workspaces.filter((w: any) => w.id !== wsId);
   if (app.activeWorkspaceId === wsId) {
