@@ -7,6 +7,19 @@
 import { tryResolveSystemDatabaseUrl } from '../resolver/systemDatabaseUrl.js';
 
 let neon: any;
+type SystemEnvironmentResolver = () => Record<string, unknown>;
+let defaultSystemEnvironmentResolver: SystemEnvironmentResolver | null = null;
+
+/** Installed only by the explicit Node backend entrypoint. */
+export function configureUnifiedDatabaseEnvironmentResolver(
+  resolver: SystemEnvironmentResolver | null,
+): void {
+  defaultSystemEnvironmentResolver = resolver;
+}
+
+function defaultSystemEnvironment(): Record<string, unknown> {
+  return defaultSystemEnvironmentResolver?.() || {};
+}
 
 export interface UnifiedQueryResult<T = any> {
   rows: T[];
@@ -25,15 +38,22 @@ export function cleanDbUrl(url?: unknown): string {
  * retain the Node compatibility fallback used by existing callers.
  */
 export function getUnifiedDbUrl(env?: Record<string, unknown>): string {
-  if (env !== undefined) {
-    const hasCanonicalBindings = [
-      'SYSTEM_DATABASE_URL',
-      'SYSTEM_DATABASE_URL_2',
-      'SYSTEM_DATABASE_URL_3',
-    ].some((key) => Object.prototype.hasOwnProperty.call(env, key));
-    if (hasCanonicalBindings) return tryResolveSystemDatabaseUrl(env) || '';
-  }
-  return tryResolveSystemDatabaseUrl() || '';
+  const supplied = env || {};
+  const hasCanonicalBindings = [
+    'SYSTEM_DATABASE_URL',
+    'SYSTEM_DATABASE_URL_2',
+    'SYSTEM_DATABASE_URL_3',
+  ].some((key) => Object.prototype.hasOwnProperty.call(supplied, key));
+
+  // A complete Fetch binding object is authoritative, including explicit
+  // undefined values. Partial service contexts may inherit only the Node
+  // resolver installed by /backend/node; Worker builds have no such resolver.
+  const effective = env === undefined
+    ? defaultSystemEnvironment()
+    : hasCanonicalBindings
+      ? supplied
+      : { ...defaultSystemEnvironment(), ...supplied };
+  return tryResolveSystemDatabaseUrl(effective) || '';
 }
 
 export async function queryUnifiedDb<T = any>(
