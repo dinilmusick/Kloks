@@ -40,7 +40,7 @@ export function tryResolveSystemDatabaseUrl(
 
 /** Resolve the configured system database or return a deterministic configuration error. */
 export function resolveSystemDatabaseUrl(
-  env: SystemDatabaseEnvironment = getRuntimeEnvironment(),
+  env: SystemDatabaseEnvironment = {},
 ): string {
   const url = tryResolveSystemDatabaseUrl(env);
   if (url) return url;
