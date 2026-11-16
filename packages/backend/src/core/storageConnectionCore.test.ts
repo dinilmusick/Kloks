@@ -308,8 +308,8 @@ describe('canonical user storage connection security contract', () => {
 
 
 
-  it('does not mint a replacement system key when decrypting an existing envelope', async () => {
-    let keyWrites = 0;
+  it('fails closed without DDL, insert, or update when an encrypted envelope has no wrapping key', async () => {
+    let writes = 0;
     const profiles = {
       srkl: {
         storage_connections: [{
@@ -326,20 +326,18 @@ describe('canonical user storage connection security contract', () => {
       },
     };
     const query = async (sql: string) => {
+      if (/^\\s*(CREATE|ALTER|INSERT|UPDATE|DELETE)\\b/i.test(sql)) writes += 1;
       if (sql.includes('FROM "ultrst-users"')) {
         return { rows: [{ id: 'user-1', app_profiles: profiles }] };
       }
       if (sql.includes('FROM "srkl_application_profiles"')) return { rows: [] };
-      if (sql.includes('FROM public."ultrst-credentials"')) {
-        return { rows: [{ id: 'system', credentials: {} }] };
-      }
-      if (sql.includes('UPDATE public."ultrst-credentials"')) keyWrites += 1;
+      if (sql.includes('FROM public."ultrst-credentials"')) return { rows: [] };
       return { rows: [] };
     };
 
     await expect(resolveUserStorageConnectionSecret('user-1', 'encrypted-b2', query as any))
       .rejects.toThrow(/storage encryption key is missing/i);
-    expect(keyWrites).toBe(0);
+    expect(writes).toBe(0);
   });
 
 
