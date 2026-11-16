@@ -25,10 +25,13 @@ export function resolveWorkspaceConnection(profiles: any, workspace: any, appId 
   }
   const connections = [...byId.values()];
 
-  if (workspace?.storageConnectionId) {
-    return connections.find((connection) => connection.id === workspace.storageConnectionId) || null;
-  }
-  return connections.find((connection) => connection.role === 'primary') || connections[0] || null;
+  const connectionId = String(workspace?.storageConnectionId || '').trim();
+  if (!connectionId) return null;
+  const connection = connections.find((item) => item.id === connectionId) || null;
+  if (!connection) return null;
+  const provider = String(workspace?.storageProvider || '').toLowerCase();
+  if (provider && String(connection.provider || '').toLowerCase() !== provider) return null;
+  return connection;
 }
 
 function isPersistentCloudConnection(connection: any): boolean {
@@ -85,6 +88,12 @@ export async function syncWorkspaceDeleteToBucket(
   env?: Record<string, unknown>,
 ): Promise<void> {
   if (!isPersistentCloudConnection(connection)) return;
+  if (!workspace?.storageConnectionId || workspace.storageConnectionId !== connection.id) {
+    throw new Error('Workspace deletion requires its exact, owner-resolved storage connection.');
+  }
+  if (String(workspace?.storageProvider || '').toLowerCase() !== String(connection.provider || '').toLowerCase()) {
+    throw new Error('Workspace deletion storage provider does not match its saved connection.');
+  }
   await deleteWorkspaceFolder(workspace, connection, env);
 }
 
