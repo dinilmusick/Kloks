@@ -472,9 +472,11 @@ export async function listUserStorageConnectionsWithSecrets(
   userId: string,
   query: StorageQuery = DEFAULT_QUERY,
 ): Promise<Record<string, any>[]> {
+  await migrateLegacyConnectionCollections(userId, query);
   const record = await findUserRecord(userId, query);
   if (!record) return [];
-  return mergeLegacySrklConnections(record.id, record.profiles, query);
+  const raw = await mergeLegacySrklConnections(record.id, record.profiles, query);
+  return Promise.all(raw.map((connection) => hydrateConnectionSecrets(record.id, connection, query)));
 }
 
 async function persistStorageConnectionCollection(
@@ -484,37 +486,44 @@ async function persistStorageConnectionCollection(
 ): Promise<void> {
   const record = await findUserRecord(userId, query);
   if (!record) throw new Error('A canonical user profile was not found for this storage connection.');
-  const profiles = record.profiles;
-  if (!profiles.srkl || typeof profiles.srkl !== 'object') profiles.srkl = {};
-  profiles.srkl.storage_connections = connections;
 
-  const table = record.source === 'ultrst-users' ? '"ultrst-users"' : '"srkl_application_profiles"';
-  await query(
-    `UPDATE ${table} SET app_profiles = $1, updated_at = NOW() WHERE id = $2`,
-    [JSON.stringify(profiles), record.id],
+  const secured = await Promise.all(
+    connections.map((connection) => protectConnectionForStorage(record.id, connection, query)),
   );
-  if (record.source === 'ultrst-users') {
-    try {
-      const legacy = await query(
-        'SELECT app_profiles FROM "srkl_application_profiles" WHERE id = $1 LIMIT 1',
-        [record.id],
-      );
-      if (legacy.rows[0]) {
-        const legacyProfiles = parseProfiles(legacy.rows[0].app_profiles);
-        if (!legacyProfiles.srkl || typeof legacyProfiles.srkl !== 'object') legacyProfiles.srkl = {};
-        legacyProfiles.srkl.storage_connections = connections;
-        await query(
-          'UPDATE "srkl_application_profiles" SET app_profiles = $1, updated_at = NOW() WHERE id = $2',
-          [JSON.stringify(legacyProfiles), record.id],
-        );
-      }
-    } catch {
-      // Older profiles without the compatibility table remain valid.
-    }
+  const incoming = new Map(secured.map((connection) => [String(connection.id), connection]));
+  const assigned = new Set<string>();
+  const profiles = record.profiles;
+
+  for (const value of Object.values(profiles)) {
+    if (!value || typeof value !== 'object') continue;
+    const profile = value as Record<string, any>;
+    if (!Array.isArray(profile.storage_connections)) continue;
+    profile.storage_connections = profile.storage_connections
+      .map((current: any) => {
+        const id = String(current?.id || '');
+        const next = incoming.get(id);
+        if (!next) return null;
+        assigned.add(id);
+        return next;
+      })
+      .filter(Boolean);
   }
+
+  const unassigned = secured.filter((connection) => !assigned.has(String(connection.id)));
+  if (unassigned.length) {
+    if (!profiles.srkl || typeof profiles.srkl !== 'object') profiles.srkl = {};
+    const existing = Array.isArray(profiles.srkl.storage_connections)
+      ? profiles.srkl.storage_connections
+      : [];
+    const byId = new Map(existing.map((connection: any) => [String(connection?.id || ''), connection]));
+    for (const connection of unassigned) byId.set(String(connection.id), connection);
+    profiles.srkl.storage_connections = [...byId.values()];
+  }
+
+  await writeUserProfiles(record, query);
 }
 
-/** Set the primary marker without changing an existing workspace's explicit association. */
+/** Set the primary marker/** Set the primary marker without changing an existing workspace's explicit association. */
 export async function setPrimaryUserStorageConnection(
   userId: string,
   connectionId: string,
@@ -574,25 +583,21 @@ export async function listUserStorageConnections(
   userId: string,
   query: StorageQuery = DEFAULT_QUERY,
 ): Promise<PublicStorageConnection[]> {
-  const record = await findUserRecord(userId, query);
-  if (!record) return [];
-  const raw = await mergeLegacySrklConnections(record.id, record.profiles, query);
-  return raw
+  const connections = await listUserStorageConnectionsWithSecrets(userId, query);
+  return connections
     .map(toPublicStorageConnection)
     .filter((connection): connection is PublicStorageConnection => Boolean(connection));
 }
 
-/** Server-only credential resolver. Never return this object from an HTTP API. */
+/** Server-only credential resolver./** Server-only credential resolver. Never return this object from an HTTP API. */
 export async function resolveUserStorageConnectionSecret(
   userId: string,
   connectionId?: string,
   query: StorageQuery = DEFAULT_QUERY,
   provider?: string,
 ): Promise<Record<string, any> | null> {
-  const record = await findUserRecord(userId, query);
-  if (!record) return null;
-  const raw = await mergeLegacySrklConnections(record.id, record.profiles, query);
-  const eligible = provider ? raw.filter((item) => item.provider === provider) : raw;
+  const connections = await listUserStorageConnectionsWithSecrets(userId, query);
+  const eligible = provider ? connections.filter((item) => item.provider === provider) : connections;
   if (connectionId) return eligible.find((item) => item.id === connectionId) || null;
   return eligible.find((item) => item.role === 'primary' && item.enabled !== false)
     || eligible.find((item) => item.enabled !== false)
@@ -604,61 +609,13 @@ async function persistStorageConnection(
   connection: Record<string, any>,
   query: StorageQuery,
 ): Promise<void> {
-  const record = await findUserRecord(userId, query);
-  if (!record) throw new Error('A canonical user profile was not found for this storage connection.');
-
-  const profiles = record.profiles;
-  if (!profiles.srkl || typeof profiles.srkl !== 'object') profiles.srkl = {};
-  const connections = Array.isArray(profiles.srkl.storage_connections)
-    ? profiles.srkl.storage_connections
-    : [];
-
-  const existingIndex = connections.findIndex((item: any) => item?.id === connection.id);
-  if (existingIndex >= 0) {
-    connections[existingIndex] = { ...connections[existingIndex], ...connection };
-  } else {
-    connections.push(connection);
-  }
-  profiles.srkl.storage_connections = connections;
-
-  const table = record.source === 'ultrst-users' ? '"ultrst-users"' : '"srkl_application_profiles"';
-  await query(
-    `UPDATE ${table} SET app_profiles = $1, updated_at = NOW() WHERE id = $2`,
-    [JSON.stringify(profiles), record.id],
-  );
-
-  // Keep the former SRKL profile mirror synchronized while deployments are
-  // migrating to ultrst-users. Failure here is not hidden for existing rows:
-  // callers must not be told the connection is available if SRKL still reads
-  // an outdated mirror.
-  if (record.source === 'ultrst-users') {
-    try {
-      const legacy = await query(
-        'SELECT app_profiles FROM "srkl_application_profiles" WHERE id = $1 LIMIT 1',
-        [record.id],
-      );
-      if (legacy.rows[0]) {
-        const legacyProfiles = parseProfiles(legacy.rows[0].app_profiles);
-        if (!legacyProfiles.srkl || typeof legacyProfiles.srkl !== 'object') legacyProfiles.srkl = {};
-        const legacyConnections = Array.isArray(legacyProfiles.srkl.storage_connections)
-          ? legacyProfiles.srkl.storage_connections
-          : [];
-        const index = legacyConnections.findIndex((item: any) => item?.id === connection.id);
-        if (index >= 0) legacyConnections[index] = { ...legacyConnections[index], ...connection };
-        else legacyConnections.push(connection);
-        legacyProfiles.srkl.storage_connections = legacyConnections;
-        await query(
-          'UPDATE "srkl_application_profiles" SET app_profiles = $1, updated_at = NOW() WHERE id = $2',
-          [JSON.stringify(legacyProfiles), record.id],
-        );
-      }
-    } catch {
-      // Newer installations may no longer have the compatibility table.
-    }
-  }
+  const existing = await listUserStorageConnectionsWithSecrets(userId, query);
+  const next = existing.filter((item) => item.id !== connection.id);
+  next.push(connection);
+  await persistStorageConnectionCollection(userId, next, query);
 }
 
-export async function testBackblazeCredentials(
+export async function testBackblazeCredentials(export async function testBackblazeCredentials(
   keyId: string,
   applicationKey: string,
 ): Promise<{ success: boolean; accountId?: string; buckets: Array<{ id: string; name: string; type?: string }>; error?: string }> {
