@@ -85,9 +85,9 @@ export async function getGoogleDriveOAuthConfiguration(
   const clientId = typeof oauth.clientId === 'string' ? oauth.clientId.trim() : '';
   const clientSecret = typeof oauth.clientSecret === 'string' ? oauth.clientSecret.trim() : '';
   const redirectUri = typeof oauth.redirectUri === 'string' ? oauth.redirectUri.trim() : '';
-  const stateSecret = typeof oauth.stateSecret === 'string' && oauth.stateSecret.length >= 32
-    ? oauth.stateSecret
-    : clientSecret;
+  const stateSecret = typeof oauth.stateSecret === 'string'
+    ? oauth.stateSecret.trim()
+    : '';
 
   const missing: string[] = [];
   if (!clientId) missing.push('client ID');
