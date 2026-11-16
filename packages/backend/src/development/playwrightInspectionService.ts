@@ -35,8 +35,12 @@ export class PlaywrightInspectionRuntime {
     let browser: BrowserLike;
     try {
       const executablePath = request.executablePath ?? findSystemChromiumExecutable();
+      const chromiumArgs = typeof process.getuid === 'function' && process.getuid() === 0
+        ? ['--no-sandbox', '--disable-dev-shm-usage']
+        : [];
       browser = await loadPlaywright().chromium.launch({
         headless: true,
+        ...(chromiumArgs.length ? { args: chromiumArgs } : {}),
         ...(executablePath ? { executablePath } : {}),
       });
     }
