@@ -97,6 +97,276 @@ function parseProfiles(value: unknown): Record<string, any> {
   return value && typeof value === 'object' ? value as Record<string, any> : {};
 }
 
+const STORAGE_SECRET_FIELDS = [
+  'b2KeyId',
+  'b2ApplicationKey',
+  'keyId',
+  'applicationKey',
+  'appKey',
+  'accessKeyId',
+  'secretAccessKey',
+  'googleAccessToken',
+  'googleAccessTokenExpiresAt',
+  'googleRefreshToken',
+  'googleTokenType',
+] as const;
+
+function encodeBase64Url(bytes: Uint8Array): string {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function decodeBase64Url(value: string): Uint8Array {
+  if (!/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('Storage connection secret envelope is malformed.');
+  const base64 = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
+  const binary = atob(base64);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+function extractConnectionSecretPayload(connection: Record<string, any>): Record<string, any> {
+  const payload: Record<string, any> = {};
+  for (const field of STORAGE_SECRET_FIELDS) {
+    if (connection[field] !== undefined && connection[field] !== null && connection[field] !== '') {
+      payload[field] = connection[field];
+    }
+  }
+  if (connection.credentials && typeof connection.credentials === 'object') {
+    payload.credentials = connection.credentials;
+    const nested = connection.credentials;
+    const aliases: Record<string, string[]> = {
+      b2KeyId: ['b2KeyId', 'keyId'],
+      b2ApplicationKey: ['b2ApplicationKey', 'applicationKey', 'appKey'],
+      googleAccessToken: ['googleAccessToken', 'accessToken'],
+      googleRefreshToken: ['googleRefreshToken', 'refreshToken'],
+      googleAccessTokenExpiresAt: ['googleAccessTokenExpiresAt', 'expiresAt'],
+    };
+    for (const [target, candidates] of Object.entries(aliases)) {
+      if (payload[target] !== undefined) continue;
+      const key = candidates.find((candidate) => nested[candidate] !== undefined && nested[candidate] !== null);
+      if (key) payload[target] = nested[key];
+    }
+  }
+  return payload;
+}
+
+function hasConnectionSecrets(connection: Record<string, any>): boolean {
+  return Object.keys(extractConnectionSecretPayload(connection)).length > 0;
+}
+
+async function encryptConnectionSecretPayload(
+  userId: string,
+  connection: Record<string, any>,
+  payload: Record<string, any>,
+  query: StorageQuery,
+): Promise<Record<string, any>> {
+  if (Object.keys(payload).length === 0) return connection;
+  if (!connection.id || !connection.provider) {
+    throw new Error('A storage connection ID and provider are required before encrypting its credentials.');
+  }
+
+  const wrappingKey = await getOrCreateStorageConnectionEncryptionKey(query);
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(wrappingKey),
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt'],
+  );
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const additionalData = new TextEncoder().encode(
+    'ultrst-storage-connection:v1:' + userId + ':' + connection.id + ':' + connection.provider,
+  );
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv, additionalData },
+    key,
+    new TextEncoder().encode(JSON.stringify(payload)),
+  );
+
+  const safe: Record<string, any> = { ...connection };
+  for (const field of STORAGE_SECRET_FIELDS) delete safe[field];
+  delete safe.credentials;
+  safe.secretCiphertext = {
+    version: 1,
+    algorithm: 'AES-GCM-256',
+    iv: encodeBase64Url(iv),
+    ciphertext: encodeBase64Url(new Uint8Array(ciphertext)),
+  };
+  return safe;
+}
+
+async function hydrateConnectionSecrets(
+  userId: string,
+  connection: Record<string, any>,
+  query: StorageQuery,
+): Promise<Record<string, any>> {
+  const envelope = connection.secretCiphertext;
+  let payload: Record<string, any> = {};
+
+  if (envelope !== undefined) {
+    if (
+      envelope?.version !== 1
+      || envelope?.algorithm !== 'AES-GCM-256'
+      || typeof envelope.iv !== 'string'
+      || typeof envelope.ciphertext !== 'string'
+    ) {
+      throw new Error('The saved storage connection has an unsupported encrypted credential format.');
+    }
+    try {
+      const wrappingKey = await getOrCreateStorageConnectionEncryptionKey(query);
+      const key = await crypto.subtle.importKey(
+        'raw',
+        new TextEncoder().encode(wrappingKey),
+        { name: 'AES-GCM' },
+        false,
+        ['decrypt'],
+      );
+      const additionalData = new TextEncoder().encode(
+        'ultrst-storage-connection:v1:' + userId + ':' + connection.id + ':' + connection.provider,
+      );
+      const plaintext = await crypto.subtle.decrypt(
+        {
+          name: 'AES-GCM',
+          iv: decodeBase64Url(envelope.iv),
+          additionalData,
+        },
+        key,
+        decodeBase64Url(envelope.ciphertext),
+      );
+      const parsed = JSON.parse(new TextDecoder().decode(plaintext));
+      if (!parsed || typeof parsed !== 'object') throw new Error('invalid payload');
+      payload = parsed;
+    } catch {
+      throw new Error('The saved storage connection credentials could not be decrypted with the current system key.');
+    }
+  }
+
+  // Legacy plaintext formats are merged only in server memory. The profile
+  // migration below rewrites them to the encrypted envelope before returning.
+  payload = { ...payload, ...extractConnectionSecretPayload(connection) };
+  const hydrated: Record<string, any> = { ...connection, ...payload };
+  if (payload.credentials && typeof payload.credentials === 'object') {
+    const nested = payload.credentials;
+    hydrated.b2KeyId = hydrated.b2KeyId || nested.b2KeyId || nested.keyId;
+    hydrated.b2ApplicationKey = hydrated.b2ApplicationKey || nested.b2ApplicationKey || nested.applicationKey || nested.appKey;
+    hydrated.googleAccessToken = hydrated.googleAccessToken || nested.googleAccessToken || nested.accessToken;
+    hydrated.googleRefreshToken = hydrated.googleRefreshToken || nested.googleRefreshToken || nested.refreshToken;
+    hydrated.googleAccessTokenExpiresAt = hydrated.googleAccessTokenExpiresAt || nested.googleAccessTokenExpiresAt || nested.expiresAt;
+  }
+  return hydrated;
+}
+
+async function protectConnectionForStorage(
+  userId: string,
+  connection: Record<string, any>,
+  query: StorageQuery,
+): Promise<Record<string, any>> {
+  const hydrated = await hydrateConnectionSecrets(userId, connection, query);
+  const payload = extractConnectionSecretPayload(hydrated);
+  if (Object.keys(payload).length === 0) return connection;
+  return encryptConnectionSecretPayload(userId, hydrated, payload, query);
+}
+
+async function writeUserProfiles(
+  record: { id: string; profiles: Record<string, any>; source: 'ultrst-users' | 'srkl_application_profiles' },
+  query: StorageQuery,
+): Promise<void> {
+  const table = record.source === 'ultrst-users' ? '"ultrst-users"' : '"srkl_application_profiles"';
+  await query(
+    'UPDATE ' + table + ' SET app_profiles = $1, updated_at = NOW() WHERE id = $2',
+    [JSON.stringify(record.profiles), record.id],
+  );
+
+  if (record.source === 'ultrst-users') {
+    try {
+      const legacy = await query(
+        'SELECT app_profiles FROM "srkl_application_profiles" WHERE id = $1 LIMIT 1',
+        [record.id],
+      );
+      if (legacy.rows[0]) {
+        const legacyProfiles = parseProfiles(legacy.rows[0].app_profiles);
+        const canonicalConnections = Array.isArray(record.profiles.srkl?.storage_connections)
+          ? record.profiles.srkl.storage_connections
+          : [];
+        if (!legacyProfiles.srkl || typeof legacyProfiles.srkl !== 'object') legacyProfiles.srkl = {};
+        legacyProfiles.srkl.storage_connections = canonicalConnections;
+        await query(
+          'UPDATE "srkl_application_profiles" SET app_profiles = $1, updated_at = NOW() WHERE id = $2',
+          [JSON.stringify(legacyProfiles), record.id],
+        );
+      }
+    } catch {
+      // The legacy compatibility table is absent after profile migration.
+    }
+  }
+}
+
+async function migrateLegacyConnectionCollections(
+  userId: string,
+  query: StorageQuery,
+): Promise<void> {
+  const record = await findUserRecord(userId, query);
+  if (!record) return;
+  let changed = false;
+
+  for (const value of Object.values(record.profiles)) {
+    if (!value || typeof value !== 'object') continue;
+    const profile = value as Record<string, any>;
+    if (!Array.isArray(profile.storage_connections)) continue;
+    const secured: any[] = [];
+    for (const connection of profile.storage_connections) {
+      if (connection && typeof connection === 'object' && hasConnectionSecrets(connection)) {
+        const next = await protectConnectionForStorage(record.id, connection, query);
+        secured.push(next);
+        if (next !== connection && !connection.secretCiphertext) changed = true;
+      } else {
+        secured.push(connection);
+      }
+    }
+    if (changed) profile.storage_connections = secured;
+  }
+
+  if (record.source === 'ultrst-users') {
+    try {
+      const legacy = await query(
+        'SELECT app_profiles FROM "srkl_application_profiles" WHERE id = $1 LIMIT 1',
+        [record.id],
+      );
+      if (legacy.rows[0]) {
+        const profiles = parseProfiles(legacy.rows[0].app_profiles);
+        let legacyChanged = false;
+        for (const value of Object.values(profiles)) {
+          if (!value || typeof value !== 'object') continue;
+          const profile = value as Record<string, any>;
+          if (!Array.isArray(profile.storage_connections)) continue;
+          const secured: any[] = [];
+          for (const connection of profile.storage_connections) {
+            if (connection && typeof connection === 'object' && hasConnectionSecrets(connection)) {
+              const next = await protectConnectionForStorage(record.id, connection, query);
+              secured.push(next);
+              if (next !== connection && !connection.secretCiphertext) legacyChanged = true;
+            } else {
+              secured.push(connection);
+            }
+          }
+          if (legacyChanged) profile.storage_connections = secured;
+        }
+        if (legacyChanged) {
+          await query(
+            'UPDATE "srkl_application_profiles" SET app_profiles = $1, updated_at = NOW() WHERE id = $2',
+            [JSON.stringify(profiles), record.id],
+          );
+        }
+      }
+    } catch {
+      // The legacy SRKL table is not required after migration.
+    }
+  }
+
+  if (changed) await writeUserProfiles(record, query);
+}
+
+
 function connectionCollections(profiles: Record<string, any>): any[][] {
   const collections: any[][] = [];
   const srklConnections = profiles.srkl?.storage_connections;
