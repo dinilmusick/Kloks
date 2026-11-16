@@ -104,6 +104,15 @@ export async function syncWorkspaceDataToBucket(
   env?: Record<string, unknown>,
 ): Promise<void> {
   if (!isPersistentCloudConnection(connection)) return;
+  if (!workspace?.storageConnectionId || workspace.storageConnectionId !== connection.id) {
+    throw new Error('Workspace data synchronization requires its exact, owner-resolved storage connection.');
+  }
+  if (String(workspace?.storageProvider || '').toLowerCase() !== String(connection.provider || '').toLowerCase()) {
+    throw new Error('Workspace data synchronization storage provider does not match its saved connection.');
+  }
+  if (!String(connection?.__ownerUserId || workspace?.__ownerUserId || '').trim()) {
+    throw new Error('Workspace data synchronization requires a connection resolved for its verified owner.');
+  }
   await writeWorkspaceFile(
     workspace,
     connection,
