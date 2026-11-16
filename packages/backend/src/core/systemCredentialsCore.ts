@@ -35,6 +35,25 @@ function parseCredentials(value: unknown): Record<string, any> {
   return value && typeof value === 'object' ? value as Record<string, any> : {};
 }
 
+/** Read the existing system record without DDL, inserts, or other bootstrap writes. */
+export async function readSystemCredentialsRecord(
+  queryDb: SystemQuery,
+  targetId = 'system',
+): Promise<SystemCredentialsRecord> {
+  const result = await queryDb(
+    'SELECT id, credentials, created_at, updated_at FROM public."ultrst-credentials" WHERE id = $1 LIMIT 1',
+    [targetId],
+  );
+  const row = result.rows[0];
+  if (!row) return { id: targetId, credentials: {} };
+  return {
+    id: String(row.id || targetId),
+    credentials: parseCredentials(row.credentials),
+    ...(row.created_at ? { created_at: new Date(row.created_at).toISOString() } : {}),
+    ...(row.updated_at ? { updated_at: new Date(row.updated_at).toISOString() } : {}),
+  };
+}
+
 /** Keep the existing system credential table/schema; do not introduce app-specific env variables. */
 export async function getSystemCredentialsRecord(
   queryDb: SystemQuery,
@@ -154,7 +173,7 @@ function decodeStorageEncryptionKey(value: string): Uint8Array {
 export async function getStorageConnectionEncryptionKey(
   queryDb: SystemQuery,
 ): Promise<string> {
-  const record = await getSystemCredentialsRecord(queryDb, 'system');
+  const record = await readSystemCredentialsRecord(queryDb, 'system');
   const storage = record.credentials?.storageConnections && typeof record.credentials.storageConnections === 'object'
     ? record.credentials.storageConnections
     : {};
