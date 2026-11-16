@@ -3,11 +3,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   writeWorkspaceFile: vi.fn(),
   deleteWorkspaceFolder: vi.fn(),
+  resolveUserWorkspaceStorageAssociation: vi.fn(),
+  queryUnifiedDb: vi.fn(),
 }));
 
 vi.mock('./workspaceFileCore.js', () => ({
   writeWorkspaceFile: mocks.writeWorkspaceFile,
   deleteWorkspaceFolder: mocks.deleteWorkspaceFolder,
+}));
+vi.mock('./storageConnectionCore.js', () => ({
+  resolveUserWorkspaceStorageAssociation: mocks.resolveUserWorkspaceStorageAssociation,
+}));
+vi.mock('./unifiedDb.js', () => ({
+  queryUnifiedDb: mocks.queryUnifiedDb,
 }));
 
 import {
@@ -37,6 +45,8 @@ describe('owner-bound workspace bucket synchronization', () => {
     vi.clearAllMocks();
     mocks.writeWorkspaceFile.mockResolvedValue(undefined);
     mocks.deleteWorkspaceFolder.mockResolvedValue(undefined);
+    mocks.resolveUserWorkspaceStorageAssociation.mockResolvedValue(workspace);
+    mocks.queryUnifiedDb.mockResolvedValue({ rows: [] });
   });
 
   it('requires an owner-resolved connection before workspace initialization', async () => {
