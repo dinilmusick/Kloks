@@ -236,7 +236,12 @@ async function hydrateConnectionSecrets(
       const parsed = JSON.parse(new TextDecoder().decode(plaintext));
       if (!parsed || typeof parsed !== 'object') throw new Error('invalid payload');
       payload = parsed;
-    } catch {
+    } catch (error) {
+      // Preserve system key configuration failures so operators can distinguish
+      // key loss/version drift from a ciphertext or AAD authentication failure.
+      if (error instanceof Error && error.message.startsWith('[STORAGE_SECRET_CONFIGURATION_')) {
+        throw error;
+      }
       throw new Error('The saved storage connection credentials could not be decrypted with the current system key.');
     }
   }
