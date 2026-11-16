@@ -7,8 +7,10 @@
  */
 
 import {
+  completeGoogleDriveAuthorization,
   getSystemGoogleOAuthConfiguration,
   type GoogleDriveSystemOAuthConfiguration,
+  type PublicStorageConnection,
 } from './storageConnectionCore.js';
 import {
   GOOGLE_DRIVE_WORKSPACE_SCOPE,
@@ -228,4 +230,29 @@ export async function verifyGoogleDriveAuthorizationState(
     throw new Error('Google Drive OAuth return URL did not match the signed authorization context.');
   }
   return parsed;
+}
+
+/**
+ * Canonical callback boundary. The signed state and nonce cookie are verified
+ * before the authorization code is exchanged or any user connection is written.
+ */
+export async function completeGoogleDriveAuthorizationCallback(
+  input: {
+    state: string;
+    nonceCookie: string;
+    callbackOrigin: string;
+    code: string;
+  },
+  query: OAuthQuery,
+): Promise<{ connection: PublicStorageConnection; returnTo: string }> {
+  const authorization = await verifyGoogleDriveAuthorizationState({
+    state: input.state,
+    nonceCookie: input.nonceCookie,
+    callbackOrigin: input.callbackOrigin,
+  }, query);
+  if (!String(input.code || '').trim()) {
+    throw new Error('Google Drive authorization code is required.');
+  }
+  const connection = await completeGoogleDriveAuthorization(authorization.userId, input.code, query);
+  return { connection, returnTo: authorization.returnTo };
 }
