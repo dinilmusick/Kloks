@@ -21,7 +21,7 @@ export class LocalExecutionProvider {
   async execute(request: LocalExecutionRequest): Promise<LocalExecutionResult> {
     const executionId = crypto.randomUUID();
     return new Promise((resolve) => {
-      const child = spawn("sh", ["-lc", request.command], {
+      const child = spawn("sh", ["-c", request.command], {
         cwd: request.cwd,
         env: buildExecutionEnvironment(request.environment),
       });
