@@ -26,9 +26,9 @@ export async function authorizeB2(keyId: string, applicationKey: string): Promis
   const cached = authCache.get(cacheKey);
   if (cached && Date.now() < cached.expiresAt) return cached.auth;
 
-  const authHeader = typeof Buffer !== 'undefined'
-    ? Buffer.from(`${keyId.trim()}:${applicationKey.trim()}`).toString('base64')
-    : btoa(`${keyId.trim()}:${applicationKey.trim()}`);
+  // Web-standard Base64 is available in Cloudflare Workers, browser runtimes,
+  // and supported modern Node runtimes; this portable client never needs Buffer.
+  const authHeader = btoa(`${keyId.trim()}:${applicationKey.trim()}`);
   let res = await fetch('https://api.backblazeb2.com/b2api/v2/b2_authorize_account', {
     headers: { Authorization: `Basic ${authHeader}` },
     signal: AbortSignal.timeout(10000),
