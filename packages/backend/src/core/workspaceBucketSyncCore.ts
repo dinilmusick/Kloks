@@ -7,15 +7,28 @@
 
 import { writeWorkspaceFile, deleteWorkspaceFolder } from './workspaceFileCore';
 
-export function resolveWorkspaceConnection(profiles: any, workspace: any) {
-  const depm = profiles.depm || {};
-  const conns = depm.storage_connections?.length
-    ? depm.storage_connections
-    : profiles.srkl?.storage_connections || profiles.docustack?.storage_connections || [];
-  return conns.find((c: any) => c.id === workspace.storageConnectionId)
-    || conns.find((c: any) => c.role === 'primary')
-    || conns[0]
-    || null;
+export function resolveWorkspaceConnection(profiles: any, workspace: any, appId = 'depm') {
+  const collections: any[][] = [];
+  const preferred = profiles?.[String(appId || 'depm').toLowerCase()]?.storage_connections;
+  if (Array.isArray(preferred)) collections.push(preferred);
+  for (const value of Object.values(profiles || {})) {
+    if (value && typeof value === 'object' && Array.isArray((value as any).storage_connections)) {
+      collections.push((value as any).storage_connections);
+    }
+  }
+  const byId = new Map<string, any>();
+  for (const connection of collections.flat()) {
+    if (connection && typeof connection.id === 'string' && !byId.has(connection.id)) {
+      byId.set(connection.id, connection);
+    }
+  }
+  const connections = [...byId.values()];
+  if (workspace?.storageConnectionId) {
+    // A declared connection ID is an immutable association. Never silently
+    // substitute a different primary account if that reference is invalid.
+    return connections.find((connection) => connection.id === workspace.storageConnectionId) || null;
+  }
+  return connections.find((connection) => connection.role === 'primary') || connections[0] || null;
 }
 
 export async function syncWorkspaceCreateToBucket(workspace: any, connection: any, env?: Record<string, unknown>) {
