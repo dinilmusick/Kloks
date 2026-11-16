@@ -22,7 +22,7 @@ export async function authorizeB2(keyId: string, applicationKey: string): Promis
   const res = await fetch('https://api.backblazeb2.com/b2api/v2/b2_authorize_account', {
     headers: { Authorization: `Basic ${basic}` },
   });
-  if (!res.ok) throw new Error(`B2 Authorization failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) throw new Error(`B2 authorization failed with HTTP ${res.status}.`);
 
   const data: any = await res.json();
   const token: B2AuthToken = {
@@ -81,7 +81,7 @@ export async function b2UploadFile(
     headers: { Authorization: auth.authorizationToken, 'Content-Type': 'application/json' },
     body: JSON.stringify({ bucketId: bucket.bucketId }),
   });
-  if (!urlRes.ok) throw new Error(`B2 get upload url failed: ${urlRes.status}`);
+  if (!urlRes.ok) throw new Error(`B2 upload URL request failed with HTTP ${urlRes.status}.`);
   const { uploadUrl, authorizationToken } = await urlRes.json() as any;
 
   const raw = typeof content === 'string' ? new TextEncoder().encode(content) : content;
@@ -94,12 +94,11 @@ export async function b2UploadFile(
       Authorization: authorizationToken,
       'X-Bz-File-Name': encodeURIComponent(fileName).replace(/%2F/g, '/'),
       'Content-Type': contentType,
-      'Content-Length': String(raw.length),
       'X-Bz-Content-Sha1': sha1,
     },
     body: raw as any,
   });
-  if (!upRes.ok) throw new Error(`B2 upload failed: ${upRes.status} ${await upRes.text()}`);
+  if (!upRes.ok) throw new Error(`B2 file upload failed with HTTP ${upRes.status}.`);
   return await upRes.json();
 }
 
