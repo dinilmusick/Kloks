@@ -742,3 +742,78 @@ export async function selectGoogleDriveRootFolder(
   }, query);
   return folder;
 }
+
+
+/** Server-only Google Drive file operations; secrets and tokens remain in the user connection. */
+export async function testGoogleDriveConnectionForUser(
+  userId: string,
+  connectionId: string,
+  query: StorageQuery = DEFAULT_QUERY,
+): Promise<{ success: boolean; latencyMs: number; error?: string; email?: string }> {
+  const drive = await createGoogleDriveWorkspaceClient(userId, connectionId, query);
+  const started = Date.now();
+  try {
+    const identity = await drive.getAccountIdentity();
+    const result = await drive.testConnection();
+    return {
+      success: Boolean(result.ok),
+      latencyMs: Number(result.latencyMs || Date.now() - started),
+      ...(identity.email ? { email: identity.email } : {}),
+      ...(result.error ? { error: result.error } : {}),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      latencyMs: Date.now() - started,
+      error: error instanceof Error ? error.message : 'Google Drive connection failed.',
+    };
+  }
+}
+
+export async function writeGoogleDriveFileForConnection(
+  userId: string,
+  connectionId: string,
+  path: string,
+  data: string | Uint8Array,
+  contentType = 'application/octet-stream',
+  query: StorageQuery = DEFAULT_QUERY,
+): Promise<void> {
+  const drive = await createGoogleDriveWorkspaceClient(userId, connectionId, query);
+  const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
+  await drive.write(path, bytes, contentType);
+}
+
+export async function readGoogleDriveFileForConnection(
+  userId: string,
+  connectionId: string,
+  path: string,
+  query: StorageQuery = DEFAULT_QUERY,
+): Promise<Uint8Array | null> {
+  const drive = await createGoogleDriveWorkspaceClient(userId, connectionId, query);
+  try {
+    return await drive.read(path);
+  } catch (error) {
+    if (error instanceof Error && /not found|HTTP 404/i.test(error.message)) return null;
+    throw error;
+  }
+}
+
+export async function deleteGoogleDriveFileForConnection(
+  userId: string,
+  connectionId: string,
+  path: string,
+  query: StorageQuery = DEFAULT_QUERY,
+): Promise<void> {
+  const drive = await createGoogleDriveWorkspaceClient(userId, connectionId, query);
+  await drive.delete(path);
+}
+
+export async function listGoogleDriveFilesForConnection(
+  userId: string,
+  connectionId: string,
+  path = '',
+  query: StorageQuery = DEFAULT_QUERY,
+): Promise<Array<{ path: string; size: number; modifiedAt: number; isFolder?: boolean }>> {
+  const drive = await createGoogleDriveWorkspaceClient(userId, connectionId, query);
+  return drive.list(path);
+}
