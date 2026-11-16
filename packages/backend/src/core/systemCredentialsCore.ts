@@ -20,6 +20,7 @@ export interface GoogleDriveOAuthConfiguration {
   clientSecret: string;
   redirectUri: string;
   stateSecret: string;
+  allowedReturnOrigins: string[];
 }
 
 function parseCredentials(value: unknown): Record<string, any> {
@@ -100,5 +101,66 @@ export async function getGoogleDriveOAuthConfiguration(
     );
   }
 
-  return { clientId, clientSecret, redirectUri, stateSecret };
+  let parsedRedirect: URL;
+  try {
+    parsedRedirect = new URL(redirectUri);
+  } catch {
+    throw new Error('[STORAGE_PROVIDER_CONFIGURATION_INVALID] Google Drive OAuth redirect URI must be an absolute URL.');
+  }
+  if (parsedRedirect.protocol !== 'https:' && parsedRedirect.hostname !== 'localhost') {
+    throw new Error('[STORAGE_PROVIDER_CONFIGURATION_INVALID] Google Drive OAuth redirect URI must use HTTPS (localhost is allowed for development).');
+  }
+
+  const allowedReturnOrigins = Array.isArray(oauth.allowedReturnOrigins)
+    ? oauth.allowedReturnOrigins.flatMap((value: unknown) => {
+        if (typeof value !== 'string') return [];
+        try {
+          const url = new URL(value.trim());
+          if (url.protocol !== 'https:' && url.hostname !== 'localhost') return [];
+          return [url.origin];
+        } catch {
+          return [];
+        }
+      })
+    : [];
+
+  return { clientId, clientSecret, redirectUri, stateSecret, allowedReturnOrigins };
+}
+
+/**
+ * System-owned wrapping key for user-scoped storage provider secrets.
+ * It is stored only in the canonical system.ultrst-credentials record and
+ * is never included in provider capability or user connection projections.
+ */
+export async function getOrCreateStorageConnectionEncryptionKey(
+  queryDb: SystemQuery,
+): Promise<string> {
+  const record = await getSystemCredentialsRecord(queryDb, 'system');
+  const root = record.credentials || {};
+  const storage = root.storageConnections && typeof root.storageConnections === 'object'
+    ? root.storageConnections
+    : {};
+  const current = typeof storage.encryptionKey === 'string' ? storage.encryptionKey.trim() : '';
+  if (current.length >= 43) return current;
+
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  const generated = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  const credentials = {
+    ...root,
+    storageConnections: {
+      ...storage,
+      encryptionKey: generated,
+      encryptionKeyVersion: 1,
+    },
+  };
+  const updated = await queryDb(
+    'UPDATE public."ultrst-credentials" SET credentials = $1::jsonb, updated_at = NOW() WHERE id = $2',
+    [JSON.stringify(credentials), 'system'],
+  );
+  if (updated.rowCount === 0) {
+    throw new Error('[STORAGE_SECRET_CONFIGURATION_UNAVAILABLE] Unable to persist the canonical storage encryption key.');
+  }
+  return generated;
 }
