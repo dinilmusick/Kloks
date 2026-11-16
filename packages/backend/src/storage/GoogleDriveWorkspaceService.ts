@@ -413,7 +413,7 @@ export class GoogleDriveWorkspaceService {
    * Folder browsing is always rooted at the persisted workspace root. A caller
    * may browse a descendant, but cannot supply an unrelated Drive folder ID.
    */
-  private async assertFolderWithinRoot(folderId: string): Promise<void> {
+  async assertFolderWithinRoot(folderId: string): Promise<void> {
     const rootId = this.options.rootFolderId || 'root';
     if (!folderId || folderId === rootId) return;
 
