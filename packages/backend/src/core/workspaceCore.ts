@@ -43,19 +43,35 @@ async function resolveWorkspaceConnectionForUser(
 export { loadWorkspaceData, saveWorkspaceData, renameAppInWorkspaceData } from './workspaceDataCore';
 export { getWorkspaceStorageDetails } from './workspaceStorageDetailsCore';
 
-export async function findUserWorkspace(workspaceId: string, env?: Record<string, unknown>) {
-  const res = await queryUnifiedDb(`SELECT id, email, username, app_profiles FROM "ultrst-users"`, [], env);
-  for (const user of res.rows) {
-    const profiles = typeof user.app_profiles === 'string' ? JSON.parse(user.app_profiles) : (user.app_profiles || {});
-    const app = appProfile(profiles, workspaceAppId(env));
-    const workspaces = Array.isArray(app.workspaces) ? app.workspaces : [];
-    const ws = workspaces.find((w: any) => w.id === workspaceId);
-    if (ws) {
-      const conn = await resolveWorkspaceConnectionForUser(String(user.id), profiles, ws, env);
-      return { user, workspace: ws, connection: conn };
-    }
-  }
-  return { user: null, workspace: null, connection: null };
+/**
+ * Resolve a workspace only within the supplied authenticated owner context.
+ * The owner ID must come from the server's verified Luth principal, never from
+ * request-body data. Workspace IDs are not authorization credentials.
+ */
+export async function findUserWorkspace(
+  workspaceId: string,
+  env?: Record<string, unknown>,
+  verifiedUserId?: string,
+) {
+  const ownerId = String(verifiedUserId || '').trim();
+  if (!ownerId) return { user: null, workspace: null, connection: null };
+
+  const res = await queryUnifiedDb(
+    `SELECT id, email, username, app_profiles FROM "ultrst-users" WHERE id = $1 OR email = $1 LIMIT 1`,
+    [ownerId],
+    env,
+  );
+  const user = res.rows[0];
+  if (!user) return { user: null, workspace: null, connection: null };
+
+  const profiles = typeof user.app_profiles === 'string' ? JSON.parse(user.app_profiles) : (user.app_profiles || {});
+  const app = appProfile(profiles, workspaceAppId(env));
+  const workspaces = Array.isArray(app.workspaces) ? app.workspaces : [];
+  const workspace = workspaces.find((candidate: any) => candidate.id === workspaceId) || null;
+  if (!workspace) return { user: null, workspace: null, connection: null };
+
+  const connection = await resolveWorkspaceConnectionForUser(String(user.id), profiles, workspace, env);
+  return { user, workspace, connection };
 }
 
 export async function getWorkspaces(userId?: string, env?: Record<string, unknown>) {
