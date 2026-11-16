@@ -6,6 +6,7 @@ import { getWorkspaceFolderPrefix, normalizeWorkspaceStoragePath } from './works
 const workspaceMocks = vi.hoisted(() => ({
   queryUnifiedDb: vi.fn(),
   resolveUserStorageConnectionSecret: vi.fn(),
+  resolveUserWorkspaceStorageAssociation: vi.fn(),
   listUserStorageConnections: vi.fn(),
   testBackblazeCredentials: vi.fn(),
   createGoogleDriveWorkspaceClient: vi.fn(),
@@ -18,6 +19,7 @@ vi.mock('./unifiedDb.js', () => ({
 }));
 vi.mock('./storageConnectionCore.js', () => ({
   resolveUserStorageConnectionSecret: workspaceMocks.resolveUserStorageConnectionSecret,
+  resolveUserWorkspaceStorageAssociation: workspaceMocks.resolveUserWorkspaceStorageAssociation,
   listUserStorageConnections: workspaceMocks.listUserStorageConnections,
   testBackblazeCredentials: workspaceMocks.testBackblazeCredentials,
   createGoogleDriveWorkspaceClient: workspaceMocks.createGoogleDriveWorkspaceClient,
