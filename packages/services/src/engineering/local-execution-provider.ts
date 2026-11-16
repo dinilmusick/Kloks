@@ -3,34 +3,16 @@ import {spawn} from "node:child_process";
 export interface LocalExecutionRequest {command: string; cwd?: string; environment?: Readonly<Record<string, string>>; timeoutMs?: number;}
 export interface LocalExecutionResult {executionId: string; status: "succeeded" | "failed" | "timed-out"; exitCode?: number; stdout: string; stderr: string;}
 
-// Only inherit the minimal OS environment needed to launch ordinary local
-// commands. Application credentials (tokens, DB URLs, signing keys, etc.)
-// must be passed explicitly by the caller for the specific execution.
-const INHERITED_ENV_ALLOWLIST = [
-  "PATH",
-  "HOME",
-  "USERPROFILE",
-  "TMPDIR",
-  "TMP",
-  "TEMP",
-  "SYSTEMROOT",
-  "WINDIR",
-  "COMSPEC",
-  "PATHEXT",
-  "LANG",
-  "LC_ALL",
-  "TERM",
-] as const;
-
+// Child commands get a deterministic PATH and only caller-supplied values.
+// Never inherit ambient host variables: deployments commonly place access
+// tokens, database URLs, and signing keys in process.env.
 function buildExecutionEnvironment(
   explicit: Readonly<Record<string, string>> = {},
 ): NodeJS.ProcessEnv {
-  const inherited: NodeJS.ProcessEnv = {};
-  for (const key of INHERITED_ENV_ALLOWLIST) {
-    const value = process.env[key];
-    if (typeof value === "string") inherited[key] = value;
-  }
-  return { ...inherited, ...explicit };
+  return {
+    PATH: "/usr/local/bin:/usr/bin:/bin",
+    ...explicit,
+  };
 }
 
 export class LocalExecutionProvider {
