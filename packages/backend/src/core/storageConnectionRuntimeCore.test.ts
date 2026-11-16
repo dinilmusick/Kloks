@@ -1,19 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const resolveUserStorageConnectionSecret = vi.fn();
-const resolveUserWorkspaceStorageAssociation = vi.fn();
-const writeWorkspaceFile = vi.fn();
+const mocks = vi.hoisted(() => ({
+  resolveUserStorageConnectionSecret: vi.fn(),
+  resolveUserWorkspaceStorageAssociation: vi.fn(),
+  writeWorkspaceFile: vi.fn(),
+}));
 
 vi.mock('./storageConnectionCore.js', () => ({
-  resolveUserStorageConnectionSecret,
-  resolveUserWorkspaceStorageAssociation,
+  resolveUserStorageConnectionSecret: mocks.resolveUserStorageConnectionSecret,
+  resolveUserWorkspaceStorageAssociation: mocks.resolveUserWorkspaceStorageAssociation,
 }));
 vi.mock('./workspaceFileCore.js', () => ({
-  writeWorkspaceFile,
+  writeWorkspaceFile: mocks.writeWorkspaceFile,
   readWorkspaceFile: vi.fn(),
   deleteWorkspaceFile: vi.fn(),
   listWorkspaceFiles: vi.fn(),
 }));
+
+const {
+  resolveUserStorageConnectionSecret,
+  resolveUserWorkspaceStorageAssociation,
+  writeWorkspaceFile,
+} = mocks;
 
 import { writeUserWorkspaceStorageFile } from './storageConnectionRuntimeCore.js';
 
