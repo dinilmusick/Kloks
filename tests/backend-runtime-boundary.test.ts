@@ -96,8 +96,8 @@ describe('Kloks portable and Node dependency graphs', () => {
     const source = readFileSync(resolve(process.cwd(), 'packages/backend/src/krnl-services.ts'), 'utf8');
     expect(source).not.toContain('StorageAdapterFactory');
     expect(source).not.toContain('workspaceGraphService');
-    expect(source).not.toMatch(/\bfrom\s+['"](?:node:|fs(?:\/|['"] )|path(?:\/|['"]))/);
-    expect(source).not.toMatch(/\bimport\(\s*['"](?:node:|fs(?:\/|['"])|path(?:\/|['"]))\s*\)/);
+    expect(source).not.toMatch(/\bfrom\s+['"](?:node:|fs(?:\/|['"])|path(?:\/|['"]))/);
+    expect(source).not.toMatch(/\bimport\(\s*['"](?:node:|fs(?:\/|['"])|path(?:\/|['"]))/);
   });
 
   it('keeps filesystem-backed graph services behind the explicit Node backend entrypoint', () => {
