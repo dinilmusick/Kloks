@@ -3,13 +3,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@neondatabase/serverless', () => {
   throw new Error('The optional Neon driver must not load during module initialization.');
 });
-import { cleanDbUrl, getUnifiedDbUrl } from './unifiedDb';
+import { cleanDbUrl, configureUnifiedDatabaseEnvironmentResolver, getUnifiedDbUrl } from './unifiedDb';
 import { normalizeSystemEnvironment, resolveSystemDatabaseUrl, tryResolveSystemDatabaseUrl } from '../resolver/systemDatabaseUrl';
 
 const keys = ['SYSTEM_DATABASE_URL', 'SYSTEM_DATABASE_URL_1', 'SYSTEM_DATABASE_URL_2', 'SYSTEM_DATABASE_URL_3', 'DATABASE_URL'] as const;
 const original = Object.fromEntries(keys.map(key => [key, process.env[key]]));
 
 afterEach(() => {
+  configureUnifiedDatabaseEnvironmentResolver(null);
   for (const key of keys) {
     const value = original[key];
     if (value === undefined) delete process.env[key];
@@ -49,9 +50,11 @@ describe('canonical system database URL contract', () => {
     else process.env.SYSTEM_DATABASE_URL = previous;
   });
 
-  it('uses process environment when no explicit runtime binding is supplied', () => {
+  it('uses Node environment only after the explicit Node adapter is configured', () => {
     for (const key of keys) delete process.env[key];
     process.env.SYSTEM_DATABASE_URL_2 = 'postgresql://two/db';
+    expect(getUnifiedDbUrl()).toBe('');
+    configureUnifiedDatabaseEnvironmentResolver(() => process.env);
     expect(getUnifiedDbUrl()).toBe('postgresql://two/db');
     process.env.SYSTEM_DATABASE_URL = 'postgresql://primary/db';
     expect(getUnifiedDbUrl()).toBe('postgresql://primary/db');
@@ -61,6 +64,7 @@ describe('canonical system database URL contract', () => {
   it('preserves Node compatibility for partial service context while treating normalized bindings as authoritative', () => {
     const previous = process.env.SYSTEM_DATABASE_URL;
     process.env.SYSTEM_DATABASE_URL = 'postgresql://node-primary/db';
+    configureUnifiedDatabaseEnvironmentResolver(() => process.env);
     expect(getUnifiedDbUrl({ WORKSPACE_APP_ID: 'aiko' })).toBe('postgresql://node-primary/db');
     expect(getUnifiedDbUrl({
       WORKSPACE_APP_ID: 'kone',
@@ -111,6 +115,7 @@ describe('canonical system database URL contract', () => {
     process.env.DATABASE_URL = 'postgresql://legacy/db';
     process.env.SYSTEM_DATABASE_URL_1 = 'postgresql://retired/db';
     expect(tryResolveSystemDatabaseUrl(process.env)).toBeNull();
+    configureUnifiedDatabaseEnvironmentResolver(() => process.env);
     expect(getUnifiedDbUrl()).toBe('');
   });
 });
