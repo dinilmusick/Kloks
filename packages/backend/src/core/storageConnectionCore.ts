@@ -16,6 +16,7 @@ import {
   type GoogleDriveWorkspaceTokens,
 } from '../storage/GoogleDriveWorkspaceService.js';
 import { queryUnifiedDb } from './unifiedDb.js';
+import { getGoogleDriveOAuthConfiguration, getOrCreateStorageConnectionEncryptionKey } from './systemCredentialsCore.js';
 
 export type StorageProviderId = 'backblaze_b2' | 'google_drive';
 
@@ -510,50 +511,7 @@ export interface GoogleDriveSystemOAuthConfiguration {
 export async function getSystemGoogleOAuthConfiguration(
   query: StorageQuery = DEFAULT_QUERY,
 ): Promise<GoogleDriveSystemOAuthConfiguration> {
-  const result = await query(
-    'SELECT credentials FROM public."ultrst-credentials" WHERE id = $1 LIMIT 1',
-    ['system'],
-  );
-  const raw = result.rows[0]?.credentials;
-  const credentials = parseProfiles(raw);
-  const oauth = credentials.googleDriveOAuth || credentials.googleOAuth || {};
-
-  const clientId = String(oauth.clientId || '').trim();
-  const clientSecret = String(oauth.clientSecret || '').trim();
-  const redirectUri = String(oauth.redirectUri || '').trim();
-  const stateSecret = String(oauth.stateSecret || clientSecret || '').trim();
-  const allowedReturnOrigins = Array.isArray(oauth.allowedReturnOrigins)
-    ? oauth.allowedReturnOrigins
-        .filter((value: unknown): value is string => typeof value === 'string')
-        .map((value: string) => {
-          try { return new URL(value.trim()).origin; } catch { return ''; }
-        })
-        .filter(Boolean)
-    : [];
-
-  const missing: string[] = [];
-  if (!clientId) missing.push('clientId');
-  if (!clientSecret) missing.push('clientSecret');
-  if (!redirectUri) missing.push('redirectUri');
-  if (stateSecret.length < 32) missing.push('stateSecret (or clientSecret of at least 32 characters)');
-
-  if (missing.length > 0) {
-    throw new Error(
-      `Google Drive OAuth system configuration is incomplete. Configure ${missing.join(', ')} in the system-owned ultrst-credentials record (id="system").`,
-    );
-  }
-
-  let parsedRedirect: URL;
-  try {
-    parsedRedirect = new URL(redirectUri);
-  } catch {
-    throw new Error('Google Drive OAuth system configuration has an invalid redirectUri.');
-  }
-  if (parsedRedirect.protocol !== 'https:' && parsedRedirect.hostname !== 'localhost') {
-    throw new Error('Google Drive OAuth redirectUri must use HTTPS (localhost is permitted for development).');
-  }
-
-  return { clientId, clientSecret, redirectUri, stateSecret, allowedReturnOrigins };
+  return getGoogleDriveOAuthConfiguration(query);
 }
 
 /** Only capability metadata is exposed; client secrets stay in the system credential store. */
