@@ -328,14 +328,14 @@ async function protectConnectionForStorage(
 }
 
 async function writeUserProfiles(
-  record: { id: string; profiles: Record<string, any>; source: 'ultrst-users' | 'srkl_application_profiles' },
+  record: { id: string; email?: string; profiles: Record<string, any>; source: 'ultrst-users' | 'srkl_application_profiles' },
   query: StorageQuery,
 ): Promise<void> {
   if (record.source === 'ultrst-users') {
     try {
       const legacy = await query(
-        'SELECT app_profiles FROM "srkl_application_profiles" WHERE id = $1 LIMIT 1',
-        [record.id],
+        'SELECT app_profiles FROM "srkl_application_profiles" WHERE id = $1 OR email = $2 LIMIT 1',
+        [record.id, record.email || record.id],
       );
       if (legacy.rows[0]) {
         const legacyProfiles = parseProfiles(legacy.rows[0].app_profiles);
@@ -361,14 +361,14 @@ async function writeUserProfiles(
         canonicalProfiles.srkl.storage_connections = [...byId.values()];
 
         await query(
-          'UPDATE "srkl_application_profiles" SET app_profiles = $1, updated_at = NOW() WHERE id = $2',
+          'UPDATE "srkl_application_profiles" SET app_profiles = $1, updated_at = NOW() WHERE id = $2 OR email = $3',
           [JSON.stringify({
             ...legacyProfiles,
             srkl: {
               ...(legacyProfiles.srkl || {}),
               storage_connections: canonicalProfiles.srkl.storage_connections,
             },
-          }), record.id],
+          }), record.id, record.email || record.id],
         );
       }
     } catch (error) {
@@ -380,8 +380,8 @@ async function writeUserProfiles(
 
   const table = record.source === 'ultrst-users' ? '"ultrst-users"' : '"srkl_application_profiles"';
   await query(
-    'UPDATE ' + table + ' SET app_profiles = $1, updated_at = NOW() WHERE id = $2',
-    [JSON.stringify(record.profiles), record.id],
+    'UPDATE ' + table + ' SET app_profiles = $1, updated_at = NOW() WHERE id = $2 OR email = $3',
+    [JSON.stringify(record.profiles), record.id, record.email || record.id],
   );
 }
 
@@ -413,8 +413,8 @@ async function migrateLegacyConnectionCollections(
   if (record.source === 'ultrst-users') {
     try {
       const legacy = await query(
-        'SELECT app_profiles FROM "srkl_application_profiles" WHERE id = $1 LIMIT 1',
-        [record.id],
+        'SELECT app_profiles FROM "srkl_application_profiles" WHERE id = $1 OR email = $2 LIMIT 1',
+        [record.id, record.email || record.id],
       );
       if (legacy.rows[0]) {
         const profiles = parseProfiles(legacy.rows[0].app_profiles);
@@ -437,8 +437,8 @@ async function migrateLegacyConnectionCollections(
         }
         if (legacyChanged) {
           await query(
-            'UPDATE "srkl_application_profiles" SET app_profiles = $1, updated_at = NOW() WHERE id = $2',
-            [JSON.stringify(profiles), record.id],
+            'UPDATE "srkl_application_profiles" SET app_profiles = $1, updated_at = NOW() WHERE id = $2 OR email = $3',
+            [JSON.stringify(profiles), record.id, record.email || record.id],
           );
         }
       }
@@ -492,6 +492,7 @@ function deduplicateRawConnections(items: any[]): any[] {
 async function findUserRecord(userId: string, query: StorageQuery): Promise<{
   id: string;
   profiles: Record<string, any>;
+  email?: string;
   source: 'ultrst-users' | 'srkl_application_profiles';
   needsProfileMerge: boolean;
 } | null> {
@@ -499,7 +500,7 @@ async function findUserRecord(userId: string, query: StorageQuery): Promise<{
 
   try {
     const result = await query(
-      'SELECT id, app_profiles FROM "ultrst-users" WHERE id = $1 OR email = $1 LIMIT 1',
+      'SELECT id, email, app_profiles FROM "ultrst-users" WHERE id = $1 OR email = $1 LIMIT 1',
       [userId],
     );
     if (result.rows[0]) {
@@ -509,8 +510,8 @@ async function findUserRecord(userId: string, query: StorageQuery): Promise<{
       let needsProfileMerge = false;
       try {
         const legacy = await query(
-          'SELECT app_profiles FROM "srkl_application_profiles" WHERE id = $1 OR email = $1 LIMIT 1',
-          [userId],
+          'SELECT app_profiles FROM "srkl_application_profiles" WHERE id = $1 OR email = $2 LIMIT 1',
+          [userId, String(result.rows[0].email || userId)],
         );
         if (legacy.rows[0]) {
           profiles = mergeProfileDocuments(profiles, parseProfiles(legacy.rows[0].app_profiles));
@@ -520,7 +521,7 @@ async function findUserRecord(userId: string, query: StorageQuery): Promise<{
         if (!isMissingOptionalProfileTable(error)) throw error;
         // An absent legacy table is optional; operational failures are not.
       }
-      return { id: userId, profiles, source: 'ultrst-users', needsProfileMerge };
+      return { id: userId, email: String(result.rows[0].email || '') || undefined, profiles, source: 'ultrst-users', needsProfileMerge };
     }
   } catch (error) {
     if (!isMissingOptionalProfileTable(error)) throw error;
@@ -530,12 +531,13 @@ async function findUserRecord(userId: string, query: StorageQuery): Promise<{
 
   try {
     const result = await query(
-      'SELECT id, app_profiles FROM "srkl_application_profiles" WHERE id = $1 OR email = $1 LIMIT 1',
+      'SELECT id, email, app_profiles FROM "srkl_application_profiles" WHERE id = $1 OR email = $1 LIMIT 1',
       [userId],
     );
     if (result.rows[0]) {
       return {
         id: String(result.rows[0].id),
+        email: String(result.rows[0].email || '') || undefined,
         profiles: parseProfiles(result.rows[0].app_profiles),
         source: 'srkl_application_profiles',
         needsProfileMerge: false,
@@ -552,12 +554,13 @@ async function mergeLegacySrklConnections(
   userId: string,
   profiles: Record<string, any>,
   query: StorageQuery,
+  email?: string,
 ): Promise<any[]> {
   const local = connectionCollections(profiles).flat();
   try {
     const result = await query(
-      'SELECT app_profiles FROM "srkl_application_profiles" WHERE id = $1 LIMIT 1',
-      [userId],
+      'SELECT app_profiles FROM "srkl_application_profiles" WHERE id = $1 OR email = $2 LIMIT 1',
+      [userId, email || userId],
     );
     if (result.rows[0]) {
       const legacyProfiles = parseProfiles(result.rows[0].app_profiles);
@@ -580,7 +583,7 @@ export async function listUserStorageConnectionsWithSecrets(
   await migrateLegacyConnectionCollections(userId, query);
   const record = await findUserRecord(userId, query);
   if (!record) return [];
-  const raw = await mergeLegacySrklConnections(record.id, record.profiles, query);
+  const raw = await mergeLegacySrklConnections(record.id, record.profiles, query, record.email);
   return Promise.all(raw.map((connection) => hydrateConnectionSecrets(record.id, connection, query)));
 }
 
@@ -673,8 +676,8 @@ export async function deleteUserStorageConnection(
   if (!referenced) {
     try {
       const legacy = await query(
-        'SELECT app_profiles FROM "srkl_application_profiles" WHERE id = $1 LIMIT 1',
-        [record.id],
+        'SELECT app_profiles FROM "srkl_application_profiles" WHERE id = $1 OR email = $2 LIMIT 1',
+        [record.id, record.email || record.id],
       );
       if (legacy.rows[0]) referenced = isReferenced(parseProfiles(legacy.rows[0].app_profiles));
     } catch (error) {
