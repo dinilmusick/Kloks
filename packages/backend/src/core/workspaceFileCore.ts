@@ -92,7 +92,7 @@ export async function writeWorkspaceFile(
 
   if (isGoogleDriveWorkspace(workspace, connection)) {
     const drive = await getGoogleDriveClient(workspace, connection, env);
-    await drive.write(cleanRel, bytes, contentType);
+    await drive.write(`${folderPrefix}/${cleanRel}`, bytes, contentType);
     return;
   }
 
@@ -125,7 +125,7 @@ export async function readWorkspaceFile(
   if (isGoogleDriveWorkspace(workspace, connection)) {
     const drive = await getGoogleDriveClient(workspace, connection, env);
     try {
-      return await drive.read(cleanRel);
+      return await drive.read(`${folderPrefix}/${cleanRel}`);
     } catch (error) {
       if (error instanceof Error && /not found|HTTP 404/i.test(error.message)) return null;
       throw error;
@@ -152,7 +152,7 @@ export async function deleteWorkspaceFile(
 
   if (isGoogleDriveWorkspace(workspace, connection)) {
     const drive = await getGoogleDriveClient(workspace, connection, env);
-    await drive.delete(cleanRel);
+    await drive.delete(`${folderPrefix}/${cleanRel}`);
     return true;
   }
 
@@ -180,9 +180,12 @@ export async function listWorkspaceFiles(
 
   if (isGoogleDriveWorkspace(workspace, connection)) {
     const drive = await getGoogleDriveClient(workspace, connection, env);
-    const files = await drive.list(subPrefix);
+    const targetPrefix = [folderPrefix, subPrefix.replace(/^\/+|\/+$/g, '')].filter(Boolean).join('/');
+    const files = await drive.list(targetPrefix);
     return files.map((file) => ({
-      fileName: file.path,
+      fileName: file.path.startsWith(folderPrefix + '/')
+        ? file.path.slice(folderPrefix.length + 1)
+        : file.path,
       sizeBytes: file.size,
       uploadTimestamp: file.modifiedAt,
     }));
@@ -219,8 +222,19 @@ export async function deleteWorkspaceFolder(
   const folderPrefix = getWorkspaceFolderPrefix(workspace);
 
   if (isGoogleDriveWorkspace(workspace, connection)) {
-    // The selected Drive root is user-owned and must not be recursively
-    // deleted when an application workspace is removed.
+    // Delete only the application-created child directory. The user-selected
+    // Drive root folder and its unrelated contents are never removed.
+    const drive = await getGoogleDriveClient(workspace, connection, env);
+    const removeTree = async (relativePath: string): Promise<void> => {
+      let entries: Array<{ path: string; isFolder?: boolean }> = [];
+      try { entries = await drive.list(relativePath); } catch { return; }
+      for (const entry of entries) {
+        if (entry.isFolder) await removeTree(entry.path);
+        else await drive.delete(entry.path);
+      }
+      if (relativePath) await drive.delete(relativePath);
+    };
+    await removeTree(folderPrefix);
     return;
   }
 
