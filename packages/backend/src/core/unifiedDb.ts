@@ -1,8 +1,10 @@
 /**
  * @file unifiedDb.ts
- * @description Isomorphic Database Client using Neon Serverless HTTP driver.
- * Resolves the canonical SYSTEM_DATABASE_URL primary plus numbered fallbacks.
+ * @description Canonical isomorphic database client using the Neon Serverless HTTP driver.
+ * The normalized SYSTEM_DATABASE_URL contract is resolved in one shared location.
  */
+
+import { tryResolveSystemDatabaseUrl } from '../resolver/systemDatabaseUrl.js';
 
 let neon: any;
 
@@ -12,28 +14,32 @@ export interface UnifiedQueryResult<T = any> {
 }
 
 export function cleanDbUrl(url?: unknown): string {
-  if (!url || typeof url !== 'string') return '';
-  return url.trim().replace(/^["']|["']$/g, '');
+  if (typeof url !== 'string') return '';
+  return url.trim().replace(/^["']|["']$/g, '').trim();
 }
 
+/**
+ * A supplied runtime binding is authoritative. Do not silently fall back to
+ * process.env when an explicit Worker binding object was provided: that can
+ * conceal a missing deployment secret with a stale Node compatibility value.
+ */
 export function getUnifiedDbUrl(env?: Record<string, unknown>): string {
-  const keys = ['SYSTEM_DATABASE_URL', 'SYSTEM_DATABASE_URL_1', 'SYSTEM_DATABASE_URL_2', 'SYSTEM_DATABASE_URL_3'];
-  const fromBindings = keys.map((key) => cleanDbUrl(env?.[key])).find(Boolean);
-  if (fromBindings) return fromBindings;
-
-  if (typeof process !== 'undefined' && process.env) {
-    return keys.map((key) => cleanDbUrl(process.env[key])).find(Boolean) || '';
-  }
-  return '';
+  if (env !== undefined) return tryResolveSystemDatabaseUrl(env) || '';
+  return tryResolveSystemDatabaseUrl();
 }
 
 export async function queryUnifiedDb<T = any>(
   sqlText: string,
   params: any[] = [],
-  env?: Record<string, unknown>
+  env?: Record<string, unknown>,
 ): Promise<UnifiedQueryResult<T>> {
   const dbUrl = getUnifiedDbUrl(env);
-  if (!dbUrl) throw new Error('[UnifiedDB] No database URL configured in environment.');
+  if (!dbUrl) {
+    throw new Error(
+      '[UnifiedDB] Missing system database configuration. ' +
+      'Set SYSTEM_DATABASE_URL; SYSTEM_DATABASE_URL_2 and SYSTEM_DATABASE_URL_3 are optional failover URLs.',
+    );
+  }
 
   if (!neon) {
     const mod = await import('@neondatabase/serverless');
@@ -42,10 +48,16 @@ export async function queryUnifiedDb<T = any>(
 
   const sql = neon(dbUrl);
   try {
-    const rows = (await ((sql as any).query ? (sql as any).query(sqlText, params) : (sql as any)(sqlText, params))) as T[];
-    return { rows: Array.isArray(rows) ? rows : [], rowCount: Array.isArray(rows) ? rows.length : 0 };
+    const rows = (await ((sql as any).query
+      ? (sql as any).query(sqlText, params)
+      : (sql as any)(sqlText, params))) as T[];
+    return {
+      rows: Array.isArray(rows) ? rows : [],
+      rowCount: Array.isArray(rows) ? rows.length : 0,
+    };
   } catch (err: any) {
-    console.error('[UnifiedDB] Query execution error:', err.message);
+    // Never log the connection string or query parameters (which may contain secrets).
+    console.error('[UnifiedDB] Query execution failed:', err?.message || 'unknown database error');
     throw err;
   }
 }
