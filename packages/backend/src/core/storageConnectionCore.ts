@@ -168,7 +168,7 @@ async function encryptConnectionSecretPayload(
   const wrappingKey = await getOrCreateStorageConnectionEncryptionKey(query);
   const key = await crypto.subtle.importKey(
     'raw',
-    new TextEncoder().encode(wrappingKey),
+    decodeBase64Url(wrappingKey),
     { name: 'AES-GCM' },
     false,
     ['encrypt'],
