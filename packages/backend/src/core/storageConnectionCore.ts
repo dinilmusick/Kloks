@@ -271,12 +271,6 @@ async function writeUserProfiles(
   record: { id: string; profiles: Record<string, any>; source: 'ultrst-users' | 'srkl_application_profiles' },
   query: StorageQuery,
 ): Promise<void> {
-  const table = record.source === 'ultrst-users' ? '"ultrst-users"' : '"srkl_application_profiles"';
-  await query(
-    'UPDATE ' + table + ' SET app_profiles = $1, updated_at = NOW() WHERE id = $2',
-    [JSON.stringify(record.profiles), record.id],
-  );
-
   if (record.source === 'ultrst-users') {
     try {
       const legacy = await query(
@@ -285,20 +279,48 @@ async function writeUserProfiles(
       );
       if (legacy.rows[0]) {
         const legacyProfiles = parseProfiles(legacy.rows[0].app_profiles);
-        const canonicalConnections = Array.isArray(record.profiles.srkl?.storage_connections)
-          ? record.profiles.srkl.storage_connections
+        const canonicalProfiles = record.profiles;
+        const canonicalConnections = Array.isArray(canonicalProfiles.srkl?.storage_connections)
+          ? canonicalProfiles.srkl.storage_connections
           : [];
-        if (!legacyProfiles.srkl || typeof legacyProfiles.srkl !== 'object') legacyProfiles.srkl = {};
-        legacyProfiles.srkl.storage_connections = canonicalConnections;
+        const legacyConnections = Array.isArray(legacyProfiles.srkl?.storage_connections)
+          ? legacyProfiles.srkl.storage_connections
+          : [];
+        const byId = new Map<string, any>();
+        for (const connection of legacyConnections) {
+          if (connection && typeof connection.id === 'string') byId.set(connection.id, connection);
+        }
+        // Canonical records win when the same ID exists, but legacy-only IDs
+        // are retained so a profile-store migration cannot orphan old accounts.
+        for (const connection of canonicalConnections) {
+          if (connection && typeof connection.id === 'string') byId.set(connection.id, connection);
+        }
+        if (!canonicalProfiles.srkl || typeof canonicalProfiles.srkl !== 'object') {
+          canonicalProfiles.srkl = {};
+        }
+        canonicalProfiles.srkl.storage_connections = [...byId.values()];
+
         await query(
           'UPDATE "srkl_application_profiles" SET app_profiles = $1, updated_at = NOW() WHERE id = $2',
-          [JSON.stringify(legacyProfiles), record.id],
+          [JSON.stringify({
+            ...legacyProfiles,
+            srkl: {
+              ...(legacyProfiles.srkl || {}),
+              storage_connections: canonicalProfiles.srkl.storage_connections,
+            },
+          }), record.id],
         );
       }
     } catch {
       // The legacy compatibility table is absent after profile migration.
     }
   }
+
+  const table = record.source === 'ultrst-users' ? '"ultrst-users"' : '"srkl_application_profiles"';
+  await query(
+    'UPDATE ' + table + ' SET app_profiles = $1, updated_at = NOW() WHERE id = $2',
+    [JSON.stringify(record.profiles), record.id],
+  );
 }
 
 async function migrateLegacyConnectionCollections(
@@ -694,10 +716,10 @@ export async function createBackblazeStorageConnection(
 
   const record = await findUserRecord(userId, query);
   if (!record) throw new Error('A canonical user profile was not found for this storage connection.');
-  const currentConnections = await mergeLegacySrklConnections(record.id, record.profiles, query);
+  const currentConnections = await listUserStorageConnectionsWithSecrets(record.id, query);
   const duplicate = currentConnections.find((item) =>
     item.provider === 'backblaze_b2'
-    && String(item.b2KeyId || item.keyId || '') === keyId
+    && String(item.b2KeyId || item.keyId || item.accessKeyId || '') === keyId
     && String(item.b2BucketName || item.bucketName || '') === bucketName,
   );
   if (duplicate) return toPublicStorageConnection(duplicate)!;
