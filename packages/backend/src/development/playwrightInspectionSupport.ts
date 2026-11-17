@@ -31,12 +31,22 @@ export type BrowserLike = {
   close(): Promise<void>;
 };
 
-type PlaywrightModule = { chromium: { launch(options: object): Promise<BrowserLike> } };
-const require = createRequire(import.meta.url);
-
+type PlaywrightModule = { chromium: { launch(options: object): Promise<BrowserLike>; executablePath?: () => string } };
 export function findSystemChromiumExecutable(): string | undefined {
   if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH && existsSync(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH)) {
     return process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+  }
+  // When CI installs an isolated Playwright runtime, use the browser binary
+  // installed for that exact module version instead of an unrelated system Chrome.
+  const runtimeRoot = process.env.PLAYWRIGHT_RUNTIME_PATH;
+  if (runtimeRoot) {
+    try {
+      const runtimeRequire = createRequire(`${runtimeRoot}/package.json`);
+      const executable = (runtimeRequire('playwright') as PlaywrightModule).chromium.executablePath?.();
+      if (typeof executable === 'string' && existsSync(executable)) return executable;
+    } catch {
+      // Fall back to known system browser locations when no managed binary exists.
+    }
   }
   const candidates = [
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -55,7 +65,11 @@ export function findSystemChromiumExecutable(): string | undefined {
 }
 
 export function loadPlaywright(): PlaywrightModule {
-  try { return require('playwright') as PlaywrightModule; }
+  const runtimeRoot = process.env.PLAYWRIGHT_RUNTIME_PATH;
+  const requireFromRuntime = runtimeRoot
+    ? createRequire(`${runtimeRoot}/package.json`)
+    : createRequire(import.meta.url);
+  try { return requireFromRuntime('playwright') as PlaywrightModule; }
   catch { throw new Error('Playwright is required for browser inspection. Install the optional "playwright" package and Chromium browser.'); }
 }
 

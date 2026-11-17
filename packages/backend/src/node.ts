@@ -19,9 +19,14 @@ export type {
 } from './architecture/types.js';
 export { validateServiceDefinition } from './architecture/types.js';
 export * from './services/node.js';
+// Install the Node-only local filesystem workspace adapter before exporting Node services.
+import './core/workspaceFileNodeAdapter.js';
+import './core/unifiedDbNodeAdapter.js';
 export * from './core/index.js';
 export * from './server/index.js';
 export * from './krnl-services.js';
+// Node-only graph persistence uses the explicitly selected filesystem adapter.
+export * from './krnl-services.node.js';
 export * from './resourceEngine/index.js';
 export * from './resolver/systemDatabaseUrl.js';
 

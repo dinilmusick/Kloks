@@ -1,6 +1,6 @@
 {
   "name": "@ultrst-armada/kloks",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "private": false,
   "publishConfig": {
     "access": "public",
@@ -86,6 +86,11 @@
       "types": "./packages/backend/dist/krnl-services.d.ts",
       "import": "./packages/backend/dist/krnl-services.js",
       "default": "./packages/backend/dist/krnl-services.js"
+    },
+    "./backend/resolver": {
+      "types": "./packages/backend/dist/resolver/index.d.ts",
+      "import": "./packages/backend/dist/resolver/index.js",
+      "default": "./packages/backend/dist/resolver/index.js"
     },
     "./orchestrations": {
       "types": "./packages/orchestrations/dist/index.d.ts",

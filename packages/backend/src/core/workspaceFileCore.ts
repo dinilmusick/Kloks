@@ -1,43 +1,104 @@
 /**
  * @file workspaceFileCore.ts
- * @description Universal Workspace File IO Abstraction.
- * Routes reads, writes, and deletions to Local Disk or Backblaze B2 Object Storage (< 200 lines).
+ * @description Fetch-compatible workspace file IO for B2, Google Drive, and local storage.
+ * This portable module has no Node imports. Local filesystem behavior is
+ * supplied only by the explicitly Node-specific entrypoint adapter.
  */
 
-import { b2UploadFile, b2DownloadFile, b2ListFileNames, b2DeleteFileVersion, b2DeleteFolder } from './b2DirectCore';
+import { b2UploadFile, b2DownloadFile, b2ListFileNames, b2DeleteFileVersion, b2DeleteFolder } from './b2DirectCore.js';
+import { createGoogleDriveWorkspaceClient } from './storageConnectionCore.js';
+import { queryUnifiedDb } from './unifiedDb.js';
 
-declare const process: any;
-
-async function getFs(): Promise<any> {
-  if (typeof process !== 'undefined' && process.versions?.node) {
-    try {
-      const mod = await import('node:fs');
-      return mod.promises || mod.default?.promises || mod;
-    } catch {}
-  }
-  return null;
+/**
+ * Local filesystem adapter injection. The portable module has no Node imports;
+ * the explicit /backend/node entrypoint installs the Node implementation.
+ */
+export interface LocalWorkspaceFileAdapter {
+  write(path: string, content: Uint8Array): Promise<void>;
+  read(path: string): Promise<Uint8Array | null>;
+  delete(path: string): Promise<boolean>;
+  list(path: string): Promise<Array<{ fileName: string; sizeBytes: number }>>;
+  deleteFolder(path: string): Promise<void>;
 }
 
-async function getPath(): Promise<any> {
-  if (typeof process !== 'undefined' && process.versions?.node) {
-    try {
-      const mod = await import('node:path');
-      return mod.default || mod;
-    } catch {}
+let localWorkspaceFileAdapter: LocalWorkspaceFileAdapter | null = null;
+
+export function configureLocalWorkspaceFileAdapter(
+  adapter: LocalWorkspaceFileAdapter | null,
+): void {
+  localWorkspaceFileAdapter = adapter;
+}
+
+export function normalizeWorkspaceStoragePath(value: string, allowEmpty = false): string {
+  const normalized = String(value || '').replace(/\\/g, '/');
+  if (!normalized && allowEmpty) return '';
+  if (!normalized || normalized.startsWith('/') || /^[A-Za-z]:(?:$|\/)/.test(normalized) || normalized.includes('\0')) {
+    throw new Error('Storage path must be a safe workspace-relative path.');
   }
-  return null;
+  const segments = normalized.split('/');
+  if (segments.some((segment) => !segment || segment === '.' || segment === '..')) {
+    throw new Error('Storage path must not contain empty, current-directory, or parent-directory segments.');
+  }
+  return segments.join('/');
 }
 
 export function getWorkspaceFolderPrefix(workspace: any): string {
-  return workspace.localFolderKey || workspace.localFolderName || (workspace.workspacePath ? workspace.workspacePath.replace(/^\.\//, '') : workspace.id);
+  const raw = workspace?.localFolderKey
+    || workspace?.localFolderName
+    || (workspace?.workspacePath ? workspace.workspacePath.replace(/^\.\//, '') : workspace?.id);
+  return normalizeWorkspaceStoragePath(String(raw || ''));
 }
 
+function getWorkspaceFilePath(workspace: any, relativePath: string): string {
+  return `${getWorkspaceFolderPrefix(workspace)}/${normalizeWorkspaceStoragePath(relativePath)}`;
+}
 export function isB2Workspace(workspace: any, connection: any): boolean {
-  return (
-    connection?.provider === 'backblaze_b2' ||
-    connection?.provider === 'BACKBLAZE_B2' ||
-    workspace?.storageProvider === 'backblaze_b2'
+  return connection?.provider === 'backblaze_b2'
+    || connection?.provider === 'BACKBLAZE_B2'
+    || workspace?.storageProvider === 'backblaze_b2';
+}
+
+export function isGoogleDriveWorkspace(workspace: any, connection: any): boolean {
+  return connection?.provider === 'google_drive'
+    || workspace?.storageProvider === 'google_drive';
+}
+
+async function getGoogleDriveClient(
+  workspace: any,
+  connection: any,
+  env?: Record<string, unknown>,
+) {
+  const userId = String(connection?.__ownerUserId || workspace?.__ownerUserId || '').trim();
+  const connectionId = String(connection?.id || workspace?.storageConnectionId || '').trim();
+  if (!userId || !connectionId) {
+    throw new Error('Google Drive workspace operations require an owned storage connection reference.');
+  }
+  return createGoogleDriveWorkspaceClient(
+    userId,
+    connectionId,
+    (sql, params) => queryUnifiedDb(sql, params, env),
+    workspace?.googleRootFolderId || connection?.googleRootFolderId || 'root',
   );
+}
+
+function getB2Settings(workspace: any, connection: any): {
+  keyId: string;
+  applicationKey: string;
+  bucketName: string;
+} {
+  const keyId = String(connection?.b2KeyId || connection?.keyId || connection?.accessKeyId || '').trim();
+  const applicationKey = String(
+    connection?.b2ApplicationKey
+    || connection?.applicationKey
+    || connection?.appKey
+    || connection?.secretAccessKey
+    || '',
+  ).trim();
+  const bucketName = String(connection?.b2BucketName || connection?.bucketName || workspace?.b2BucketName || '').trim();
+  if (!keyId || !applicationKey || !bucketName) {
+    throw new Error('The Backblaze workspace connection is missing its server-side credentials or bucket.');
+  }
+  return { keyId, applicationKey, bucketName };
 }
 
 export async function writeWorkspaceFile(
@@ -45,151 +106,167 @@ export async function writeWorkspaceFile(
   connection: any,
   relativePath: string,
   content: string | Uint8Array,
-  contentType = 'application/json'
+  contentType = 'application/json',
+  env?: Record<string, unknown>,
 ): Promise<void> {
-  const cleanRel = relativePath.replace(/^\/+/, '');
-  const prefix = getWorkspaceFolderPrefix(workspace);
-  const buffer = typeof content === 'string' ? new TextEncoder().encode(content) : content;
+  const targetPath = getWorkspaceFilePath(workspace, relativePath);
+  const bytes = typeof content === 'string' ? new TextEncoder().encode(content) : content;
 
-  if (isB2Workspace(workspace, connection)) {
-    const keyId = connection.b2KeyId || connection.keyId;
-    const appKey = connection.b2ApplicationKey || connection.appKey;
-    const bucketName = connection.b2BucketName || workspace.b2BucketName || 'ultrst-apps';
-    const fullKey = `${prefix}/${cleanRel}`;
-    await b2UploadFile(keyId, appKey, bucketName, fullKey, buffer, contentType);
+  if (isGoogleDriveWorkspace(workspace, connection)) {
+    const drive = await getGoogleDriveClient(workspace, connection, env);
+    await drive.write(targetPath, bytes, contentType);
     return;
   }
 
-  // Local filesystem fallback
-  const fs = await getFs();
-  const path = await getPath();
-  if (!fs || !path) throw new Error('Local filesystem operations not supported in this runtime.');
-  const localDir = path.resolve(process.cwd(), prefix, path.dirname(cleanRel));
-  await fs.mkdir(localDir, { recursive: true });
-  await fs.writeFile(path.resolve(process.cwd(), prefix, cleanRel), buffer);
+  if (isB2Workspace(workspace, connection)) {
+    const config = getB2Settings(workspace, connection);
+    await b2UploadFile(
+      config.keyId,
+      config.applicationKey,
+      config.bucketName,
+      targetPath,
+      bytes,
+      contentType,
+    );
+    return;
+  }
+
+  if (!localWorkspaceFileAdapter) throw new Error('Local filesystem operations require the explicit Kloks Node backend adapter.');
+  await localWorkspaceFileAdapter.write(targetPath, bytes);
 }
 
 export async function readWorkspaceFile(
   workspace: any,
   connection: any,
-  relativePath: string
+  relativePath: string,
+  env?: Record<string, unknown>,
 ): Promise<Uint8Array | null> {
-  const cleanRel = relativePath.replace(/^\/+/, '');
-  const prefix = getWorkspaceFolderPrefix(workspace);
+  const targetPath = getWorkspaceFilePath(workspace, relativePath);
+
+  if (isGoogleDriveWorkspace(workspace, connection)) {
+    const drive = await getGoogleDriveClient(workspace, connection, env);
+    try {
+      return await drive.read(targetPath);
+    } catch (error) {
+      if (error instanceof Error && /not found|HTTP 404/i.test(error.message)) return null;
+      throw error;
+    }
+  }
 
   if (isB2Workspace(workspace, connection)) {
-    const keyId = connection.b2KeyId || connection.keyId;
-    const appKey = connection.b2ApplicationKey || connection.appKey;
-    const bucketName = connection.b2BucketName || workspace.b2BucketName || 'ultrst-apps';
-    const fullKey = `${prefix}/${cleanRel}`;
-    return await b2DownloadFile(keyId, appKey, bucketName, fullKey);
+    const config = getB2Settings(workspace, connection);
+    return b2DownloadFile(config.keyId, config.applicationKey, config.bucketName, targetPath);
   }
 
-  // Local filesystem fallback
-  const fs = await getFs();
-  const path = await getPath();
-  if (!fs || !path) return null;
-  const fullPath = path.resolve(process.cwd(), prefix, cleanRel);
-  try {
-    const buf = await fs.readFile(fullPath);
-    return new Uint8Array(buf);
-  } catch {
-    return null;
-  }
+  if (!localWorkspaceFileAdapter) return null;
+  return localWorkspaceFileAdapter.read(targetPath);
 }
 
 export async function deleteWorkspaceFile(
   workspace: any,
   connection: any,
-  relativePath: string
+  relativePath: string,
+  env?: Record<string, unknown>,
 ): Promise<boolean> {
-  const cleanRel = relativePath.replace(/^\/+/, '');
-  const prefix = getWorkspaceFolderPrefix(workspace);
+  const targetPath = getWorkspaceFilePath(workspace, relativePath);
+
+  if (isGoogleDriveWorkspace(workspace, connection)) {
+    const drive = await getGoogleDriveClient(workspace, connection, env);
+    await drive.delete(targetPath);
+    return true;
+  }
 
   if (isB2Workspace(workspace, connection)) {
-    const keyId = connection.b2KeyId || connection.keyId;
-    const appKey = connection.b2ApplicationKey || connection.appKey;
-    const bucketName = connection.b2BucketName || workspace.b2BucketName || 'ultrst-apps';
-    const fullKey = `${prefix}/${cleanRel}`;
-    const files = await b2ListFileNames(keyId, appKey, bucketName, fullKey);
-    const match = files.find((f) => f.fileName === fullKey);
-    if (match) {
-      await b2DeleteFileVersion(keyId, appKey, match.fileName, match.fileId);
-      return true;
-    }
-    return false;
+    const config = getB2Settings(workspace, connection);
+    const fullKey = targetPath;
+    const files = await b2ListFileNames(config.keyId, config.applicationKey, config.bucketName, fullKey);
+    const match = files.find((file: any) => file.fileName === fullKey);
+    if (!match) return false;
+    await b2DeleteFileVersion(config.keyId, config.applicationKey, match.fileName, match.fileId);
+    return true;
   }
 
-  const fs = await getFs();
-  const path = await getPath();
-  if (!fs || !path) return false;
-  const fullPath = path.resolve(process.cwd(), prefix, cleanRel);
-  try {
-    await fs.unlink(fullPath);
-    return true;
-  } catch {
-    return false;
-  }
+  if (!localWorkspaceFileAdapter) return false;
+  return localWorkspaceFileAdapter.delete(targetPath);
 }
 
 export async function listWorkspaceFiles(
   workspace: any,
   connection: any,
-  subPrefix = ''
+  subPrefix = '',
+  env?: Record<string, unknown>,
 ): Promise<Array<{ fileName: string; sizeBytes: number; uploadTimestamp?: number }>> {
   const folderPrefix = getWorkspaceFolderPrefix(workspace);
-  const targetPrefix = subPrefix ? `${folderPrefix}/${subPrefix.replace(/^\/+/, '')}` : `${folderPrefix}/`;
+  const cleanSubPrefix = normalizeWorkspaceStoragePath(subPrefix, true);
+  const targetPrefix = cleanSubPrefix ? `${folderPrefix}/${cleanSubPrefix}` : folderPrefix;
 
-  if (isB2Workspace(workspace, connection)) {
-    const keyId = connection.b2KeyId || connection.keyId;
-    const appKey = connection.b2ApplicationKey || connection.appKey;
-    const bucketName = connection.b2BucketName || workspace.b2BucketName || 'ultrst-apps';
-    const rawFiles = await b2ListFileNames(keyId, appKey, bucketName, targetPrefix);
-    return rawFiles.map((f) => ({
-      fileName: f.fileName.slice(folderPrefix.length + 1),
-      sizeBytes: f.contentLength,
-      uploadTimestamp: f.uploadTimestamp,
+  if (isGoogleDriveWorkspace(workspace, connection)) {
+    const drive = await getGoogleDriveClient(workspace, connection, env);
+    const files = await drive.list(targetPrefix);
+    return files.map((file) => ({
+      fileName: file.path.startsWith(folderPrefix + '/')
+        ? file.path.slice(folderPrefix.length + 1)
+        : file.path,
+      sizeBytes: file.size,
+      uploadTimestamp: file.modifiedAt,
     }));
   }
 
-  const fs = await getFs();
-  const path = await getPath();
-  if (!fs || !path) return [];
-  const baseDir = path.resolve(process.cwd(), folderPrefix, subPrefix);
-  try {
-    const entries = await fs.readdir(baseDir, { withFileTypes: true, recursive: true });
-    const result: Array<{ fileName: string; sizeBytes: number }> = [];
-    for (const entry of entries) {
-      if (entry.isFile()) {
-        const full = path.join(entry.parentPath || baseDir, entry.name);
-        const st = await fs.stat(full);
-        result.push({
-          fileName: path.relative(path.resolve(process.cwd(), folderPrefix), full),
-          sizeBytes: st.size,
-        });
-      }
-    }
-    return result;
-  } catch {
-    return [];
+  if (isB2Workspace(workspace, connection)) {
+    const config = getB2Settings(workspace, connection);
+    const b2TargetPrefix = cleanSubPrefix ? `${targetPrefix}/` : `${folderPrefix}/`;
+    const files = await b2ListFileNames(config.keyId, config.applicationKey, config.bucketName, b2TargetPrefix);
+    return files.map((file: any) => ({
+      fileName: String(file.fileName || '').slice(folderPrefix.length + 1),
+      sizeBytes: Number(file.contentLength || 0),
+      uploadTimestamp: file.uploadTimestamp,
+    }));
   }
+
+  if (!localWorkspaceFileAdapter) return [];
+  const files = await localWorkspaceFileAdapter.list(targetPrefix);
+  return files.map((file) => ({
+    ...file,
+    fileName: file.fileName.startsWith(`${folderPrefix}/`)
+      ? file.fileName.slice(folderPrefix.length + 1)
+      : file.fileName,
+  }));
 }
 
-export async function deleteWorkspaceFolder(workspace: any, connection: any): Promise<void> {
-  const prefix = getWorkspaceFolderPrefix(workspace);
-  if (isB2Workspace(workspace, connection)) {
-    const keyId = connection.b2KeyId || connection.keyId;
-    const appKey = connection.b2ApplicationKey || connection.appKey;
-    const bucketName = connection.b2BucketName || workspace.b2BucketName || 'ultrst-apps';
-    await b2DeleteFolder(keyId, appKey, bucketName, prefix);
+export async function deleteWorkspaceFolder(
+  workspace: any,
+  connection: any,
+  env?: Record<string, unknown>,
+): Promise<void> {
+  const folderPrefix = getWorkspaceFolderPrefix(workspace);
+
+  if (isGoogleDriveWorkspace(workspace, connection)) {
+    // Delete only the application-created child directory. The user-selected
+    // Drive root folder and its unrelated contents are never removed.
+    const drive = await getGoogleDriveClient(workspace, connection, env);
+    const removeTree = async (relativePath: string): Promise<void> => {
+      let entries: Array<{ path: string; isFolder?: boolean }> = [];
+      try {
+        entries = await drive.list(relativePath);
+      } catch (error) {
+        if (error instanceof Error && /not found|HTTP 404/i.test(error.message)) return;
+        throw error;
+      }
+      for (const entry of entries) {
+        if (entry.isFolder) await removeTree(entry.path);
+        else await drive.delete(entry.path);
+      }
+      if (relativePath) await drive.delete(relativePath);
+    };
+    await removeTree(folderPrefix);
     return;
   }
 
-  const fs = await getFs();
-  const path = await getPath();
-  if (!fs || !path) return;
-  const localDir = path.resolve(process.cwd(), prefix);
-  try {
-    await fs.rm(localDir, { recursive: true, force: true });
-  } catch {}
+  if (isB2Workspace(workspace, connection)) {
+    const config = getB2Settings(workspace, connection);
+    await b2DeleteFolder(config.keyId, config.applicationKey, config.bucketName, folderPrefix);
+    return;
+  }
+
+  if (localWorkspaceFileAdapter) await localWorkspaceFileAdapter.deleteFolder(folderPrefix);
 }

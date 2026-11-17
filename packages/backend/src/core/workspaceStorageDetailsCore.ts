@@ -5,12 +5,21 @@
  */
 
 import { findUserWorkspace } from './workspaceCore';
+import { toPublicStorageConnection } from './storageConnectionCore.js';
 import { b2ListBuckets, b2ListFileNames } from './b2DirectCore';
 
-export async function getWorkspaceStorageDetails(workspaceId: string, env?: Record<string, unknown>) {
+export async function getWorkspaceStorageDetails(
+  workspaceId: string,
+  env?: Record<string, unknown>,
+  verifiedUserId?: string,
+) {
   if (!workspaceId) return { success: false, error: 'workspaceId is required' };
-  const { workspace, connection } = await findUserWorkspace(workspaceId, env);
+  const ownerId = String(verifiedUserId || '').trim();
+  if (!ownerId) return { success: false, error: 'A verified workspace owner is required.' };
+  const { workspace, connection } = await findUserWorkspace(workspaceId, env, ownerId);
+  if (!workspace) return { success: false, error: 'Workspace was not found for this owner.' };
 
+  const safeConnection = connection ? toPublicStorageConnection(connection) : null;
   const folderPrefix = workspace?.localFolderKey || workspace?.localFolderName || (workspace?.workspacePath ? workspace.workspacePath.replace(/^\.\//, '') : workspaceId);
 
   if (!connection || (connection.provider !== 'backblaze_b2' && connection.provider !== 'BACKBLAZE_B2')) {
@@ -18,7 +27,7 @@ export async function getWorkspaceStorageDetails(workspaceId: string, env?: Reco
       success: true,
       workspaceId,
       storageProvider: workspace?.storageProvider || 'local_fs',
-      connection: connection || null,
+      connection: safeConnection,
       folderPrefix,
       localStats: { exists: false, appsCount: 0, ecosystemsCount: 0 },
       bucket: null,
@@ -39,7 +48,7 @@ export async function getWorkspaceStorageDetails(workspaceId: string, env?: Reco
         success: true,
         workspaceId,
         storageProvider: 'backblaze_b2',
-        connection: { id: connection.id, label: connection.label, provider: connection.provider },
+        connection: safeConnection,
         folderPrefix,
         bucket: { name: bucketName, status: 'BUCKET_NOT_FOUND' },
         files: [],
@@ -74,7 +83,7 @@ export async function getWorkspaceStorageDetails(workspaceId: string, env?: Reco
       success: false,
       workspaceId,
       storageProvider: 'backblaze_b2',
-      error: err.message,
+      error: 'Unable to inspect workspace storage. Verify the selected connection and try again.',
       folderPrefix,
     };
   }

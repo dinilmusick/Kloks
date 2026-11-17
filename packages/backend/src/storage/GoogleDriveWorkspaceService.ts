@@ -88,7 +88,11 @@ function quoteDriveQuery(value: string): string {
 }
 
 async function parseJson(response: Response): Promise<any> {
-  return response.json().catch(() => ({}));
+  try {
+    return await response.json();
+  } catch {
+    throw new Error('Google Drive returned an invalid JSON response.');
+  }
 }
 
 async function persistTokensSafely(
@@ -338,7 +342,10 @@ export class GoogleDriveWorkspaceService {
       url.searchParams.set('includeItemsFromAllDrives', 'true');
       if (pageToken) url.searchParams.set('pageToken', pageToken);
       const data = await parseJson(await this.api(url.toString()));
-      if (Array.isArray(data.files)) files.push(...data.files);
+      if (!Array.isArray(data.files)) {
+        throw new Error('Google Drive file listing returned an invalid response.');
+      }
+      files.push(...data.files);
       pageToken = typeof data.nextPageToken === 'string' ? data.nextPageToken : '';
     } while (pageToken);
     return files;
@@ -402,7 +409,33 @@ export class GoogleDriveWorkspaceService {
     };
   }
 
+  /**
+   * Folder browsing is always rooted at the persisted workspace root. A caller
+   * may browse a descendant, but cannot supply an unrelated Drive folder ID.
+   */
+  async assertFolderWithinRoot(folderId: string): Promise<void> {
+    const rootId = this.options.rootFolderId || 'root';
+    if (!folderId || folderId === rootId) return;
+
+    const pending = [folderId];
+    const visited = new Set<string>();
+    while (pending.length && visited.size < 128) {
+      const current = pending.shift()!;
+      if (current === rootId) return;
+      if (current === 'root' && rootId !== 'root') break;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      const folder = await this.resolveFolder(current);
+      for (const parentId of folder.parentIds) {
+        if (parentId === rootId) return;
+        if (!visited.has(parentId)) pending.push(parentId);
+      }
+    }
+    throw new Error('The selected Google Drive folder is outside the configured workspace root.');
+  }
+
   async listFolders(parentFolderId = this.options.rootFolderId || 'root'): Promise<GoogleDriveWorkspaceFolder[]> {
+    await this.assertFolderWithinRoot(parentFolderId);
     const files = await this.listFiles(
       parentFolderId,
       `mimeType = '${FOLDER_MIME_TYPE}' and trashed = false`,

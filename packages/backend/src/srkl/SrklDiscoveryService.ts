@@ -5,6 +5,7 @@
  */
 
 import { b2ListBuckets } from '../storage/B2DirectClient.js';
+import { resolveUserStorageConnectionSecret } from '../core/storageConnectionCore.js';
 
 let cachedSrklUrls: { urls: string[]; expiresAt: number } | null = null;
 let roundRobinIndex = 0;
@@ -105,23 +106,13 @@ export async function getSrklAccounts(
           if (!seenKeys.has(key)) {
             seenKeys.add(key);
             accounts.push({
-              id: conn.id,
-              name: conn.label || conn.id,
-              provider: conn.provider,
-              serviceId: conn.provider,
-              credentials: {
-                keyId: conn.b2KeyId || conn.keyId,
-                applicationKey: conn.b2ApplicationKey || conn.appKey,
-                bucketName: conn.b2BucketName || conn.bucketName,
-                region: conn.b2Region || conn.region,
-                endpoint: conn.b2Endpoint || conn.endpoint,
-                email: conn.googleEmail,
-                rootFolderId: conn.googleRootFolderId,
-                rootFolderName: conn.googleRootFolderName,
-                accessToken: conn.googleAccessToken,
-                accessTokenExpiresAt: conn.googleAccessTokenExpiresAt,
-                refreshToken: conn.googleRefreshToken,
-              },
+              id: String(conn.id),
+              name: String(conn.label || conn.id),
+              provider: String(conn.provider || ''),
+              serviceId: String(conn.provider || ''),
+              category: 'storage',
+              status: conn.testStatus === 'ok' ? 'CONNECTED' : (conn.enabled === false ? 'DISABLED' : 'ACTIVE'),
+              emailOrSlug: conn.googleEmail || conn.label || conn.id,
             });
           }
         }
@@ -141,11 +132,22 @@ export async function getSrklAccounts(
       for (const item of list) {
         const sId = String(item.serviceId || item.id || '').toLowerCase();
         if (service && !sId.includes(service.toLowerCase())) continue;
-        const kId = (item.credentials?.keyId || item.credentials?.b2KeyId || '').trim();
-        const key = kId ? `key:${kId}` : `id:${item.id}`;
+        // The downstream SRKL account endpoint can include credential
+        // material for authorized internal consumers. Federation discovery
+        // deliberately retains metadata only; secret resolution is server-only.
+        const id = String(item.id || `srkl-${sId}`);
+        const key = `id:${id}`;
         if (!seenKeys.has(key)) {
           seenKeys.add(key);
-          accounts.push(item);
+          accounts.push({
+            id,
+            name: String(item.name || item.label || sId),
+            serviceId: sId,
+            provider: String(item.provider || item.serviceId || ''),
+            category: String(item.category || 'storage'),
+            status: String(item.status || 'ACTIVE'),
+            ...(typeof item.emailOrSlug === 'string' ? { emailOrSlug: item.emailOrSlug } : {}),
+          });
         }
       }
     }
@@ -166,12 +168,18 @@ export async function srklListBackblazeBuckets(
   let resolvedKeyId = (keyId || '').trim();
   let resolvedAppKey = (applicationKey || '').trim();
 
-  if ((!resolvedKeyId || !resolvedAppKey) && (userId || accountId)) {
-    const accountsRes = await getSrklAccounts(userId || '', 'backblaze', queryDb);
-    const matched = accountsRes.accounts.find((a) => (accountId && a.id === accountId) || (resolvedKeyId && (a.credentials?.keyId || a.credentials?.b2KeyId) === resolvedKeyId)) || accountsRes.accounts[0];
+  if ((!resolvedKeyId || !resolvedAppKey) && userId) {
+    const matched = await resolveUserStorageConnectionSecret(
+      userId,
+      accountId,
+      queryDb,
+      'backblaze_b2',
+    );
     if (matched) {
-      resolvedKeyId = matched.credentials?.keyId || matched.credentials?.b2KeyId || resolvedKeyId;
-      resolvedAppKey = matched.credentials?.applicationKey || matched.credentials?.b2ApplicationKey || resolvedAppKey;
+      resolvedKeyId = String(matched.b2KeyId || matched.keyId || matched.accessKeyId || '').trim();
+      resolvedAppKey = String(
+        matched.b2ApplicationKey || matched.applicationKey || matched.appKey || matched.secretAccessKey || '',
+      ).trim();
     }
   }
 

@@ -82,6 +82,35 @@ describe('Kloks portable and Node dependency graphs', () => {
     expect(result.external.some((specifier) => specifier === '@kloks/functions' || specifier.startsWith('@kloks/functions/'))).toBe(false);
   });
 
+
+  it('keeps the portable Krnl service facade separate from Node-only storage factories', () => {
+    const result = graph('krnl-services.js');
+    expect(result.files.length).toBeGreaterThan(0);
+    // The shared Fetch-facing facade may use guarded Web/Node fallback helpers,
+    // but must not statically import the filesystem adapter graph.
+    expect(result.files.some((file) => file.endsWith('/storage/LocalFSAdapter.js'))).toBe(false);
+    expect(result.files.some((file) => file.endsWith('/storage/StorageAdapterFactory.js'))).toBe(false);
+    expect(result.files.some((file) => file.endsWith('/services/workspaceGraphService.js'))).toBe(false);
+    expect(result.files.some((file) => file.endsWith('/core/SrklStorageService.js'))).toBe(false);
+
+    const source = readFileSync(resolve(process.cwd(), 'packages/backend/src/krnl-services.ts'), 'utf8');
+    expect(source).not.toContain('StorageAdapterFactory');
+    expect(source).not.toContain('workspaceGraphService');
+    expect(source).not.toMatch(/\bfrom\s+['"](?:node:|fs(?:\/|['"])|path(?:\/|['"]))/);
+    expect(source).not.toMatch(/\bimport\(\s*['"](?:node:|fs(?:\/|['"])|path(?:\/|['"]))/);
+  });
+
+  it('keeps filesystem-backed graph services behind the explicit Node backend entrypoint', () => {
+    const portableSource = readFileSync(resolve(process.cwd(), 'packages/backend/src/krnl-services.ts'), 'utf8');
+    const nodeSource = readFileSync(resolve(process.cwd(), 'packages/backend/src/node.ts'), 'utf8');
+    const nodeServicesSource = readFileSync(resolve(process.cwd(), 'packages/backend/src/krnl-services.node.ts'), 'utf8');
+
+    expect(portableSource).not.toContain('workspaceGraphService');
+    expect(portableSource).not.toContain('StorageAdapterFactory');
+    expect(nodeSource).toContain("export * from './krnl-services.node.js';");
+    expect(nodeServicesSource).toContain("from './services/workspaceGraphService.js'");
+  });
+
   it('publishes separate portable and Node adapter package exports', () => {
     const pkg = JSON.parse(readFileSync(resolve(process.cwd(), 'packages/backend/package.json'), 'utf8'));
     expect(pkg.exports['.'].import).toBe('./dist/index.js');

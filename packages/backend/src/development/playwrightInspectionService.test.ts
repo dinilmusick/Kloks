@@ -54,7 +54,7 @@ describe('PlaywrightInspectionRuntime', () => {
         viewports: [{ width: 1440, height: 900 }, { width: 390, height: 844 }],
       });
       expect(result.ok).toBe(false);
-      expect(result.title).toBe('Inspection fixture');
+      expect(result.title, JSON.stringify(result.errors)).toBe('Inspection fixture');
       expect(result.errors.some(item => item.kind === 'console')).toBe(true);
       expect(result.logs.some(item => item.message === 'fixture console error')).toBe(true);
       expect(result.logs.some(item => item.type === 'log' && item.message.includes('fixture console info'))).toBe(true);
@@ -83,7 +83,7 @@ describe('PlaywrightInspectionRuntime', () => {
       checks: [{ selector: 'h1', text: 'Clean page' }],
       captureDom: true,
     });
-    expect(result.checks[0]?.passed).toBe(true);
+    expect(result.checks[0]?.passed, JSON.stringify({ errors: result.errors, checks: result.checks, title: result.title })).toBe(true);
     expect(result.ok).toBe(true);
     expect(result.errors).toHaveLength(0);
     expect(result.screenshots).toHaveLength(2);

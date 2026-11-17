@@ -22,36 +22,52 @@ const authCache = new Map<string, { auth: B2AuthData; expiresAt: number }>();
 const bucketIdCache = new Map<string, string>();
 
 export async function authorizeB2(keyId: string, applicationKey: string): Promise<B2AuthData> {
-  const cacheKey = `${keyId.trim()}:${applicationKey.trim()}`;
+  const normalizedKeyId = keyId.trim();
+  const normalizedApplicationKey = applicationKey.trim();
+  if (!normalizedKeyId || !normalizedApplicationKey) {
+    throw new Error('B2 credentials are required.');
+  }
+  const cacheKey = `${normalizedKeyId}:${normalizedApplicationKey}`;
   const cached = authCache.get(cacheKey);
   if (cached && Date.now() < cached.expiresAt) return cached.auth;
 
-  const authHeader = typeof Buffer !== 'undefined'
-    ? Buffer.from(`${keyId.trim()}:${applicationKey.trim()}`).toString('base64')
-    : btoa(`${keyId.trim()}:${applicationKey.trim()}`);
-  let res = await fetch('https://api.backblazeb2.com/b2api/v2/b2_authorize_account', {
-    headers: { Authorization: `Basic ${authHeader}` },
-    signal: AbortSignal.timeout(10000),
-  });
-
-  if (!res.ok) {
-    res = await fetch('https://api.backblazeb2.com/b2api/v4/b2_authorize_account', {
+  const authHeader = btoa(`${normalizedKeyId}:${normalizedApplicationKey}`);
+  let res: Response;
+  try {
+    res = await fetch('https://api.backblazeb2.com/b2api/v2/b2_authorize_account', {
       headers: { Authorization: `Basic ${authHeader}` },
       signal: AbortSignal.timeout(10000),
     });
+    if (!res.ok) {
+      res = await fetch('https://api.backblazeb2.com/b2api/v4/b2_authorize_account', {
+        headers: { Authorization: `Basic ${authHeader}` },
+        signal: AbortSignal.timeout(10000),
+      });
+    }
+  } catch {
+    throw new Error('Backblaze B2 authorization failed before receiving a response.');
   }
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Backblaze B2 authorization failed (${res.status}): ${errText}`);
-  }
+  if (!res.ok) throw new Error(`Backblaze B2 authorization failed with HTTP ${res.status}.`);
 
   const data: any = await res.json();
+  const apiUrl = data.apiInfo?.storageApi?.apiUrl || data.apiUrl;
+  const downloadUrl = data.apiInfo?.storageApi?.downloadUrl || data.downloadUrl || apiUrl;
+  if (
+    typeof data.accountId !== 'string'
+    || !data.accountId
+    || typeof data.authorizationToken !== 'string'
+    || !data.authorizationToken
+    || typeof apiUrl !== 'string'
+    || typeof downloadUrl !== 'string'
+  ) {
+    throw new Error('Backblaze B2 authorization returned an invalid response.');
+  }
+
   const auth: B2AuthData = {
     accountId: data.accountId,
     authorizationToken: data.authorizationToken,
-    apiUrl: (data.apiInfo?.storageApi?.apiUrl || data.apiUrl || 'https://api.backblazeb2.com').replace(/\/+$/, ''),
-    downloadUrl: (data.apiInfo?.storageApi?.downloadUrl || data.downloadUrl || data.apiUrl || 'https://f003.backblazeb2.com').replace(/\/+$/, ''),
+    apiUrl: apiUrl.replace(/\/+$/, ''),
+    downloadUrl: downloadUrl.replace(/\/+$/, ''),
     s3ApiUrl: data.apiInfo?.storageApi?.s3ApiUrl || data.s3ApiUrl,
     allowed: data.apiInfo?.storageApi?.allowed || data.allowed,
   };
@@ -62,57 +78,49 @@ export async function authorizeB2(keyId: string, applicationKey: string): Promis
 
 export async function b2ListBuckets(keyId: string, applicationKey: string, bucketId?: string, bucketName?: string) {
   const auth = await authorizeB2(keyId, applicationKey);
-  const rBucketId = bucketId || auth.allowed?.bucketId || auth.allowed?.buckets?.[0]?.bucketId;
-  const rBucketName = bucketName || auth.allowed?.bucketName || auth.allowed?.buckets?.[0]?.bucketName;
+  const allowed = auth.allowed;
 
-  // 1. If key is unrestricted, query all buckets in the account
-  if (!auth.allowed?.bucketId && !auth.allowed?.bucketName) {
-    try {
-      const res = await fetch(`${auth.apiUrl}/b2api/v2/b2_list_buckets`, {
-        method: 'POST',
-        headers: { Authorization: auth.authorizationToken, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId: auth.accountId }),
-        signal: AbortSignal.timeout(8000),
-      });
-      if (res.ok) {
-        const data: any = await res.json();
-        if (Array.isArray(data.buckets) && data.buckets.length > 0) return data.buckets;
-      }
-    } catch (err: any) {
-      console.warn('[B2DirectCore] list_buckets query failed:', err.message);
-    }
+  // Restricted application keys are authoritative only when the B2
+  // authorization response identifies the actual permitted bucket.
+  if (allowed?.bucketId || allowed?.bucketName || Array.isArray(allowed?.buckets)) {
+    const candidates = Array.isArray(allowed.buckets)
+      ? allowed.buckets
+      : allowed.bucketId && allowed.bucketName
+        ? [{ bucketId: allowed.bucketId, bucketName: allowed.bucketName }]
+        : [];
+    return candidates.filter((bucket) =>
+      (!bucketId || bucket.bucketId === bucketId)
+      && (!bucketName || bucket.bucketName === bucketName)
+      && typeof bucket.bucketId === 'string'
+      && Boolean(bucket.bucketId)
+      && typeof bucket.bucketName === 'string'
+      && Boolean(bucket.bucketName),
+    );
   }
 
-  // 2. Restricted key or fallback with specific bucketId/bucketName
-  if (rBucketId || rBucketName) {
-    const body: Record<string, unknown> = { accountId: auth.accountId };
-    if (rBucketId) body.bucketId = rBucketId;
-    else if (rBucketName) body.bucketName = rBucketName;
-    try {
-      const res = await fetch(`${auth.apiUrl}/b2api/v2/b2_list_buckets`, {
-        method: 'POST',
-        headers: { Authorization: auth.authorizationToken, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(8000),
-      });
-      if (res.ok) {
-        const data: any = await res.json();
-        if (Array.isArray(data.buckets) && data.buckets.length > 0) return data.buckets;
-      }
-    } catch {}
-
-    return [{
-      accountId: auth.accountId,
-      bucketId: rBucketId || 'restricted',
-      bucketName: rBucketName || (bucketName || 'default-bucket'),
-      bucketType: 'allPrivate',
-    }];
+  let response: Response;
+  try {
+    response = await fetch(`${auth.apiUrl}/b2api/v2/b2_list_buckets`, {
+      method: 'POST',
+      headers: { Authorization: auth.authorizationToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: auth.accountId }),
+      signal: AbortSignal.timeout(8000),
+    });
+  } catch {
+    throw new Error('Backblaze B2 bucket discovery failed before receiving a response.');
   }
-  return [];
+  if (!response.ok) {
+    throw new Error(`Backblaze B2 bucket discovery failed with HTTP ${response.status}.`);
+  }
+  const data: any = await response.json();
+  if (!Array.isArray(data.buckets)) {
+    throw new Error('Backblaze B2 bucket discovery returned an invalid response.');
+  }
+  return data.buckets;
 }
 
 export async function getB2BucketId(keyId: string, applicationKey: string, bucketName: string): Promise<string> {
-  const cacheKey = `${keyId.trim()}:${bucketName.trim()}`;
+  const cacheKey = `${keyId.trim()}:${applicationKey.trim()}:${bucketName.trim()}`;
   if (bucketIdCache.has(cacheKey)) return bucketIdCache.get(cacheKey)!;
 
   const buckets = await b2ListBuckets(keyId, applicationKey, undefined, bucketName);
@@ -131,8 +139,13 @@ export async function b2UploadFile(keyId: string, applicationKey: string, bucket
     headers: { Authorization: auth.authorizationToken, 'Content-Type': 'application/json' },
     body: JSON.stringify({ bucketId }),
   });
-  if (!urlRes.ok) throw new Error(`B2 get upload url failed (${urlRes.status})`);
+  if (!urlRes.ok) throw new Error(`B2 upload URL request failed with HTTP ${urlRes.status}.`);
   const { uploadUrl, authorizationToken } = (await urlRes.json()) as any;
+
+  const bytes = new Uint8Array(buffer.byteLength);
+  bytes.set(buffer);
+  const digest = await crypto.subtle.digest('SHA-1', bytes);
+  const sha1 = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
   const encodedFileName = encodeURIComponent(fileName).replace(/%2F/g, '/');
   const uploadRes = await fetch(uploadUrl, {
     method: 'POST',
@@ -140,12 +153,11 @@ export async function b2UploadFile(keyId: string, applicationKey: string, bucket
       Authorization: authorizationToken,
       'X-Bz-File-Name': encodedFileName,
       'Content-Type': contentType,
-      'Content-Length': String(buffer.byteLength),
-      'X-Bz-Content-Sha1': 'do_not_verify',
+      'X-Bz-Content-Sha1': sha1,
     },
-    body: buffer as any,
+    body: bytes,
   });
-  if (!uploadRes.ok) throw new Error(`B2 upload failed for ${fileName} (${uploadRes.status}): ${await uploadRes.text()}`);
+  if (!uploadRes.ok) throw new Error(`B2 upload failed with HTTP ${uploadRes.status}.`);
   return uploadRes.json();
 }
 
@@ -154,7 +166,7 @@ export async function b2DownloadFile(keyId: string, applicationKey: string, buck
   const encodedName = encodeURIComponent(fileName).replace(/%2F/g, '/');
   const res = await fetch(`${auth.downloadUrl}/file/${bucketName}/${encodedName}`, { headers: { Authorization: auth.authorizationToken } });
   if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`B2 download failed for ${fileName} (${res.status})`);
+  if (!res.ok) throw new Error(`B2 file download failed with HTTP ${res.status}.`);
   return new Uint8Array(await res.arrayBuffer());
 }
 
@@ -166,9 +178,10 @@ export async function b2ListFileNames(keyId: string, applicationKey: string, buc
     headers: { Authorization: auth.authorizationToken, 'Content-Type': 'application/json' },
     body: JSON.stringify({ bucketId, prefix, maxFileCount: 1000 }),
   });
-  if (!res.ok) throw new Error(`B2 list files failed (${res.status})`);
+  if (!res.ok) throw new Error(`B2 file listing failed with HTTP ${res.status}.`);
   const data: any = await res.json();
-  return (data.files || []) as Array<{ fileName: string; fileId: string; contentLength: number; uploadTimestamp: number }>;
+  if (!Array.isArray(data.files)) throw new Error('B2 file listing returned an invalid response.');
+  return data.files as Array<{ fileName: string; fileId: string; contentLength: number; uploadTimestamp: number }>;
 }
 
 export async function b2DeleteFileVersion(keyId: string, applicationKey: string, fileName: string, fileId: string) {

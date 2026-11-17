@@ -6,15 +6,56 @@
  */
 
 import { queryUnifiedDb } from './unifiedDb';
-import { resolveWorkspaceConnection, syncWorkspaceDataToBucket } from './workspaceBucketSyncCore';
+import { syncWorkspaceDataToBucket } from './workspaceBucketSyncCore';
+import { listUserStorageConnections, resolveUserStorageConnectionSecret } from './storageConnectionCore.js';
 import { readWorkspaceFile } from './workspaceFileCore';
 
-async function resolveUserRow(userId?: string, env?: Record<string, unknown>) {
-  if (userId) {
-    const res = await queryUnifiedDb(`SELECT * FROM "ultrst-users" WHERE id = $1 OR email = $1 LIMIT 1`, [userId], env);
-    if (res.rows.length > 0) return res.rows[0];
+async function resolveWorkspaceConnectionForOwner(
+  user: Record<string, any>,
+  workspace: Record<string, any>,
+  env?: Record<string, unknown>,
+) {
+  const userId = String(user?.id || '').trim();
+  const connectionId = String(workspace?.storageConnectionId || '').trim();
+  const provider = String(workspace?.storageProvider || '').toLowerCase();
+  if (!userId || !connectionId || !['backblaze_b2', 'google_drive'].includes(provider)) return null;
+  const connection = await resolveUserStorageConnectionSecret(
+    userId,
+    connectionId,
+    (sql, params) => queryUnifiedDb(sql, params, env),
+    provider,
+  );
+  if (!connection || connection.enabled === false || String(connection.provider || '').toLowerCase() !== provider) {
+    return null;
   }
-  return null;
+  return { ...connection, __ownerUserId: userId };
+}
+
+async function resolveUserRow(userId?: string, env?: Record<string, unknown>) {
+  if (!userId) return null;
+  const query = (sql: string, params?: unknown[]) => queryUnifiedDb(sql, params, env);
+  await listUserStorageConnections(userId, query);
+
+  try {
+    const canonical = await queryUnifiedDb(
+      `SELECT * FROM "ultrst-users" WHERE id = $1 OR email = $1 LIMIT 1`,
+      [userId],
+      env,
+    );
+    if (canonical.rows.length > 0) return canonical.rows[0];
+  } catch (error) {
+    const value = error as { code?: unknown; message?: unknown };
+    const missing = value?.code === '42P01' || value?.code === 'PGRST205'
+      || (typeof value?.message === 'string' && /(?:relation|table).*(?:does not exist|not found)/i.test(value.message));
+    if (!missing) throw error;
+  }
+
+  const legacy = await queryUnifiedDb(
+    `SELECT * FROM "srkl_application_profiles" WHERE id = $1 OR email = $1 LIMIT 1`,
+    [userId],
+    env,
+  );
+  return legacy.rows[0] || null;
 }
 
 export async function loadWorkspaceData(userId?: string, workspaceId?: string, env?: Record<string, unknown>) {
@@ -32,7 +73,7 @@ export async function loadWorkspaceData(userId?: string, workspaceId?: string, e
   if (isEmptyData) {
     const ws = (depm.workspaces || []).find((w: any) => w.id === workspaceId);
     if (ws) {
-      const conn = resolveWorkspaceConnection(profiles, ws);
+      const conn = await resolveWorkspaceConnectionForOwner(user, ws, env);
       if (conn) {
         try {
           const fileBuf = await readWorkspaceFile(ws, conn, 'ecosystem.json');
@@ -142,8 +183,19 @@ export async function saveWorkspaceData(
 
   const ws = Array.isArray(profiles.depm?.workspaces) ? profiles.depm.workspaces.find((w: any) => w.id === workspaceId) : null;
   if (ws) {
-    const conn = resolveWorkspaceConnection(profiles, ws);
-    await syncWorkspaceDataToBucket(ws, conn, data, env);
+    const provider = String(ws.storageProvider || '').toLowerCase();
+    if (provider === 'backblaze_b2' || provider === 'google_drive') {
+      const conn = await resolveWorkspaceConnectionForOwner(user, ws, env);
+      if (!conn) {
+        throw new Error('Workspace data synchronization requires its exact owner-owned storage connection.');
+      }
+      await syncWorkspaceDataToBucket(
+        { ...ws, __ownerUserId: String(user.id) },
+        conn,
+        data,
+        env,
+      );
+    }
   }
 
   return { success: true, workspaceId, workspace: data };

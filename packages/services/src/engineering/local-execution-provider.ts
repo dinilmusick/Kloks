@@ -3,15 +3,27 @@ import {spawn} from "node:child_process";
 export interface LocalExecutionRequest {command: string; cwd?: string; environment?: Readonly<Record<string, string>>; timeoutMs?: number;}
 export interface LocalExecutionResult {executionId: string; status: "succeeded" | "failed" | "timed-out"; exitCode?: number; stdout: string; stderr: string;}
 
+// Preserve only PATH so requested executables remain discoverable. Never
+// inherit other ambient host variables: deployments commonly place access
+// tokens, database URLs, and signing keys in process.env.
+function buildExecutionEnvironment(
+  explicit: Readonly<Record<string, string>> = {},
+): NodeJS.ProcessEnv {
+  return {
+    PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
+    ...explicit,
+  };
+}
+
 export class LocalExecutionProvider {
   readonly id = "local";
 
   async execute(request: LocalExecutionRequest): Promise<LocalExecutionResult> {
     const executionId = crypto.randomUUID();
     return new Promise((resolve) => {
-      const child = spawn("sh", ["-lc", request.command], {
+      const child = spawn("sh", ["-c", request.command], {
         cwd: request.cwd,
-        env: {...process.env, ...(request.environment ?? {})},
+        env: buildExecutionEnvironment(request.environment),
       });
       let stdout = "";
       let stderr = "";

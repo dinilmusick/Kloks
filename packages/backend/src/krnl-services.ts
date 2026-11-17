@@ -15,10 +15,42 @@ import {
 } from '@ultrst-armada/krnl';
 import { loginSystemUser, resolveUserFromToken } from './auth/UnifiedAuthCore.js';
 import { queryUnifiedDb } from './core/unifiedDb.js';
+import {
+  deleteUserWorkspaceStorageFile,
+  deleteUserWorkspaceStorageFolder,
+  listUserWorkspaceStorageFiles,
+  readUserWorkspaceStorageFile,
+  writeUserWorkspaceStorageFile,
+} from './core/storageConnectionRuntimeCore.js';
 type UserRole = 'admin' | 'user';
-import { StorageAdapterFactory } from './storage/StorageAdapterFactory.js';
 import { b2ListBuckets } from './storage/B2DirectClient.js';
-import { getSrklAccounts, srklListBackblazeBuckets } from './srkl/SrklDiscoveryService.js';
+import {
+  createBackblazeStorageConnection,
+  deleteUserStorageConnection,
+  getGoogleDriveAccountIdentityForUser,
+  getStorageProviderCapabilities,
+  listBackblazeBucketsForConnection,
+  listUserStorageConnections,
+  listUserStorageConnectionsWithSecrets,
+  setPrimaryUserStorageConnection,
+  testBackblazeCredentials,
+} from './core/storageConnectionCore.js';
+import { getPrimarySrklDeploymentUrl, getSrklAccounts, srklListBackblazeBuckets } from './srkl/SrklDiscoveryService.js';
+import {
+  createGoogleDriveAuthorizationRequest,
+  verifyGoogleDriveAuthorizationState,
+} from './core/googleDriveOAuthCore.js';
+import {
+  completeGoogleDriveAuthorization,
+  deleteGoogleDriveFileForConnection,
+  listGoogleDriveFilesForConnection,
+  listGoogleDriveFoldersForConnection,
+  persistGoogleDriveTokens,
+  readGoogleDriveFileForConnection,
+  selectGoogleDriveRootFolder,
+  testGoogleDriveConnectionForUser,
+  writeGoogleDriveFileForConnection,
+} from './core/storageConnectionCore.js';
 import { findUserWorkspace, getWorkspaces, createWorkspace, updateWorkspace, deleteWorkspace } from './core/workspaceCore.js';
 import {
   formatCanonicalWorkspaceFolderName,
@@ -69,6 +101,255 @@ export const StorageServiceDefinition: ServiceDefinition = createServiceDefiniti
   name: 'StorageService',
   version: '1.0.0',
   operations: {
+    getProviderCapabilities: {
+      id: 'StorageService.getProviderCapabilities',
+      name: 'getProviderCapabilities',
+      handler: async (input: { env?: Record<string, unknown> }) =>
+        getStorageProviderCapabilities((sql, params) => queryUnifiedDb(sql, params, input.env)),
+    },
+    getConnections: {
+      id: 'StorageService.getConnections',
+      name: 'getConnections',
+      handler: async (input: { userId: string; env?: Record<string, unknown> }) =>
+        listUserStorageConnections(input.userId, (sql, params) => queryUnifiedDb(sql, params, input.env)),
+    },
+    testBackblazeCredentials: {
+      id: 'StorageService.testBackblazeCredentials',
+      name: 'testBackblazeCredentials',
+      handler: async (input: { keyId: string; applicationKey: string }) =>
+        testBackblazeCredentials(input.keyId, input.applicationKey),
+    },
+    /** Server-only operation for backend storage engines. Never bind this operation to browser HTTP routes. */
+    getConnectionsWithSecrets: {
+      id: 'StorageService.getConnectionsWithSecrets',
+      name: 'getConnectionsWithSecrets',
+      handler: async (input: { userId: string; env?: Record<string, unknown> }) =>
+        listUserStorageConnectionsWithSecrets(
+          input.userId,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    setPrimaryConnection: {
+      id: 'StorageService.setPrimaryConnection',
+      name: 'setPrimaryConnection',
+      handler: async (input: { userId: string; connectionId: string; env?: Record<string, unknown> }) =>
+        setPrimaryUserStorageConnection(
+          input.userId,
+          input.connectionId,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    deleteConnection: {
+      id: 'StorageService.deleteConnection',
+      name: 'deleteConnection',
+      handler: async (input: { userId: string; connectionId: string; env?: Record<string, unknown> }) =>
+        deleteUserStorageConnection(
+          input.userId,
+          input.connectionId,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+
+    createBackblazeConnection: {
+      id: 'StorageService.createBackblazeConnection',
+      name: 'createBackblazeConnection',
+      handler: async (input: {
+        userId: string;
+        label?: string;
+        keyId: string;
+        applicationKey: string;
+        bucketName: string;
+        region?: string;
+        endpoint?: string;
+        env?: Record<string, unknown>;
+      }) =>
+        createBackblazeStorageConnection(input, (sql, params) => queryUnifiedDb(sql, params, input.env)),
+    },
+    listBackblazeConnectionBuckets: {
+      id: 'StorageService.listBackblazeConnectionBuckets',
+      name: 'listBackblazeConnectionBuckets',
+      handler: async (input: { userId: string; connectionId: string; env?: Record<string, unknown> }) =>
+        listBackblazeBucketsForConnection(
+          input.userId,
+          input.connectionId,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    createGoogleDriveAuthorizationRequest: {
+      id: 'StorageService.createGoogleDriveAuthorizationRequest',
+      name: 'createGoogleDriveAuthorizationRequest',
+      handler: async (input: { userId: string; returnTo: string; callbackOrigin: string; env?: Record<string, unknown> }) =>
+        createGoogleDriveAuthorizationRequest(
+          input,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    verifyGoogleDriveAuthorizationState: {
+      id: 'StorageService.verifyGoogleDriveAuthorizationState',
+      name: 'verifyGoogleDriveAuthorizationState',
+      handler: async (input: { state: string; nonceCookie: string; callbackOrigin: string; env?: Record<string, unknown> }) =>
+        verifyGoogleDriveAuthorizationState(
+          input,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    completeGoogleDriveAuthorization: {
+      id: 'StorageService.completeGoogleDriveAuthorization',
+      name: 'completeGoogleDriveAuthorization',
+      handler: async (input: { userId: string; code: string; env?: Record<string, unknown> }) =>
+        completeGoogleDriveAuthorization(
+          input.userId,
+          input.code,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    /** Server-only token persistence for the shared Google Drive adapter. */
+    persistGoogleDriveTokens: {
+      id: 'StorageService.persistGoogleDriveTokens',
+      name: 'persistGoogleDriveTokens',
+      handler: async (input: {
+        userId: string;
+        connectionId: string;
+        tokens: { accessToken: string; refreshToken?: string; expiresAt?: number; tokenType?: string };
+        env?: Record<string, unknown>;
+      }) => persistGoogleDriveTokens(
+        input.userId,
+        input.connectionId,
+        input.tokens,
+        (sql, params) => queryUnifiedDb(sql, params, input.env),
+      ),
+    },
+
+    listGoogleDriveFolders: {
+      id: 'StorageService.listGoogleDriveFolders',
+      name: 'listGoogleDriveFolders',
+      handler: async (input: { userId: string; connectionId: string; parentFolderId?: string; env?: Record<string, unknown> }) =>
+        listGoogleDriveFoldersForConnection(
+          input.userId,
+          input.connectionId,
+          input.parentFolderId,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    selectGoogleDriveRootFolder: {
+      id: 'StorageService.selectGoogleDriveRootFolder',
+      name: 'selectGoogleDriveRootFolder',
+      handler: async (input: { userId: string; connectionId: string; folderId: string; env?: Record<string, unknown> }) =>
+        selectGoogleDriveRootFolder(
+          input.userId,
+          input.connectionId,
+          input.folderId,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    getGoogleDriveAccountIdentity: {
+      id: 'StorageService.getGoogleDriveAccountIdentity',
+      name: 'getGoogleDriveAccountIdentity',
+      handler: async (input: { userId: string; connectionId: string; env?: Record<string, unknown> }) =>
+        getGoogleDriveAccountIdentityForUser(
+          input.userId,
+          input.connectionId,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    testGoogleDriveConnection: {
+      id: 'StorageService.testGoogleDriveConnection',
+      name: 'testGoogleDriveConnection',
+      handler: async (input: { userId: string; connectionId: string; env?: Record<string, unknown> }) =>
+        testGoogleDriveConnectionForUser(
+          input.userId,
+          input.connectionId,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    writeGoogleDriveFile: {
+      id: 'StorageService.writeGoogleDriveFile',
+      name: 'writeGoogleDriveFile',
+      handler: async (input: { userId: string; connectionId: string; path: string; data: string | Uint8Array; contentType?: string; env?: Record<string, unknown> }) =>
+        writeGoogleDriveFileForConnection(
+          input.userId,
+          input.connectionId,
+          input.path,
+          input.data,
+          input.contentType,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    readGoogleDriveFile: {
+      id: 'StorageService.readGoogleDriveFile',
+      name: 'readGoogleDriveFile',
+      handler: async (input: { userId: string; connectionId: string; path: string; env?: Record<string, unknown> }) =>
+        readGoogleDriveFileForConnection(
+          input.userId,
+          input.connectionId,
+          input.path,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    deleteGoogleDriveFile: {
+      id: 'StorageService.deleteGoogleDriveFile',
+      name: 'deleteGoogleDriveFile',
+      handler: async (input: { userId: string; connectionId: string; path: string; env?: Record<string, unknown> }) =>
+        deleteGoogleDriveFileForConnection(
+          input.userId,
+          input.connectionId,
+          input.path,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    listGoogleDriveFiles: {
+      id: 'StorageService.listGoogleDriveFiles',
+      name: 'listGoogleDriveFiles',
+      handler: async (input: { userId: string; connectionId: string; path?: string; env?: Record<string, unknown> }) =>
+        listGoogleDriveFilesForConnection(
+          input.userId,
+          input.connectionId,
+          input.path || '',
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+        ),
+    },
+    writeWorkspaceStorageFile: {
+      id: 'StorageService.writeWorkspaceStorageFile',
+      name: 'writeWorkspaceStorageFile',
+      handler: async (input: {
+        userId: string; connectionId: string; folderPrefix: string; relativePath: string;
+        content: string | Uint8Array; contentType?: string; bucketName?: string; rootFolderId?: string;
+        env?: Record<string, unknown>;
+      }) => writeUserWorkspaceStorageFile(input),
+    },
+    readWorkspaceStorageFile: {
+      id: 'StorageService.readWorkspaceStorageFile',
+      name: 'readWorkspaceStorageFile',
+      handler: async (input: {
+        userId: string; connectionId: string; folderPrefix: string; relativePath: string;
+        bucketName?: string; rootFolderId?: string; env?: Record<string, unknown>;
+      }) => readUserWorkspaceStorageFile(input),
+    },
+    deleteWorkspaceStorageFile: {
+      id: 'StorageService.deleteWorkspaceStorageFile',
+      name: 'deleteWorkspaceStorageFile',
+      handler: async (input: {
+        userId: string; connectionId: string; folderPrefix: string; relativePath: string;
+        bucketName?: string; rootFolderId?: string; env?: Record<string, unknown>;
+      }) => deleteUserWorkspaceStorageFile(input),
+    },
+    deleteWorkspaceStorageFolder: {
+      id: 'StorageService.deleteWorkspaceStorageFolder',
+      name: 'deleteWorkspaceStorageFolder',
+      handler: async (input: {
+        userId: string; connectionId: string; folderPrefix: string;
+        bucketName?: string; rootFolderId?: string; env?: Record<string, unknown>;
+      }) => deleteUserWorkspaceStorageFolder(input),
+    },
+    listWorkspaceStorageFiles: {
+      id: 'StorageService.listWorkspaceStorageFiles',
+      name: 'listWorkspaceStorageFiles',
+      handler: async (input: {
+        userId: string; connectionId: string; folderPrefix: string; subPrefix?: string;
+        bucketName?: string; rootFolderId?: string; env?: Record<string, unknown>;
+      }) => listUserWorkspaceStorageFiles(input),
+    },
+
     listBackblazeBuckets: {
       id: 'StorageService.listBackblazeBuckets',
       name: 'listBackblazeBuckets',
@@ -79,14 +360,22 @@ export const StorageServiceDefinition: ServiceDefinition = createServiceDefiniti
       name: 'resolveAdapterType',
       handler: async (input: { provider: 'local' | 'local_fs' | 's3' | 's3_compatible' | 'b2' | 'supabase' | 'google_drive'; basePath?: string }) => {
         const normalized = input.provider === 'local' ? 'local_fs' : input.provider;
+        // This portable service reports capability only. Instantiating LocalFSAdapter
+        // belongs to the explicit /backend/node entrypoint because it imports fs/path.
         if (normalized === 'local_fs') {
-          const adapter = StorageAdapterFactory.create({
-            provider: 'local_fs',
-            basePath: input.basePath ?? '/tmp/kloks-storage',
-          });
-          return { provider: 'local', initialized: Boolean(adapter) };
+          return {
+            provider: 'local',
+            initialized: true,
+            runtimeSupport: 'node_only',
+            requiresNodeAdapter: true,
+          };
         }
-        return { provider: input.provider, initialized: true };
+        return {
+          provider: normalized,
+          initialized: true,
+          runtimeSupport: 'fetch',
+          requiresNodeAdapter: false,
+        };
       },
     },
   },
@@ -213,14 +502,20 @@ export const DatabaseServiceDefinition: ServiceDefinition = createServiceDefinit
     query: {
       id: 'DatabaseService.query',
       name: 'query',
-      handler: async (input: { sql: string; params?: unknown[] }) => {
-        return { rows: [], sql: input.sql, executedAt: Date.now() };
-      },
+      handler: async (input: { sql: string; params?: unknown[]; env?: Record<string, unknown> }) =>
+        queryUnifiedDb(input.sql, input.params || [], input.env),
     },
     isHealthy: {
       id: 'DatabaseService.isHealthy',
       name: 'isHealthy',
-      handler: async () => ({ healthy: true }),
+      handler: async (input: { env?: Record<string, unknown> }) => {
+        try {
+          await queryUnifiedDb('SELECT 1 AS ok', [], input.env);
+          return { healthy: true };
+        } catch {
+          return { healthy: false, reason: 'SYSTEM_DATABASE_UNAVAILABLE' };
+        }
+      },
     },
   },
 });
@@ -296,20 +591,28 @@ export const SrklServiceDefinition: ServiceDefinition = createServiceDefinition(
       name: 'getAccounts',
       handler: async (input: { userId: string; service?: string; env?: Record<string, unknown> }) => getSrklAccounts(input.userId, input.service, (sql, params) => queryUnifiedDb(sql, params, input.env)),
     },
+    getPrimaryDeploymentUrl: {
+      id: 'SrklService.getPrimaryDeploymentUrl',
+      name: 'getPrimaryDeploymentUrl',
+      handler: async (input: { env?: Record<string, unknown> }) => ({
+        success: true,
+        deploymentUrl: await getPrimarySrklDeploymentUrl((sql, params) => queryUnifiedDb(sql, params, input.env)),
+      }),
+    },
+
     listBackblazeBuckets: {
       id: 'SrklService.listBackblazeBuckets',
       name: 'listBackblazeBuckets',
-      handler: async (input: { keyId?: string; applicationKey?: string; accountId?: string; userId?: string; env?: Record<string, unknown> }) => {
-        let keyId = input.keyId;
-        let applicationKey = input.applicationKey;
-        if ((!keyId || !applicationKey) && input.accountId && input.userId) {
-          const accounts = await getSrklAccounts(input.userId, 'backblaze', (sql, params) => queryUnifiedDb(sql, params, input.env));
-          const account = accounts.accounts.find((item: any) => item.id === input.accountId);
-          keyId = account?.credentials?.keyId || account?.credentials?.b2KeyId;
-          applicationKey = account?.credentials?.applicationKey || account?.credentials?.b2ApplicationKey;
-        }
-        return srklListBackblazeBuckets(keyId, applicationKey, undefined, undefined, input.userId, (sql, params) => queryUnifiedDb(sql, params, input.env));
-      },
+      handler: async (input: { keyId?: string; applicationKey?: string; accountId?: string; userId?: string; env?: Record<string, unknown> }) =>
+        srklListBackblazeBuckets(
+          input.keyId,
+          input.applicationKey,
+          undefined,
+          undefined,
+          input.userId,
+          (sql, params) => queryUnifiedDb(sql, params, input.env),
+          input.accountId,
+        ),
     },
   },
 });
@@ -329,59 +632,3 @@ export const SrklServiceFacade = {
 
 export const krnlSrklServiceDefinition = SrklServiceDefinition;
 export const krnlSrklServiceFacade = SrklServiceFacade;
-
-
-// Universal workspace graph persistence service.
-import { workspaceGraphService } from './services/workspaceGraphService.js';
-import type { UniversalGraphNode, UniversalGraphEdge } from './services/nodeGraphPersistence/types.js';
-
-export const WorkspaceGraphServiceDefinition: ServiceDefinition = createServiceDefinition({
-  id: 'kloks.backend.workspaceGraph',
-  name: 'WorkspaceGraphService',
-  version: '1.0.0',
-  operations: {
-    listGraphs: {
-      id: 'WorkspaceGraphService.listGraphs', name: 'listGraphs',
-      handler: async (input: { userId: string; workspaceId: string }) => workspaceGraphService.listGraphs(input.userId, input.workspaceId),
-    },
-    createGraph: {
-      id: 'WorkspaceGraphService.createGraph', name: 'createGraph',
-      handler: async (input: { userId: string; workspaceId: string; name?: string }) => workspaceGraphService.createGraph(input.userId, input.workspaceId, { name: input.name }),
-    },
-    getGraph: {
-      id: 'WorkspaceGraphService.getGraph', name: 'getGraph',
-      handler: async (input: { userId: string; workspaceId: string; slug: string }) => workspaceGraphService.getGraph(input.userId, input.workspaceId, input.slug),
-    },
-    saveGraph: {
-      id: 'WorkspaceGraphService.saveGraph', name: 'saveGraph',
-      handler: async (input: { userId: string; workspaceId: string; slug: string; nodes?: UniversalGraphNode[]; edges?: UniversalGraphEdge[]; name?: string }) => workspaceGraphService.saveGraph(input.userId, input.workspaceId, input.slug, input),
-    },
-    deleteGraph: {
-      id: 'WorkspaceGraphService.deleteGraph', name: 'deleteGraph',
-      handler: async (input: { userId: string; workspaceId: string; slug: string }) => workspaceGraphService.deleteGraph(input.userId, input.workspaceId, input.slug),
-    },
-    duplicateGraph: {
-      id: 'WorkspaceGraphService.duplicateGraph', name: 'duplicateGraph',
-      handler: async (input: { userId: string; workspaceId: string; slug: string; newName?: string }) => workspaceGraphService.duplicateGraph(input.userId, input.workspaceId, input.slug, input.newName),
-    },
-    clearGraph: {
-      id: 'WorkspaceGraphService.clearGraph', name: 'clearGraph',
-      handler: async (input: { userId: string; workspaceId: string; slug: string }) => workspaceGraphService.clearGraph(input.userId, input.workspaceId, input.slug),
-    },
-  },
-});
-
-const workspaceGraphServiceInstance: IService = createService(WorkspaceGraphServiceDefinition);
-export const WorkspaceGraphServiceFacade = {
-  id: WorkspaceGraphServiceDefinition.id,
-  name: WorkspaceGraphServiceDefinition.name,
-  version: WorkspaceGraphServiceDefinition.version,
-  runtime: 'server' as const,
-  deployment: 'local' as const,
-  definition: WorkspaceGraphServiceDefinition,
-  createInstance: () => createService(WorkspaceGraphServiceDefinition),
-  execute: async <TIn = unknown, TOut = unknown>(op: string, input?: TIn) => { await workspaceGraphServiceInstance.start(); return workspaceGraphServiceInstance.call<TIn, TOut>(op, input); },
-};
-
-export const krnlWorkspaceGraphServiceDefinition = WorkspaceGraphServiceDefinition;
-export const krnlWorkspaceGraphServiceFacade = WorkspaceGraphServiceFacade;

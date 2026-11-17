@@ -5,7 +5,8 @@
  */
 
 import { CloudflareResourceFetcher } from '../resourceEngine/CloudflareResourceFetcher';
-import { getSrklAccounts, getPrimarySrklDeploymentUrl } from './srklCore';
+import { getSrklAccounts } from './srklCore';
+
 
 const cfFetcher = new CloudflareResourceFetcher();
 
@@ -164,33 +165,15 @@ export async function fetchCloudflareData(
       projects: allProjects, projectObservability, workers: workersList, pages: pagesList,
       usageMetrics: unifiedMetrics, unifiedMetrics,
     };
-  } catch (err: any) {
-    // SRKL Engine fallback if available
-    try {
-      const srklUrl = await getPrimarySrklDeploymentUrl(env);
-      const srklRes = await fetch(`${srklUrl}/api/resources`, {
-        headers: {
-          'x-service-id': 'cloudflare',
-          authorization: `Bearer ${token}`,
-          'x-cf-account-id': accountTag,
-        },
-        signal: AbortSignal.timeout(6000),
-      });
-      if (srklRes.ok) {
-        const sData = await srklRes.json();
-        if (sData.success && Array.isArray(sData.resources)) {
-          const projs = sData.resources.map((r: any) => ({
-            id: r.id || r.name, name: r.name, type: r.type, status: r.status || 'ONLINE',
-            framework: r.type === 'PAGES_PROJECT' ? 'Cloudflare Pages' : 'Cloudflare Worker',
-            domain: r.subdomain ? `${r.subdomain}.pages.dev` : (r.url ? r.url.replace(/^https?:\/\//, '') : `${r.name}.workers.dev`),
-            domains: r.routes || [r.url || `${r.name}.workers.dev`], url: r.url || `https://${r.name}.workers.dev`,
-            edgeRequestsFormatted: '0', fastDataTransferFormatted: '0 MB', updatedAt: r.updatedAt,
-          }));
-          return { success: true, provider: 'CLOUDFLARE', tier: 'free', isFree: true, accountName: accountName || undefined, accountId: accountTag, projectsCount: projs.length, projects: projs, projectObservability: projs.map((p: any) => ({ ...p, projectId: p.id, projectName: p.name, deploymentUrl: p.url, latestDeploymentUrl: p.url })), workers: projs.filter((p: any) => p.type === 'WORKER'), pages: projs.filter((p: any) => p.type === 'PAGES_PROJECT') };
-        }
-      }
-    } catch {}
-
-    return { success: false, error: err.message || 'Failed to query Cloudflare API.', projects: [], projectObservability: [] };
+  } catch {
+    // Provider credentials are scoped to Cloudflare and must never be forwarded
+    // to SRKL (or any other service) as a fallback. Return a redacted provider
+    // failure instead of crossing service credential boundaries.
+    return {
+      success: false,
+      error: 'Cloudflare API request failed. Check token permissions and account configuration.',
+      projects: [],
+      projectObservability: [],
+    };
   }
 }
