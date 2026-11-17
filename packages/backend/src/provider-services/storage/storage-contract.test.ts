@@ -27,6 +27,9 @@ describe('canonical storage API contract', () => {
     for (const path of ['/a/../b', '/a/./b', '/a\\b', '/a?b', '/a#b'])
       expect(() => normalizeStoragePath(path)).toThrow();
     expect(normalizeStoragePath('/team/folder/')).toBe('team/folder');
+    for (const unsafe of ['/a/%2e%2e/b','/a/%252e%252e/b','/a/%2f/b'])
+      expect(() => normalizeStoragePath(unsafe)).toThrow();
+
     const google = listProviderServiceTree().find(p => p.id === 'google');
     expect(google?.children.map(p => p.id)).toEqual(expect.arrayContaining([
       'google-drive','google-gemini','google-cloud-run','google-cloud-storage',

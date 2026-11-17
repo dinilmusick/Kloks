@@ -1,3 +1,4 @@
+export { normalizeStoragePath } from '@dinilmusick/gutts/urls/safety';
 /** Provider-neutral storage APIs. Credential and tenant authorization remain caller-owned. */
 export type StorageProviderId = 'github' | 'backblaze-b2' | 'dropbox' | 'google-drive';
 export type StorageKind = 'bucket' | 'repository' | 'folder' | 'file';
@@ -40,14 +41,6 @@ export class UnsupportedStorageOperation extends Error {
 export function assertStorageOperation(service: CanonicalStorageService, operation: StorageOperation): void {
   if (!service.capabilities[operation])
     throw new UnsupportedStorageOperation(service.providerId, operation);
-}
-export function normalizeStoragePath(path = ''): string {
-  if (path.includes('\\') || path.includes('?') || path.includes('#') || /[\x00-\x1f]/.test(path))
-    throw new Error('Invalid storage path');
-  const parts = path.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
-  if (parts.some(p => p === '.' || p === '..' || p === '%2e' || p === '%2e%2e'))
-    throw new Error('Storage path traversal is not permitted');
-  return parts.join('/');
 }
 export function readOnlyService(id: StorageProviderId): {
   read: (path: string) => Promise<Uint8Array>;
