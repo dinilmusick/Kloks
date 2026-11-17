@@ -68,7 +68,30 @@ try {
   const guttsPackageJsonPath = path.join(guttsPackageDir, 'package.json');
   if (!fs.existsSync(guttsPackageJsonPath)) throw new Error('Installed GutTS package was not found.');
   const guttsPackageJson = JSON.parse(fs.readFileSync(guttsPackageJsonPath, 'utf8'));
-  if (!/^2\.1\./.test(guttsPackageJson.version)) throw new Error('Expected published GutTS ^2.1.0; found ' + guttsPackageJson.version);
+  const pinnedGuttsVersion = pkg.dependencies?.['@dinilmusick/gutts'];
+  if (!/^\d+\.\d+\.\d+$/.test(pinnedGuttsVersion || ''))
+    throw new Error('Kloks must pin an exact GutTS version in package.json');
+  if (guttsPackageJson.version !== pinnedGuttsVersion)
+    throw new Error('Expected published GutTS ' + pinnedGuttsVersion + '; found ' + guttsPackageJson.version);
+  const safetyExport = guttsPackageJson.exports?.['./urls/safety'];
+  if (!safetyExport || typeof safetyExport !== 'object')
+    throw new Error('Installed GutTS lacks the canonical URL safety subpath');
+  for (const target of [safetyExport.types, safetyExport.import]) {
+    if (!target || !fs.existsSync(path.join(guttsPackageDir, target)))
+      throw new Error('Published GutTS URL safety export is missing: ' + String(target));
+  }
+  const safety = await import('@dinilmusick/gutts/urls/safety');
+  if (safety.normalizeStoragePath('/workspace/file') !== 'workspace/file')
+    throw new Error('Published GutTS path normalization is unavailable');
+  if (safety.resolveTrustedApiUrl('https://api.example.com', '/ok').origin !== 'https://api.example.com')
+    throw new Error('Published GutTS trusted-origin resolution is unavailable');
+  for (const bad of ['/a/%2e%2e/b', '/a/%252e%252e/b']) {
+    let rejected = false;
+    try { safety.normalizeStoragePath(bad); }
+    catch { rejected = true; }
+    if (!rejected) throw new Error('Published GutTS failed to reject encoded traversal');
+  }
+  console.log('GUTTS SAFETY ARTIFACT VERIFIED: ' + guttsPackageJson.version);
   const s3Export = guttsPackageJson.exports?.['./storage/s3'];
   const s3ExportPath = typeof s3Export === 'string' ? s3Export : s3Export?.import || s3Export?.default;
   if (!s3ExportPath || !fs.existsSync(path.join(guttsPackageDir, s3ExportPath))) {
