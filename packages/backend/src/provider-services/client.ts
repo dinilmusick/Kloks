@@ -6,6 +6,10 @@ const origins: Record<string, string> = {
   vercel: 'https://api.vercel.com',
   google: 'https://www.googleapis.com',
   'google-gemini': 'https://generativelanguage.googleapis.com',
+  'google-drive': 'https://www.googleapis.com',
+  github: 'https://api.github.com',
+  gitlab: 'https://gitlab.com',
+  dropbox: 'https://api.dropboxapi.com',
 };
 export interface ProviderRequest {
   path: string;
@@ -42,6 +46,10 @@ export function createProviderClient(connection: ProviderConnection, transport: 
     const secret = connection.credential.trim();
     if (id === 'google-gemini') headers['x-goog-api-key'] = secret;
     else headers.Authorization = 'Bearer ' + secret;
+    if (id === 'github') {
+      headers.Accept = 'application/vnd.github+json';
+      headers['X-GitHub-Api-Version'] = '2022-11-28';
+    }
     if (options.body !== undefined) headers['Content-Type'] = 'application/json';
     const response = await transport(target.toString(), {
       method: options.method || 'GET', headers,
