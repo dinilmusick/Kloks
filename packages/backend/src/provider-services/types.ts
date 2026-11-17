@@ -1,10 +1,12 @@
 /** Canonical provider/service identity and quota contracts. No secrets are persisted here. */
-export type ProviderCategory = 'deployment' | 'cloud' | 'ai' | 'storage' | 'developer';
+export type ProviderCategory = 'suite' | 'deployment' | 'cloud' | 'ai' | 'storage' | 'developer';
 export type ProviderStatus = 'ready' | 'catalogued' | 'excluded';
 export type CredentialMode = 'api-token' | 'api-key' | 'oauth2' | 'application-key';
 export type RenewalPolicy = 'daily' | 'monthly' | 'ongoing' | 'unknown' | 'trial';
 
 export interface ProviderDefinition {
+  /** A suite groups related service adapters and can expose its own identity API. */
+  kind?: 'suite' | 'service';
   id: string;
   name: string;
   category: ProviderCategory;
