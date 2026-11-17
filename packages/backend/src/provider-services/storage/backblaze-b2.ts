@@ -1,14 +1,14 @@
 import { b2ListBuckets, b2ListFileNames, b2DownloadFile, b2UploadFile }
   from '../../storage/B2DirectClient.js';
 import { normalizeStoragePath, UnsupportedStorageOperation } from './contract.js';
-import type { StorageService, StoragePage } from './contract.js';
+import type { CanonicalStorageService, StoragePage } from './contract.js';
 
 export interface B2StorageCredentials {
   readonly keyId: string;
   readonly applicationKey: string;
 }
 /** Reuses existing B2 APIs and preserves the provider's bucket/file boundary. */
-export function createBackblazeB2StorageService(creds: B2StorageCredentials): StorageService {
+export function createBackblazeB2StorageService(creds: B2StorageCredentials): CanonicalStorageService {
   if (!creds.keyId?.trim() || !creds.applicationKey?.trim())
     throw new Error('Backblaze application key and key ID required');
   const splitPath = (path: string): { bucket: string; file: string } => {

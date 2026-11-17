@@ -21,7 +21,7 @@ export interface StorageCapabilities {
   write: boolean;
   delete: boolean;
 }
-export interface StorageService {
+export interface CanonicalStorageService {
   readonly providerId: StorageProviderId;
   readonly capabilities: Readonly<StorageCapabilities>;
   list(path?: string, cursor?: string): Promise<StoragePage>;
@@ -37,7 +37,7 @@ export class UnsupportedStorageOperation extends Error {
   }
 }
 /** Check capability before performing an operation; no stubs or false support. */
-export function assertStorageOperation(service: StorageService, operation: StorageOperation): void {
+export function assertStorageOperation(service: CanonicalStorageService, operation: StorageOperation): void {
   if (!service.capabilities[operation])
     throw new UnsupportedStorageOperation(service.providerId, operation);
 }

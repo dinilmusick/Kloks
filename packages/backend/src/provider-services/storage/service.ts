@@ -1,7 +1,7 @@
 import type { ProviderConnection } from '../types.js';
 import type { GoogleDriveWorkspaceOptions } from '../../storage/GoogleDriveWorkspaceService.js';
 import type { B2StorageCredentials } from './backblaze-b2.js';
-import type { StorageProviderId, StorageService, StorageCapabilities } from './contract.js';
+import type { StorageProviderId, CanonicalStorageService, StorageCapabilities } from './contract.js';
 import { createGitHubStorageService } from './github.js';
 import { createDropboxStorageService } from './dropbox.js';
 import { createBackblazeB2StorageService } from './backblaze-b2.js';
@@ -33,7 +33,7 @@ export function getCanonicalStorageCapabilities(id: StorageProviderId): Readonly
   return Object.freeze({ ...CONTRACTS[id] });
 }
 /** One runtime-neutral contract; no per-app provider SDK code is necessary. */
-export function createCanonicalStorageService(config: StorageServiceConfig): StorageService {
+export function createCanonicalStorageService(config: StorageServiceConfig): CanonicalStorageService {
   switch (config.providerId) {
     case 'github': return createGitHubStorageService(config.connection, config.transport);
     case 'dropbox': return createDropboxStorageService(config.connection, config.transport);

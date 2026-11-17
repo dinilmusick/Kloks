@@ -1,10 +1,10 @@
 import { GoogleDriveWorkspaceService } from '../../storage/GoogleDriveWorkspaceService.js';
 import type { GoogleDriveWorkspaceOptions } from '../../storage/GoogleDriveWorkspaceService.js';
 import { normalizeStoragePath } from './contract.js';
-import type { StorageService, StoragePage } from './contract.js';
+import type { CanonicalStorageService, StoragePage } from './contract.js';
 
 /** Delegates OAuth refresh, root-scoping and safe writes to canonical Drive implementation. */
-export function createGoogleDriveStorageService(options: GoogleDriveWorkspaceOptions): StorageService {
+export function createGoogleDriveStorageService(options: GoogleDriveWorkspaceOptions): CanonicalStorageService {
   const drive = new GoogleDriveWorkspaceService(options);
   return {
     providerId: 'google-drive',

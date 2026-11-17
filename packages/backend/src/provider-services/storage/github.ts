@@ -1,7 +1,7 @@
 import { listGitHubRepositories, listGitHubRepositoryContents } from '../storage-providers.js';
 import type { ProviderConnection } from '../types.js';
 import { normalizeStoragePath, UnsupportedStorageOperation } from './contract.js';
-import type { StorageService, StorageEntry, StoragePage } from './contract.js';
+import type { CanonicalStorageService, StorageEntry, StoragePage } from './contract.js';
 
 function splitRepo(path: string): { owner: string; repo: string; file: string } {
   const parts = normalizeStoragePath(path).split('/');
@@ -20,7 +20,7 @@ function toEntry(value: { name: string; path: string; type: string; sha?: string
 /** GitHub contents API: read/list only; commits require separate explicit revision semantics. */
 export function createGitHubStorageService(
   connection: ProviderConnection, transport: typeof fetch = fetch,
-): StorageService {
+): CanonicalStorageService {
   if (connection.providerId !== 'github') throw new Error('GitHub connection required');
   const capabilities = Object.freeze({ list: true, read: true, write: false, delete: false });
   return {

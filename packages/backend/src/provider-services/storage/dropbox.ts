@@ -1,7 +1,7 @@
 import { continueDropboxFolder, listDropboxFolder } from '../storage-providers.js';
 import type { ProviderConnection } from '../types.js';
 import { normalizeStoragePath } from './contract.js';
-import type { StorageService, StoragePage } from './contract.js';
+import type { CanonicalStorageService, StoragePage } from './contract.js';
 
 function toDropboxPath(path: string): string {
   const normalized = normalizeStoragePath(path);
@@ -31,7 +31,7 @@ async function contentRequest(
 }
 export function createDropboxStorageService(
   connection: ProviderConnection, transport: typeof fetch = fetch,
-): StorageService {
+): CanonicalStorageService {
   if (connection.providerId !== 'dropbox') throw new Error('Dropbox connection required');
   return {
     providerId: 'dropbox',
