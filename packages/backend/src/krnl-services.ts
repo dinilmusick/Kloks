@@ -15,6 +15,8 @@ import {
 } from '@ultrst-armada/krnl';
 import { loginSystemUser, resolveUserFromToken } from './auth/UnifiedAuthCore.js';
 import { queryUnifiedDb } from './core/unifiedDb.js';
+import { executeB2Explorer } from './core/b2ExplorerOperations.js';
+import type { B2ExplorerInput } from './core/b2ExplorerContext.js';
 import {
   deleteUserWorkspaceStorageFile,
   deleteUserWorkspaceStorageFolder,
@@ -164,6 +166,15 @@ export const StorageServiceDefinition: ServiceDefinition = createServiceDefiniti
         env?: Record<string, unknown>;
       }) =>
         createBackblazeStorageConnection(input, (sql, params) => queryUnifiedDb(sql, params, input.env)),
+    },
+    /**
+     * Connection-bound Explorer API. Never accepts direct provider credentials;
+     * all B2 calls resolve the verified user's encrypted canonical connection.
+     */
+    executeBackblazeExplorer: {
+      id: 'StorageService.executeBackblazeExplorer',
+      name: 'executeBackblazeExplorer',
+      handler: async (input: B2ExplorerInput) => executeB2Explorer(input),
     },
     listBackblazeConnectionBuckets: {
       id: 'StorageService.listBackblazeConnectionBuckets',
