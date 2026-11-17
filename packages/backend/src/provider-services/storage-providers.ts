@@ -32,11 +32,15 @@ function safeRepositoryPath(path: string): string {
 }
 
 export async function listGitHubRepositories(
-  connection: ProviderConnection, transport: typeof fetch = fetch,
+  connection: ProviderConnection, transport: typeof fetch = fetch, page = 1,
 ): Promise<Array<{ id: number; full_name: string; private: boolean }>> {
+  if (!Number.isSafeInteger(page) || page < 1 || page > 10000)
+    throw new Error('Invalid GitHub repositories page');
   const { data } = await createProviderClient(serviceConnection(connection, 'github'), transport)
     .request<Array<{ id: number; full_name: string; private: boolean }>>({
-      path: '/user/repos', query: { per_page: 100, affiliation: 'owner,collaborator,organization_member' },
+      path: '/user/repos', query: {
+        per_page: 100, page, affiliation: 'owner,collaborator,organization_member',
+      },
     });
   if (!Array.isArray(data)) throw new Error('Invalid GitHub repositories response');
   return data;

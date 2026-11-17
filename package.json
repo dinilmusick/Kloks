@@ -132,6 +132,66 @@
       "import": "./packages/backend/dist/provider-services/index.js",
       "default": "./packages/backend/dist/provider-services/index.js"
     },
+    "./provider-services/storage": {
+      "types": "./packages/backend/dist/provider-services/storage.d.ts",
+      "import": "./packages/backend/dist/provider-services/storage.js",
+      "default": "./packages/backend/dist/provider-services/storage.js"
+    },
+    "./provider-services/storage/node": {
+      "types": "./packages/backend/dist/provider-services/storage/node.d.ts",
+      "import": "./packages/backend/dist/provider-services/storage/node.js",
+      "default": "./packages/backend/dist/provider-services/storage/node.js"
+    },
+    "./provider-services/storage/github": {
+      "types": "./packages/backend/dist/provider-services/storage/github.d.ts",
+      "import": "./packages/backend/dist/provider-services/storage/github.js",
+      "default": "./packages/backend/dist/provider-services/storage/github.js"
+    },
+    "./provider-services/storage/backblaze-b2": {
+      "types": "./packages/backend/dist/provider-services/storage/backblaze-b2.d.ts",
+      "import": "./packages/backend/dist/provider-services/storage/backblaze-b2.js",
+      "default": "./packages/backend/dist/provider-services/storage/backblaze-b2.js"
+    },
+    "./provider-services/storage/dropbox": {
+      "types": "./packages/backend/dist/provider-services/storage/dropbox.d.ts",
+      "import": "./packages/backend/dist/provider-services/storage/dropbox.js",
+      "default": "./packages/backend/dist/provider-services/storage/dropbox.js"
+    },
+    "./provider-services/google": {
+      "types": "./packages/backend/dist/provider-services/google.d.ts",
+      "import": "./packages/backend/dist/provider-services/google.js",
+      "default": "./packages/backend/dist/provider-services/google.js"
+    },
+    "./provider-services/google/drive": {
+      "types": "./packages/backend/dist/provider-services/google/drive.d.ts",
+      "import": "./packages/backend/dist/provider-services/google/drive.js",
+      "default": "./packages/backend/dist/provider-services/google/drive.js"
+    },
+    "./provider-services/google/gemini": {
+      "types": "./packages/backend/dist/provider-services/google/gemini.d.ts",
+      "import": "./packages/backend/dist/provider-services/google/gemini.js",
+      "default": "./packages/backend/dist/provider-services/google/gemini.js"
+    },
+    "./provider-services/google/cloud-run": {
+      "types": "./packages/backend/dist/provider-services/google/cloud-run.d.ts",
+      "import": "./packages/backend/dist/provider-services/google/cloud-run.js",
+      "default": "./packages/backend/dist/provider-services/google/cloud-run.js"
+    },
+    "./provider-services/google/cloud-storage": {
+      "types": "./packages/backend/dist/provider-services/google/cloud-storage.d.ts",
+      "import": "./packages/backend/dist/provider-services/google/cloud-storage.js",
+      "default": "./packages/backend/dist/provider-services/google/cloud-storage.js"
+    },
+    "./provider-services/google/cloud-shell": {
+      "types": "./packages/backend/dist/provider-services/google/cloud-shell.d.ts",
+      "import": "./packages/backend/dist/provider-services/google/cloud-shell.js",
+      "default": "./packages/backend/dist/provider-services/google/cloud-shell.js"
+    },
+    "./provider-services/google/vertex-ai": {
+      "types": "./packages/backend/dist/provider-services/google/vertex-ai.d.ts",
+      "import": "./packages/backend/dist/provider-services/google/vertex-ai.js",
+      "default": "./packages/backend/dist/provider-services/google/vertex-ai.js"
+    },
     "./provider-services/node": {
       "types": "./packages/backend/dist/provider-services/node.d.ts",
       "import": "./packages/backend/dist/provider-services/node.js",
