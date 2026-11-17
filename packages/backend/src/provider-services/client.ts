@@ -1,3 +1,4 @@
+import { resolveTrustedApiUrl } from '@dinilmusick/gutts/urls/safety';
 import { getProviderService, resolveProviderServiceId } from './registry.js';
 import type { ProviderConnection } from './types.js';
 
@@ -34,12 +35,7 @@ export function createProviderClient(connection: ProviderConnection, transport: 
     throw new Error('A vault account and credential are required');
 
   async function request<T = unknown>(options: ProviderRequest): Promise<ProviderResponse<T>> {
-    if (!options.path.startsWith('/') || options.path.startsWith('//')
-        || options.path.includes('\\') || options.path.includes('#'))
-      throw new Error('Only provider-relative API paths are permitted');
-    const target = new URL(options.path, origin);
-    if (target.origin !== origin || /(?:^|\/)\.\.(?:\/|$)/.test(decodeURIComponent(target.pathname)))
-      throw new Error('Provider URL crossed the allowed origin');
+    const target = resolveTrustedApiUrl(origin, options.path);
     for (const [key, value] of Object.entries(options.query || {}))
       target.searchParams.set(key, String(value));
     const headers: Record<string, string> = { Accept: 'application/json' };

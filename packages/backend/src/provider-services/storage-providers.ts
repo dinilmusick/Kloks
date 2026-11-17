@@ -1,4 +1,5 @@
 /** Read-only storage/service discovery adapters. Account credentials stay in SRKL. */
+import { encodeSafePathSegments } from '@dinilmusick/gutts/urls/safety';
 import { createProviderClient } from './client.js';
 import { resolveProviderServiceId } from './registry.js';
 import type { ProviderConnection } from './types.js';
@@ -24,13 +25,6 @@ function githubName(value: string): string {
     throw new Error('Invalid GitHub repository owner or name');
   return value;
 }
-function safeRepositoryPath(path: string): string {
-  const parts = path.split('/');
-  if (parts.some(part => part === '' || part === '.' || part === '..'))
-    throw new Error('Invalid repository path');
-  return parts.map(encodeURIComponent).join('/');
-}
-
 export async function listGitHubRepositories(
   connection: ProviderConnection, transport: typeof fetch = fetch, page = 1,
 ): Promise<Array<{ id: number; full_name: string; private: boolean }>> {
@@ -49,7 +43,7 @@ export async function listGitHubRepositoryContents(
   connection: ProviderConnection, owner: string, repo: string, path = '',
   transport: typeof fetch = fetch,
 ): Promise<unknown> {
-  const suffix = path ? '/' + safeRepositoryPath(path) : '';
+  const suffix = path ? '/' + encodeSafePathSegments(path) : '';
   const { data } = await createProviderClient(serviceConnection(connection, 'github'), transport)
     .request({
       path: `/repos/${githubName(owner)}/${githubName(repo)}/contents${suffix}`,
@@ -72,7 +66,7 @@ export async function listGitLabRepositoryTree(
 ): Promise<Array<{ id: string; name: string; type: string }>> {
   const key = String(project).trim();
   if (!key || key.includes('?') || key.includes('#')) throw new Error('GitLab project required');
-  if (path) safeRepositoryPath(path);
+  if (path) encodeSafePathSegments(path);
   const { data } = await createProviderClient(serviceConnection(connection, 'gitlab'), transport)
     .request<Array<{ id: string; name: string; type: string }>>({
       path: `/api/v4/projects/${encodeURIComponent(key)}/repository/tree`,

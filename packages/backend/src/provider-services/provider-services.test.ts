@@ -35,6 +35,17 @@ describe('canonical provider services', () => {
     await expect(client.request({ path: '//attacker.invalid/path' })).rejects.toThrow();
     expect(transport).not.toHaveBeenCalled();
   });
+  it('rejects encoded API traversal before sending account credentials', async () => {
+    const transport = vi.fn<typeof fetch>();
+    const client = createProviderClient({
+      providerId: 'gitlab', accountId: 'a', credential: 'secret',
+    }, transport);
+    for (const path of ['/api/%2e%2e/escape','/api/%252e%252e/escape',
+      '/api/../escape','/\\bad.test/path']) {
+      await expect(client.request({ path })).rejects.toThrow();
+    }
+    expect(transport).not.toHaveBeenCalled();
+  });
   it('uses a UTC daily Cloudflare quota with provider-reported zero, not synthetic traffic', async () => {
     const transport = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(JSON.stringify({ data: { viewer: { accounts: [
