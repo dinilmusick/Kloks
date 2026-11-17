@@ -13,6 +13,11 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./ui-session": {
+      "types": "./dist/api/uiSession.d.ts",
+      "import": "./dist/api/uiSession.js",
+      "default": "./dist/api/uiSession.js"
+    },
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts",

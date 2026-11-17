@@ -26,6 +26,11 @@
     "scripts/normalize-package-declarations.mjs"
   ],
   "exports": {
+    "./backend/ui-session": {
+      "types": "./packages/backend/dist/api/uiSession.d.ts",
+      "import": "./packages/backend/dist/api/uiSession.js",
+      "default": "./packages/backend/dist/api/uiSession.js"
+    },
     ".": {
       "types": "./index.d.ts",
       "import": "./index.js",
