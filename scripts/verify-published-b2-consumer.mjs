@@ -49,7 +49,10 @@ try {
   writeFileSync(join(consumer, 'package.json'), JSON.stringify({
     name: 'kloks-registry-consumer-smoke', private: true, type: 'module',
   }));
-  run(['install', '--ignore-scripts', '--no-audit', '--no-fund', '--no-save', tarballPath], consumer);
+  // Krnl is an intentionally optional peer in Kloks metadata but is required
+  // by the /backend/krnl-services entrypoint. Install the actual public peer.
+  run(['install', '--ignore-scripts', '--no-audit', '--no-fund', '--no-save',
+    tarballPath, '@ultrst-armada/krnl@^1.0.11'], consumer);
 
   const script = String.raw`
     import assert from 'node:assert/strict';
