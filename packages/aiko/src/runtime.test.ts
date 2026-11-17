@@ -40,3 +40,28 @@ it('resolves natural-language input before executing the agent tool',async()=>{
  await runtime.executeAgent('aiko-endpoint-api','do it');
  expect(received).toEqual({value:42});
 });
+
+it('invalidates previously discovered tools after revocation and uses only the current binding', async () => {
+ const original = { id: 'api', name: 'API', sourceKind: 'endpoint' as const, sourceId: 'api',
+  execute: async () => 'old' };
+ let capabilities = [original];
+ const runtime = new AikoRuntime({
+  capabilities: () => capabilities,
+  resolver: { resolve: () => ({ spec: {} }) },
+  keys: { listKeys: async () => [], getActiveKey: async () => null, rotateKey: async () => null, syncFromAikoEngine: async () => ({ synced: 0 }) },
+ });
+ const [agent] = await runtime.listAgents();
+ const custom = await runtime.createCustomAgent('Saved', ['api']);
+ capabilities = [{ ...original, execute: async () => 'current' }];
+ await expect(agent.tool.execute({})).resolves.toBe('current');
+ await expect(runtime.executeAgent(custom.id, { toolId: 'api', input: {} })).resolves.toBe('current');
+
+ capabilities = [{ ...original, sourceId: 'different-operation' }];
+ await expect(agent.tool.execute({})).rejects.toThrow('no longer permitted');
+ await expect(runtime.executeAgent(custom.id, { toolId: 'api', input: {} })).rejects.toThrow('no longer permitted');
+ await expect(runtime.createCustomAgent('Mixed', ['api', 'unknown'])).rejects.toThrow('permitted capabilities');
+
+ capabilities = [];
+ expect((await runtime.listAgents()).map(item => item.id)).toEqual([custom.id]);
+ await expect(runtime.executeAgent(agent.id, {})).rejects.toThrow('not found');
+});
