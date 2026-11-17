@@ -7,6 +7,7 @@ export interface AikoTool {
   name:string;
   description?:string;
   inputSchema?:unknown;
+  validateInput?:(input:unknown)=>readonly string[];
   execute:(input:unknown)=>Promise<unknown>;
   sourceKind:AikoSourceKind;
   sourceId:string;
@@ -34,7 +35,24 @@ export interface AikoCapability {
   sourceKind:AikoSourceKind;
   sourceId:string;
   inputSchema?:unknown;
+  validateInput?:(input:unknown)=>readonly string[];
   execute:(input:unknown)=>Promise<unknown>;
+}
+
+export type AikoNaturalLanguageCandidate =
+  | { readonly status: 'inputs'; readonly input: unknown }
+  | { readonly status: 'clarification'; readonly question: string };
+
+export type AikoNaturalLanguageResult =
+  | { readonly status: 'completed'; readonly output: unknown }
+  | { readonly status: 'clarification'; readonly question: string; readonly issues?: readonly string[] };
+
+export interface AikoNaturalLanguageTarget {
+  readonly name: string;
+  readonly description: string;
+  readonly inputSchema: unknown;
+  readonly intelligenceSpec: AikoIntelligenceSpec;
+  readonly intelligenceSpecId?: string;
 }
 
 export interface AikoKey {
@@ -64,5 +82,6 @@ export interface AikoRuntimeOptions {
   capabilities:(()=>Promise<AikoCapability[]>|AikoCapability[])|AikoCapability[];
   resolver:AikoIntelligenceResolver;
   resolveNaturalLanguage?: (agent:AikoAgentDefinition,input:string)=>Promise<unknown>;
+  parseNaturalLanguage?: (target:AikoNaturalLanguageTarget,input:string)=>Promise<AikoNaturalLanguageCandidate>;
   keys:AikoKeyRuntime;
 }

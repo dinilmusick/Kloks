@@ -65,3 +65,33 @@ it('invalidates previously discovered tools after revocation and uses only the c
  expect((await runtime.listAgents()).map(item => item.id)).toEqual([custom.id]);
  await expect(runtime.executeAgent(agent.id, {})).rejects.toThrow('not found');
 });
+
+it('executes typed conversational input only after schema validation and a live grant check', async () => {
+ const delivered: unknown[] = [];
+ const capability = {
+  id: 'integer', name: 'Integer', sourceKind: 'endpoint' as const, sourceId: 'integer',
+  inputSchema: { type: 'integer' },
+  validateInput: (input: unknown) => Number.isInteger(input) ? [] : ['$ must be an integer'],
+  execute: async (input: unknown) => { delivered.push(input); return input; },
+ };
+ let allowed = true;
+ const runtime = new AikoRuntime({
+  capabilities: () => allowed ? [capability] : [],
+  resolver: { resolve: () => ({ spec: {}, specId: 'typed-input' }) },
+  parseNaturalLanguage: async (target, prompt) => {
+   expect(target.intelligenceSpecId).toBe('typed-input');
+   expect(target.inputSchema).toEqual({ type: 'integer' });
+   expect(target).not.toHaveProperty('execute');
+   if (prompt === 'which number?') return { status: 'clarification', question: 'Which integer?' };
+   if (prompt === 'revoke during parsing') allowed = false;
+   return { status: 'inputs', input: prompt === 'bad type' ? '16' : 16 };
+  },
+  keys: { listKeys: async () => [], getActiveKey: async () => null, rotateKey: async () => null, syncFromAikoEngine: async () => ({ synced: 0 }) },
+ });
+ const id = 'aiko-endpoint-integer';
+ await expect(runtime.executeAgentFromNaturalLanguage(id, 'I want to put in 16')).resolves.toEqual({ status: 'completed', output: 16 });
+ await expect(runtime.executeAgentFromNaturalLanguage(id, 'bad type')).resolves.toMatchObject({ status: 'clarification', issues: ['$ must be an integer'] });
+ await expect(runtime.executeAgentFromNaturalLanguage(id, 'which number?')).resolves.toEqual({ status: 'clarification', question: 'Which integer?' });
+ await expect(runtime.executeAgentFromNaturalLanguage(id, 'revoke during parsing')).rejects.toThrow('no longer permitted');
+ expect(delivered).toEqual([16]);
+});

@@ -1,4 +1,4 @@
-import type { AikoAgentDefinition, AikoCapability, AikoRuntimeOptions, AikoTool } from './types.js';
+import type { AikoAgentDefinition, AikoCapability, AikoNaturalLanguageResult, AikoRuntimeOptions, AikoTool } from './types.js';
 
 export class AikoRuntime {
   private readonly customAgents = new Map<string, AikoAgentDefinition>();
@@ -27,12 +27,50 @@ export class AikoRuntime {
   }
 
   async executeAgent(agentId: string, input: unknown): Promise<unknown> {
-    const agent = this.customAgents.get(agentId) ?? (await this.refreshAgents()).find(item => item.id === agentId);
-    if (!agent) throw new Error('Aiko agent not found: ' + agentId);
+    const agent = await this.requireAgent(agentId);
     const resolvedInput = typeof input === 'string' && this.options.resolveNaturalLanguage
       ? await this.options.resolveNaturalLanguage(agent, input)
       : input;
     return agent.tool.execute(resolvedInput);
+  }
+
+  /** Parse conversational input against a trusted, server-side capability contract. */
+  async executeAgentFromNaturalLanguage(agentId: string, input: string): Promise<AikoNaturalLanguageResult> {
+    const parse = this.options.parseNaturalLanguage;
+    if (!parse) throw new Error('Typed natural-language input is unavailable.');
+    const agent = await this.requireAgent(agentId);
+    const { tool } = agent;
+    if (tool.inputSchema === undefined || !tool.validateInput) {
+      throw new Error('This Aiko tool has no typed natural-language input contract.');
+    }
+    if (!input.trim()) return { status: 'clarification', question: 'What would you like to enter?' };
+
+    const candidate = await parse({
+      name: tool.name,
+      description: tool.description ?? agent.description,
+      inputSchema: tool.inputSchema,
+      intelligenceSpec: agent.intelligenceSpec,
+      intelligenceSpecId: agent.intelligenceSpecId,
+    }, input);
+    if (candidate?.status === 'clarification' && typeof candidate.question === 'string' && candidate.question.trim()) {
+      return { status: 'clarification', question: candidate.question.trim().slice(0, 500) };
+    }
+    if (candidate?.status !== 'inputs' || !Object.hasOwn(candidate, 'input')) {
+      return { status: 'clarification', question: 'Could you clarify the requested input?' };
+    }
+    const current = await this.requireCurrentCapability(tool);
+    if (current.inputSchema === undefined || !current.validateInput) {
+      throw new Error('This Aiko tool has no typed natural-language input contract.');
+    }
+    const issues = current.validateInput(candidate.input);
+    if (issues.length) return { status: 'clarification', question: 'Could you supply the required input in the expected format?', issues };
+    return { status: 'completed', output: await current.execute(candidate.input) };
+  }
+
+  private async requireAgent(agentId: string): Promise<AikoAgentDefinition> {
+    const agent = this.customAgents.get(agentId) ?? (await this.refreshAgents()).find(item => item.id === agentId);
+    if (!agent) throw new Error('Aiko agent not found: ' + agentId);
+    return agent;
   }
 
   async createCustomAgent(name: string, capabilityIds: string[], specId?: string): Promise<AikoAgentDefinition> {
@@ -92,18 +130,19 @@ export class AikoRuntime {
   }
 
   private guardCapability(capability: AikoCapability): AikoTool {
-    const { id, sourceKind, sourceId } = capability;
     return {
       ...capability,
-      execute: async input => {
-        const matches = (await this.listCapabilities()).filter(item => item.id === id);
-        const [current] = matches;
-        if (matches.length !== 1 || current.sourceKind !== sourceKind || current.sourceId !== sourceId) {
-          throw new Error('Aiko capability is no longer permitted.');
-        }
-        return current.execute(input);
-      },
+      execute: async input => (await this.requireCurrentCapability(capability)).execute(input),
     };
+  }
+
+  private async requireCurrentCapability({ id, sourceKind, sourceId }: AikoTool): Promise<AikoCapability> {
+    const matches = (await this.listCapabilities()).filter(item => item.id === id);
+    const [current] = matches;
+    if (matches.length !== 1 || current.sourceKind !== sourceKind || current.sourceId !== sourceId) {
+      throw new Error('Aiko capability is no longer permitted.');
+    }
+    return current;
   }
 
   listKeys() { return this.options.keys.listKeys(); }
