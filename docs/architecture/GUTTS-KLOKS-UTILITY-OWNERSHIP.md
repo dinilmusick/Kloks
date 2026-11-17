@@ -9,7 +9,7 @@ Kloks imports these utilities, preserving its previous public
 Google, GitHub, Dropbox and Backblaze APIs, account models, quota logic,
 authorization boundaries and KrnlTS facades remain in Kloks.
 
-GutTS 2.2.1 rejects nested encoded traversal and delimiter smuggling
+GutTS 2.2.2 rejects nested encoded traversal and delimiter smuggling
 without adding Node or provider SDK dependencies. Kloks's provider tests
 prove that invalid paths never reach the fetch transport carrying
 provider credentials. Valid GitLab encoded project names remain supported.
