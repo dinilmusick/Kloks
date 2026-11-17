@@ -95,3 +95,28 @@ it('executes typed conversational input only after schema validation and a live 
  await expect(runtime.executeAgentFromNaturalLanguage(id, 'revoke during parsing')).rejects.toThrow('no longer permitted');
  expect(delivered).toEqual([16]);
 });
+
+it('refreshes a saved agent’s selected spec before parsing and stops on revocation', async () => {
+  let reasoning = 3;
+  let revoked = false;
+  const deliveries: unknown[] = [];
+  const runtime = new AikoRuntime({
+    capabilities: [{
+      id: 'item', name: 'Item', sourceKind: 'endpoint', sourceId: 'item',
+      execute: async input => { deliveries.push(input); return input; },
+    }],
+    resolver: { resolve(specId) {
+      expect(specId).toBe('selected');
+      if (revoked) throw new Error('Central Aiko access was denied.');
+      return { spec: { reasoning } };
+    } },
+    resolveNaturalLanguage: async agent => ({ toolId: 'item', input: agent.intelligenceSpec.reasoning }),
+    keys: { listKeys: async () => [], getActiveKey: async () => null, rotateKey: async () => null, syncFromAikoEngine: async () => ({ synced: 0 }) },
+  });
+  const saved = await runtime.createCustomAgent('Saved', ['item'], 'selected');
+  reasoning = 8;
+  await expect(runtime.executeAgent(saved.id, 'use current settings')).resolves.toBe(8);
+  revoked = true;
+  await expect(runtime.executeAgent(saved.id, 'use current settings')).rejects.toThrow('access was denied');
+  expect(deliveries).toEqual([8]);
+});

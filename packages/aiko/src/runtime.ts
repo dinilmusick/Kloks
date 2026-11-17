@@ -68,7 +68,13 @@ export class AikoRuntime {
   }
 
   private async requireAgent(agentId: string): Promise<AikoAgentDefinition> {
-    const agent = this.customAgents.get(agentId) ?? (await this.refreshAgents()).find(item => item.id === agentId);
+    const saved = this.customAgents.get(agentId);
+    if (saved) {
+      if (!saved.intelligenceSpecId) return saved;
+      const current = await this.options.resolver.resolve(saved.intelligenceSpecId, { agent: saved, tool: saved.tool });
+      return { ...saved, intelligenceSpec: current.spec, intelligenceSpecId: current.specId ?? saved.intelligenceSpecId };
+    }
+    const agent = (await this.refreshAgents()).find(item => item.id === agentId);
     if (!agent) throw new Error('Aiko agent not found: ' + agentId);
     return agent;
   }
@@ -102,7 +108,7 @@ export class AikoRuntime {
       agentType: 'AIKO',
       tool,
       intelligenceSpec: resolved.spec,
-      intelligenceSpecId: resolved.specId,
+      intelligenceSpecId: resolved.specId ?? specId,
       sourceKind: 'custom',
       sourceId: name,
       allowedToolIds: [...grants],
