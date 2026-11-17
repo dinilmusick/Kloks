@@ -24,7 +24,8 @@ describe('canonical storage API contract', () => {
       credentials: { keyId: '', applicationKey: '' } })).toThrow();
   });
   it('validates path boundaries and does not create phantom Google child services', () => {
-    for (const path of ['/a/../b', '/a/./b', '/a\\b', '/a?b', '/a#b'])
+    for (const path of ['/a/../b', '/a/./b', '/a\\b', '/a?b', '/a#b',
+      '/a/%2525252e%2525252e/b', '/a/%252f/b', '/a/%2f/b'])
       expect(() => normalizeStoragePath(path)).toThrow();
     expect(normalizeStoragePath('/team/folder/')).toBe('team/folder');
     for (const unsafe of ['/a/%2e%2e/b','/a/%252e%252e/b','/a/%2f/b'])

@@ -46,6 +46,22 @@ describe('canonical provider services', () => {
     }
     expect(transport).not.toHaveBeenCalled();
   });
+  it('rejects nested traversal before including provider credentials', async () => {
+    const transport = vi.fn<typeof fetch>();
+    const client = createProviderClient({
+      providerId: 'github', accountId: 'a', credential: 'secret',
+    }, transport);
+    for (const path of [
+      '/api/%2525252e%2525252e/secret', '/api/team%2F..%2Fsecret',
+      '/api/%252f..%252fsecret', '/api/%3fquery', '//other.example/secret',
+    ]) await expect(client.request({ path })).rejects.toThrow();
+    expect(transport).not.toHaveBeenCalled();
+    const gitlab = createProviderClient({
+      providerId: 'gitlab', accountId: 'a', credential: 'secret',
+    }, vi.fn<typeof fetch>().mockResolvedValue(new Response('{}', { status: 200 })));
+    await expect(gitlab.request({ path: '/api/v4/projects/team%2Frepo' }))
+      .resolves.toMatchObject({ status: 200 });
+  });
   it('uses a UTC daily Cloudflare quota with provider-reported zero, not synthetic traffic', async () => {
     const transport = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(JSON.stringify({ data: { viewer: { accounts: [
