@@ -32,6 +32,11 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      - name: Diagnose GutTS 2.2.1 registry tarball
+        run: |
+          npm view @dinilmusick/gutts@2.2.1 version dist.tarball dist.integrity --json
+          npm pack @dinilmusick/gutts@2.2.1 --dry-run --json > /tmp/gutts-registry-pack.json
+          node -e "const a=require('/tmp/gutts-registry-pack.json');console.log(JSON.stringify({name:a[0]?.name,version:a[0]?.version,integrity:a[0]?.integrity}))"
       - name: Install from frozen lockfile
         run: pnpm install --frozen-lockfile
       - name: Build
