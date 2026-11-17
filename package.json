@@ -1,6 +1,6 @@
 {
   "name": "@ultrst-armada/kloks",
-  "version": "2.0.5",
+  "version": "2.1.0",
   "private": false,
   "publishConfig": {
     "access": "public",
@@ -158,9 +158,9 @@
       "default": "./packages/backend/dist/provider-services/storage/dropbox.js"
     },
     "./provider-services/google": {
-      "types": "./packages/backend/dist/provider-services/google.d.ts",
-      "import": "./packages/backend/dist/provider-services/google.js",
-      "default": "./packages/backend/dist/provider-services/google.js"
+      "types": "./packages/backend/dist/provider-services/google/index.d.ts",
+      "import": "./packages/backend/dist/provider-services/google/index.js",
+      "default": "./packages/backend/dist/provider-services/google/index.js"
     },
     "./provider-services/google/drive": {
       "types": "./packages/backend/dist/provider-services/google/drive.d.ts",

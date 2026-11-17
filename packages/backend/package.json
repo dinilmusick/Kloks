@@ -114,9 +114,9 @@
       "default": "./dist/provider-services/storage/dropbox.js"
     },
     "./provider-services/google": {
-      "types": "./dist/provider-services/google.d.ts",
-      "import": "./dist/provider-services/google.js",
-      "default": "./dist/provider-services/google.js"
+      "types": "./dist/provider-services/google/index.d.ts",
+      "import": "./dist/provider-services/google/index.js",
+      "default": "./dist/provider-services/google/index.js"
     },
     "./provider-services/google/drive": {
       "types": "./dist/provider-services/google/drive.d.ts",
