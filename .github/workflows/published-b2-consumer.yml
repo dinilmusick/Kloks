@@ -1,0 +1,23 @@
+name: Published B2 registry consumer evidence
+on:
+  pull_request:
+    paths:
+      - scripts/verify-published-b2-consumer.mjs
+      - .github/workflows/published-b2-consumer.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org/
+      - name: Verify npm SRI, consumer install and canonical Backblaze export
+        run: node scripts/verify-published-b2-consumer.mjs
