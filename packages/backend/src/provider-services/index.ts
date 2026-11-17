@@ -6,3 +6,4 @@ export * from './client.js';
 export * from './cloudflare.js';
 export * from './vercel.js';
 export * from './gemini.js';
+export * from './operations.js';

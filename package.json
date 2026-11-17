@@ -127,6 +127,11 @@
       "import": "./packages/backend/dist/development/playwrightInspectionService.js",
       "default": "./packages/backend/dist/development/playwrightInspectionService.js"
     },
+    "./provider-services": {
+      "types": "./packages/backend/dist/provider-services/index.d.ts",
+      "import": "./packages/backend/dist/provider-services/index.js",
+      "default": "./packages/backend/dist/provider-services/index.js"
+    },
     "./ai-provider": {
       "types": "./packages/backend/dist/ai-provider/index.d.ts",
       "import": "./packages/backend/dist/ai-provider/index.js",

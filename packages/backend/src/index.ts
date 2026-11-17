@@ -10,3 +10,5 @@ export type {
   Runtime, Deployment, FunctionSet, ServiceFacade, OrchestrationFn,
   BackendFacade, ServiceRegistryRecord,
 } from './architecture/types.js';
+
+export * from './provider-services/index.js';

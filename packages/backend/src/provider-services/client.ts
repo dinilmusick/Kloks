@@ -4,6 +4,7 @@ import type { ProviderConnection } from './types.js';
 const origins: Record<string, string> = {
   cloudflare: 'https://api.cloudflare.com',
   vercel: 'https://api.vercel.com',
+  google: 'https://www.googleapis.com',
   'google-gemini': 'https://generativelanguage.googleapis.com',
 };
 export interface ProviderRequest {
