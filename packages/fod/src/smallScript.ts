@@ -51,7 +51,15 @@ function utf8Length(text: string): number {
 /** Sanitizes values through the JSON boundary; functions, cycles and oversized values are rejected. */
 export function jsonBoundary(value: unknown, maxBytes: number, label: string): unknown {
   let encoded: string | undefined;
-  try { encoded = JSON.stringify(value); }
+  try {
+    encoded = JSON.stringify(value, (_key, item: unknown) => {
+      if (item === undefined || typeof item === 'function' || typeof item === 'symbol' ||
+          (typeof item === 'number' && !Number.isFinite(item))) {
+        throw new TypeError('Invalid JSON value');
+      }
+      return item;
+    });
+  }
   catch { throw new SmallScriptLimitError('INVALID_JSON', label + ' must be valid JSON.'); }
   if (encoded === undefined) throw new SmallScriptLimitError('INVALID_JSON', label + ' must be JSON serializable.');
   if (utf8Length(encoded) > maxBytes) {
@@ -70,6 +78,12 @@ export async function executeSmallScript(
   limits: Readonly<SmallScriptLimits> = DEFAULT_SMALL_SCRIPT_LIMITS,
 ): Promise<unknown> {
   if (!executor) throw new SmallScriptLimitError('EXECUTOR_UNAVAILABLE', 'Isolated JavaScript executor is not configured.');
+  for (const key of ['sourceBytes', 'inputBytes', 'outputBytes', 'heapBytes', 'wallMs', 'maxInterruptChecks'] as const) {
+    if (!Number.isSafeInteger(limits[key]) || limits[key] < 1 || limits[key] > DEFAULT_SMALL_SCRIPT_LIMITS[key]) {
+      throw new SmallScriptLimitError('INVALID_LIMITS', 'Invalid JavaScript execution budget for ' + key + '.');
+    }
+  }
+  if (limits.maxAttempts !== 1) throw new SmallScriptLimitError('INVALID_LIMITS', 'JavaScript execution allows one attempt.');
   if (typeof code !== 'string' || !code.trim()) {
     throw new SmallScriptLimitError('INVALID_SCRIPT', 'JavaScript source must be a non-empty string.');
   }
@@ -78,6 +92,9 @@ export async function executeSmallScript(
   }
   if (signal?.aborted) throw new SmallScriptLimitError('CANCELLED', 'Execution was cancelled.');
   const cleanInputs = jsonBoundary(input, limits.inputBytes, 'JavaScript input') as Record<string, unknown>;
+  if (!cleanInputs || typeof cleanInputs !== 'object' || Array.isArray(cleanInputs)) {
+    throw new SmallScriptLimitError('INVALID_JSON', 'JavaScript input must be a JSON object.');
+  }
   // The engine invokes exactly once; node retries require a separate audited invocation.
   const output = await executor.execute({ code, inputs: cleanInputs, limits, signal });
   return jsonBoundary(output, limits.outputBytes, 'JavaScript output');

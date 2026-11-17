@@ -59,9 +59,11 @@ describe('bounded FOD JavaScript nodes', () => {
   it('requires interpreter-enforced heap and interrupt limits and disposes runtime', async () => {
     const hooks = { interrupt: undefined as undefined | (() => boolean), memory: 0, stack: 0, disposed: false, code: '' };
     const value = { dispose: vi.fn() };
+    const setup = { dispose: vi.fn() };
     const ctx = {
-      evalCode: vi.fn((source: string) => { hooks.code = source; return { value }; }),
-      dump: vi.fn(() => JSON.stringify({ result: 17 })),
+      evalCode: vi.fn((source: string) => { hooks.code = source; return { value }; }).mockReturnValueOnce({ value: setup }),
+      typeof: () => 'string',
+      getString: vi.fn(() => JSON.stringify({ result: 17 })),
       dispose: vi.fn(),
     };
     const runtime = {
@@ -80,6 +82,7 @@ describe('bounded FOD JavaScript nodes', () => {
     expect(hooks.interrupt?.()).toBe(false);
     expect(ctx.dispose).toHaveBeenCalledOnce();
     expect(value.dispose).toHaveBeenCalledOnce();
+    expect(setup.dispose).toHaveBeenCalledOnce();
     expect(hooks.disposed).toBe(true);
   });
 });

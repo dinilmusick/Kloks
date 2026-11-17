@@ -69,6 +69,7 @@ export interface FodExecutionEvent {
   timestamp:number;
   flowId:string;
   nodeId?:string;
+  code?:string;
   data?:unknown;
 }
 
@@ -77,7 +78,7 @@ export interface FodExecutionResult {
   flowId:string;
   output:unknown;
   outputs:Record<string,unknown>;
-  errors:Array<{nodeId?:string;message:string}>;
+  errors:Array<{nodeId?:string;message:string;code?:string}>;
   events:FodExecutionEvent[];
 }
 

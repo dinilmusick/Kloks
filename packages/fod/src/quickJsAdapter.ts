@@ -13,7 +13,8 @@ export interface QuickJsModule {
 interface QuickJsHandle { dispose(): void }
 interface QuickJsContext {
   evalCode(code: string): { value?: QuickJsHandle; error?: QuickJsHandle };
-  dump(handle: QuickJsHandle): unknown;
+  typeof(handle: QuickJsHandle): string;
+  getString(handle: QuickJsHandle): string;
   dispose(): void;
 }
 interface QuickJsRuntime {
@@ -24,51 +25,106 @@ interface QuickJsRuntime {
   dispose(): void;
 }
 
-export function createQuickJsSmallScriptExecutor(load: () => Promise<QuickJsModule>): SmallScriptExecutor {
+
+const LOCK_DOWN = `
+  for (const fn of [function () {}, async function () {}, function* () {}, async function* () {}]) {
+    Object.defineProperty(Object.getPrototypeOf(fn), 'constructor', {
+      value: undefined, writable: false, configurable: false,
+    });
+  }
+  for (const name of ['eval', 'Function']) {
+    Object.defineProperty(globalThis, name, {
+      value: undefined, writable: false, configurable: false,
+    });
+  }
+`;
+
+/** The host clock must advance during synchronous Wasm execution. */
+export function createQuickJsSmallScriptExecutor(
+  load: () => Promise<QuickJsModule>,
+  now: () => number = () => performance.now(),
+): SmallScriptExecutor {
   return {
     async execute({ code, inputs, limits, signal }: SmallScriptRequest): Promise<unknown> {
-      if (signal?.aborted) throw new SmallScriptLimitError('CANCELLED', 'Execution was cancelled.');
-      const quickjs = await load();
+      checkCancellation(signal);
+      let quickjs: QuickJsModule;
+      try {
+        quickjs = await load();
+      } catch {
+        checkCancellation(signal);
+        throw new SmallScriptLimitError('EXECUTOR_UNAVAILABLE', 'Isolated JavaScript interpreter could not be loaded.');
+      }
+      checkCancellation(signal);
+      const started = now();
       const runtime = quickjs.newRuntime();
-      const started = Date.now();
       let checks = 0;
       let interrupted = false;
       let vm: QuickJsContext | undefined;
+      const checkBudget = () => {
+        checkCancellation(signal);
+        if (interrupted || now() - started >= limits.wallMs) {
+          throw new SmallScriptLimitError('SCRIPT_INTERRUPTED', 'JavaScript execution budget exhausted.');
+        }
+      };
       try {
         runtime.setMemoryLimit(limits.heapBytes);
-        runtime.setMaxStackSize(1024 * 1024);
+        runtime.setMaxStackSize(256 * 1024);
         runtime.setInterruptHandler(() => {
           checks += 1;
-          interrupted = Boolean(signal?.aborted) || checks > limits.maxInterruptChecks ||
-            Date.now() - started >= limits.wallMs;
+          interrupted ||= Boolean(signal?.aborted) || checks >= limits.maxInterruptChecks ||
+            now() - started >= limits.wallMs;
           return interrupted;
         });
         vm = runtime.newContext();
-        // No host functions, process, network, filesystem or API credentials are installed.
-        // Execute JS in QuickJS, NOT in the hosting Worker's/Node's JS realm.
+
+        // Run hardening separately so user source cannot alter its parse scope.
+        const setup = vm.evalCode(LOCK_DOWN);
+        try {
+          checkBudget();
+          if (setup.error || !setup.value) {
+            throw new SmallScriptLimitError('EXECUTOR_UNAVAILABLE', 'JavaScript sandbox initialization failed.');
+          }
+        } finally {
+          setup.error?.dispose();
+          setup.value?.dispose();
+        }
+
+        // Parse the input as JSON data. An object literal treats "__proto__" as syntax.
         const wrapper = [
-          '(function() { "use strict";',
-          'const inputs = ' + JSON.stringify(inputs) + ';',
-          'const result = (function() {',
+          '(function () { "use strict";',
+          'const stringify = JSON.stringify;',
+          'const inputs = JSON.parse(' + JSON.stringify(JSON.stringify(inputs)) + ');',
+          'const result = (function () {',
           code,
           '})();',
-          'if (result && typeof result.then === "function") throw new Error("ASYNC_NOT_SUPPORTED");',
-          'const text = JSON.stringify(result);',
-          'if (typeof text !== "string") throw new Error("INVALID_JSON_OUTPUT");',
-          'return text;',
+          'if (result && typeof result.then === "function") return undefined;',
+          'return stringify(result, (_key, value) => {',
+          '  if (value === undefined || typeof value === "function" || typeof value === "symbol" ||',
+          '      (typeof value === "number" && !Number.isFinite(value))) throw new TypeError();',
+          '  return value;',
+          '});',
           '})()',
         ].join('\n');
         const result = vm.evalCode(wrapper);
         try {
+          checkBudget();
+          // Never inspect a guest exception, which may contain getters or proxies.
           if (result.error) {
-            const error = vm.dump(result.error) as {message?:string} | string | null;
-            if (interrupted) throw new SmallScriptLimitError('SCRIPT_INTERRUPTED', 'JavaScript execution budget exhausted.');
-            throw new SmallScriptLimitError('SCRIPT_ERROR', typeof error === 'string' ? error : String(error?.message || 'JavaScript execution failed.'));
+            throw new SmallScriptLimitError('SCRIPT_ERROR', 'JavaScript execution failed.');
           }
-          if (!result.value) throw new SmallScriptLimitError('INVALID_JSON', 'JavaScript returned no JSON value.');
-          const encoded = vm.dump(result.value);
-          if (typeof encoded !== 'string') throw new SmallScriptLimitError('INVALID_JSON', 'JavaScript returned an invalid JSON value.');
-          return JSON.parse(encoded) as unknown;
+          if (!result.value || vm.typeof(result.value) !== 'string') {
+            throw new SmallScriptLimitError('INVALID_JSON', 'JavaScript must return synchronous JSON data.');
+          }
+          const encoded = vm.getString(result.value);
+          checkBudget();
+          if (new TextEncoder().encode(encoded).byteLength > limits.outputBytes) {
+            throw new SmallScriptLimitError('PAYLOAD_TOO_LARGE', 'JavaScript output exceeds its byte budget.');
+          }
+          try {
+            return JSON.parse(encoded) as unknown;
+          } catch {
+            throw new SmallScriptLimitError('INVALID_JSON', 'JavaScript returned invalid JSON.');
+          }
         } finally {
           result.error?.dispose();
           result.value?.dispose();
@@ -79,4 +135,8 @@ export function createQuickJsSmallScriptExecutor(load: () => Promise<QuickJsModu
       }
     },
   };
+}
+
+function checkCancellation(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new SmallScriptLimitError('CANCELLED', 'Execution was cancelled.');
 }
