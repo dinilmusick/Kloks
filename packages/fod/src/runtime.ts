@@ -1,3 +1,4 @@
+import { SMALL_SCRIPT_NODE, type SmallScriptExecutor } from './smallScript.js';
 import type {FodEndpointDescriptor,FodExecutionResult,FodFlow,FodNodeDefinition} from './types.js';
 import {FodFlowStore} from './flowStore.js';
 import {executeFodFlow} from './executor.js';
@@ -7,7 +8,7 @@ export class FodRuntime {
   private endpoints=new Map<string,FodEndpointDescriptor>();
   private nodes:FodNodeDefinition[]=[];
 
-  constructor(private readonly options:{workspaceId:string;workspaceService:any;onEvent?:(event:any)=>void}) {
+  constructor(private readonly options:{workspaceId:string;workspaceService:any;onEvent?:(event:any)=>void;scriptExecutor?:SmallScriptExecutor}) {
     this.flowStore=new FodFlowStore(options.workspaceService);
   }
 
@@ -16,7 +17,7 @@ export class FodRuntime {
     this.nodes=nodes;
   }
 
-  getNodeDefinitions():FodNodeDefinition[]{return [...this.nodes];}
+  getNodeDefinitions():FodNodeDefinition[]{return [SMALL_SCRIPT_NODE,...this.nodes.filter(node=>node.type!==SMALL_SCRIPT_NODE.type)];}
   getEndpoints():FodEndpointDescriptor[]{return [...this.endpoints.values()];}
 
   async listFlows():Promise<FodFlow[]> { return this.flowStore.list(this.options.workspaceId); }
@@ -26,6 +27,6 @@ export class FodRuntime {
   async executeFlow(flowId:string,input?:unknown):Promise<FodExecutionResult> {
     const flow=await this.getFlow(flowId);
     if(!flow) throw new Error(`FOD flow '${flowId}' not found.`);
-    return executeFodFlow(flow,this.endpoints,this.options.onEvent,input);
+    return executeFodFlow(flow,this.endpoints,this.options.onEvent,input,{scriptExecutor:this.options.scriptExecutor});
   }
 }
