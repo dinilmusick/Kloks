@@ -103,20 +103,55 @@ jobs:
         if: steps.registry.outputs.exists == 'false'
         run: npm publish --provenance --access public
 
-      - name: Independently verify npm publication
-        if: steps.registry.outputs.exists == 'false'
+      - name: Independently verify downloadable npm tarball
         env:
           PACKAGE_NAME: ${{ steps.package.outputs.name }}
           PACKAGE_VERSION: ${{ steps.package.outputs.version }}
+        shell: bash
         run: |
-          for attempt in $(seq 1 30); do
-            if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
-              echo "Verified ${PACKAGE_NAME}@${PACKAGE_VERSION} on npm."
-              exit 0
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          for attempt in $(seq 1 40); do
+            rm -f "$tmp"/*.tgz
+            cache="$(mktemp -d)"
+            if NPM_CONFIG_CACHE="$cache" npm pack "${PACKAGE_NAME}@${PACKAGE_VERSION}" --silent --pack-destination "$tmp" > "$tmp/pack.log" 2> "$tmp/pack.err"; then
+              tgz="$(find "$tmp" -maxdepth 1 -name '*.tgz' -print -quit)"
+              if [ -n "$tgz" ] && tar -tzf "$tgz" > "$tmp/contents"; then
+                required=(
+                  "package/packages/backend/dist/provider-services/index.js"
+                  "package/packages/backend/dist/provider-services/storage.js"
+                  "package/packages/backend/dist/provider-services/google/index.js"
+                )
+                valid=true
+                for target in "${required[@]}"; do
+                  if ! grep -Fx "$target" "$tmp/contents" >/dev/null; then
+                    echo "Published archive missing $target" >&2
+                    valid=false
+                  fi
+                done
+                if [ "$valid" = true ]; then
+                  tar -xOzf "$tgz" package/package.json > "$tmp/published.json"
+                  node -e '
+                    const fs = require("fs");
+                    const expected = JSON.parse(fs.readFileSync("package.json", "utf8"));
+                    const actual = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+                    if (expected.name !== actual.name || expected.version !== actual.version ||
+                        expected.dependencies?.["@dinilmusick/gutts"] !== actual.dependencies?.["@dinilmusick/gutts"])
+                      throw new Error("Published package metadata does not match verified source");
+                  ' "$tmp/published.json"
+                  echo "Verified downloadable ${PACKAGE_NAME}@${PACKAGE_VERSION} with expected provider APIs"
+                  rm -rf "$cache"
+                  exit 0
+                fi
+              fi
             fi
-            sleep 10
+            rm -rf "$cache"
+            echo "Archive not yet independently downloadable/complete: $attempt/40" >&2
+            tail -n 3 "$tmp/pack.err" >&2 || true
+            sleep 15
           done
-          echo "npm publication was not independently observable."
+          echo 'FATAL: npm metadata is visible, but package download/canonical exports remain unverified' >&2
           exit 1
       - name: Notify downstream consumers after successful upstream publication
         if: success() && steps.registry.outputs.exists == 'false'
