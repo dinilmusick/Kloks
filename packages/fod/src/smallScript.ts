@@ -1,3 +1,5 @@
+import type { FodNodeDefinition } from './types.js';
+
 /** Host-independent contract for the opt-in small-JavaScript workflow node.
  * No host eval/Function, Node APIs, or interpreter payload is imported here.
  * The interpreter must interrupt itself; a Promise timeout cannot stop a JS loop.
@@ -80,3 +82,15 @@ export async function executeSmallScript(
   const output = await executor.execute({ code, inputs: cleanInputs, limits, signal });
   return jsonBoundary(output, limits.outputBytes, 'JavaScript output');
 }
+
+/** Built-in node descriptor. Execution remains disabled until an isolated adapter is provided. */
+export const SMALL_SCRIPT_NODE: FodNodeDefinition = {
+  type: 'system/javascript',
+  label: 'JavaScript',
+  description: 'Run a small, bounded JavaScript transform using an isolated executor.',
+  category: 'system',
+  group: 'Code',
+  inputs: [{ id: 'input', name: 'Input', direction: 'input', dataType: 'any' }],
+  outputs: [{ id: 'result', name: 'Result', direction: 'output', dataType: 'any' }],
+  metadata: { requiresIsolatedExecutor: true, maxSourceBytes: DEFAULT_SMALL_SCRIPT_LIMITS.sourceBytes },
+};
