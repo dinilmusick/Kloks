@@ -4,7 +4,7 @@ import { getProviderService, getProviderServicePath, listProviderServiceTree,
 import { listDropboxFolder, continueDropboxFolder, listGitHubRepositories,
   listGitHubRepositoryContents, listGitLabProjects, listGitLabRepositoryTree,
   listBackblazeB2Buckets, GoogleDriveWorkspaceService } from './index.js';
-const mock = (value: unknown) => vi.fn<typeof fetch>().mockResolvedValue(
+const mock = (value: unknown) => vi.fn<typeof fetch>().mockImplementation(async () =>
   new Response(JSON.stringify(value), { status: 200 }),
 );
 const account = (providerId: string) => ({
