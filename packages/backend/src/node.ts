@@ -50,3 +50,5 @@ export * from './krnl-ai-services.js';
 
 
 export * from './development/wasmRuntimeService.js';
+
+export * from './provider-services/node.js';
