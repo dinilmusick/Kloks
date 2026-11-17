@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { resolveConnection, authorize, listBuckets, upload, download } = vi.hoisted(() => ({
+const { resolveConnection, listConnections, authorize, listBuckets, upload, download } = vi.hoisted(() => ({
   resolveConnection: vi.fn(),
+  listConnections: vi.fn(),
   authorize: vi.fn(),
   listBuckets: vi.fn(),
   upload: vi.fn(),
@@ -10,6 +11,7 @@ const { resolveConnection, authorize, listBuckets, upload, download } = vi.hoist
 
 vi.mock('./storageConnectionCore.js', () => ({
   resolveUserStorageConnectionSecret: resolveConnection,
+  listUserStorageConnections: listConnections,
 }));
 vi.mock('./unifiedDb.js', () => ({
   queryUnifiedDb: vi.fn(),
@@ -34,6 +36,7 @@ const auth = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  listConnections.mockResolvedValue([{ id: 'alice-b2', provider: 'backblaze_b2', b2BucketName: 'alice-archive' }]);
   resolveConnection.mockImplementation(async (userId: string, connectionId: string) =>
     userId === 'alice' && connectionId === 'alice-b2'
       ? { id: connectionId, provider: 'backblaze_b2', b2KeyId: 'private-key-id', b2ApplicationKey: 'private-app-key', enabled: true }
@@ -75,6 +78,9 @@ describe('owner-scoped canonical B2 Explorer', () => {
       expect(() => safeB2ExplorerPath(path)).toThrow(/path/);
       await expect(executeB2Explorer({ ...owner, action: 'uploadFile', bucketId: 'bucket-a', fileName: path, fileBase64: 'YQ==' })).rejects.toThrow(/path/);
     }
+    expect(() => safeB2ExplorerPath('unsafe\nheader')).toThrow(/path/);
+    expect(() => safeB2ExplorerPath('unsafe\rheader')).toThrow(/path/);
+    expect(() => safeB2ExplorerPath('unsafe\theader')).toThrow(/path/);
     expect(resolveConnection).not.toHaveBeenCalled();
   });
 
@@ -100,6 +106,47 @@ describe('owner-scoped canonical B2 Explorer', () => {
     expect(result).toEqual({ deletedCount: 1 });
     expect(transport).toHaveBeenCalledTimes(3);
     expect(transport.mock.calls[2][0]).toContain('b2_delete_file_version');
+  });
+
+  it('refuses to delete an owned bucket while any saved storage connection references it', async () => {
+    const providerFetch = vi.fn();
+    vi.stubGlobal('fetch', providerFetch);
+    await expect(executeB2Explorer({
+      ...owner, action: 'deleteBucket', bucketId: 'bucket-a',
+    })).rejects.toThrow(/saved workspace storage connection/);
+    expect(listConnections).toHaveBeenCalledWith('alice', expect.any(Function));
+    expect(providerFetch).not.toHaveBeenCalled();
+  });
+
+  it('propagates database failures before a destructive bucket deletion', async () => {
+    listConnections.mockRejectedValue(new Error('storage registry unavailable'));
+    const providerFetch = vi.fn();
+    vi.stubGlobal('fetch', providerFetch);
+    await expect(executeB2Explorer({
+      ...owner, action: 'deleteBucket', bucketId: 'bucket-a',
+    })).rejects.toThrow(/storage registry unavailable/);
+    expect(providerFetch).not.toHaveBeenCalled();
+  });
+
+  it('allows deletion only of an authorized bucket not referenced by a saved connection', async () => {
+    listBuckets.mockResolvedValue([
+      { bucketId: 'bucket-a', bucketName: 'alice-archive', bucketType: 'allPrivate' },
+      { bucketId: 'bucket-b', bucketName: 'temporary-bucket', bucketType: 'allPrivate' },
+    ]);
+    const providerFetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+    vi.stubGlobal('fetch', providerFetch);
+    await expect(executeB2Explorer({
+      ...owner, action: 'deleteBucket', bucketId: 'bucket-b',
+    })).resolves.toEqual({ success: true });
+    expect(providerFetch).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(providerFetch.mock.calls[0][1].body)).toMatchObject({ accountId: 'account-a', bucketId: 'bucket-b' });
+  });
+
+  it('rejects invalid runtime bucket types even when a TypeScript client circumvents its type', async () => {
+    await expect(executeB2Explorer({
+      ...owner, action: 'createBucket', bucketName: 'example123',
+      bucketType: 'unexpected' as any,
+    })).rejects.toThrow(/bucket type is invalid/);
   });
 
   it('fails when provider versions cannot be listed; never silently reports success', async () => {
