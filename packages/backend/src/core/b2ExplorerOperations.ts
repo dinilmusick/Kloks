@@ -6,6 +6,8 @@
 import {
   b2DownloadFile, b2UploadFile,
 } from './b2DirectCore.js';
+import { listUserStorageConnections } from './storageConnectionCore.js';
+import { queryUnifiedDb } from './unifiedDb.js';
 import {
   type B2ExplorerInput, type B2ExplorerContext,
   postB2Explorer, resolveB2ExplorerContext, safeB2ExplorerPath,
@@ -87,6 +89,9 @@ export async function executeB2Explorer(input: B2ExplorerInput): Promise<unknown
   if (action === 'createBucket') {
     const bucketName = required(input.bucketName, 'bucket name');
     if (!/^[A-Za-z0-9-]{6,50}$/.test(bucketName)) throw new Error('B2 bucket name is invalid.');
+    if (input.bucketType && !['allPrivate', 'allPublic'].includes(input.bucketType)) {
+      throw new Error('B2 bucket type is invalid.');
+    }
     // A key restricted to an existing bucket cannot create account-wide buckets.
     if (ctx.auth.allowed?.bucketId || ctx.auth.allowed?.bucketName || ctx.auth.allowed?.buckets?.length) {
       throw new Error('This B2 key is restricted to an existing bucket.');
@@ -97,6 +102,15 @@ export async function executeB2Explorer(input: B2ExplorerInput): Promise<unknown
   }
   const bucket = selectB2ExplorerBucket(ctx, input.bucketId, input.bucketName);
   if (action === 'deleteBucket') {
+    // Refuse to destroy a bucket referenced by a canonical user storage connection.
+    // Query errors fail closed rather than allowing unverified destructive operations.
+    const connections = await listUserStorageConnections(
+      input.userId, (sql, params) => queryUnifiedDb(sql, params, input.env),
+    );
+    if (connections.some(connection => connection.provider === 'backblaze_b2'
+      && (connection.b2BucketName === bucket.bucketName || connection.bucketName === bucket.bucketName))) {
+      throw new Error('Cannot delete a bucket assigned to a saved workspace storage connection.');
+    }
     await postB2Explorer(ctx.auth, 'b2_delete_bucket', {
       accountId: ctx.auth.accountId, bucketId: bucket.bucketId,
     });
