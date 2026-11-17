@@ -43,7 +43,7 @@ export interface B2ExplorerContext {
 }
 
 export function safeB2ExplorerPath(value: unknown): string {
-  if (typeof value !== 'string' || !value || value.startsWith('/') || value.includes('\\') || value.includes('\0')) {
+  if (typeof value !== 'string' || !value || value.startsWith('/') || value.includes('\\') || /[\\u0000-\\u001f\\u007f]/.test(value)) {
     throw new Error('B2 object path must be a safe relative path.');
   }
   if (value.split('/').some((part) => !part || part === '.' || part === '..')) {
