@@ -166,7 +166,7 @@ export async function b2DownloadFile(keyId: string, applicationKey: string, buck
   const encodedName = encodeURIComponent(fileName).replace(/%2F/g, '/');
   const res = await fetch(`${auth.downloadUrl}/file/${bucketName}/${encodedName}`, { headers: { Authorization: auth.authorizationToken } });
   if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`B2 download failed for ${fileName} (${res.status})`);
+  if (!res.ok) throw new Error(`B2 file download failed with HTTP ${res.status}.`);
   return new Uint8Array(await res.arrayBuffer());
 }
 
@@ -178,7 +178,7 @@ export async function b2ListFileNames(keyId: string, applicationKey: string, buc
     headers: { Authorization: auth.authorizationToken, 'Content-Type': 'application/json' },
     body: JSON.stringify({ bucketId, prefix, maxFileCount: 1000 }),
   });
-  if (!res.ok) throw new Error(`B2 list files failed (${res.status})`);
+  if (!res.ok) throw new Error(`B2 file listing failed with HTTP ${res.status}.`);
   const data: any = await res.json();
   if (!Array.isArray(data.files)) throw new Error('B2 file listing returned an invalid response.');
   return data.files as Array<{ fileName: string; fileId: string; contentLength: number; uploadTimestamp: number }>;

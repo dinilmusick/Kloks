@@ -4,6 +4,8 @@
  * user-owned storage connection associated with a workspace.
  */
 
+import { resolveUserWorkspaceStorageAssociation } from './storageConnectionCore.js';
+import { queryUnifiedDb } from './unifiedDb.js';
 import { writeWorkspaceFile, deleteWorkspaceFolder } from './workspaceFileCore.js';
 
 export function resolveWorkspaceConnection(profiles: any, workspace: any, appId = 'depm') {

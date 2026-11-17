@@ -96,6 +96,6 @@ describe('canonical Backblaze B2 workspace client', () => {
       `listing-secret-${crypto.randomUUID()}`,
       'workspace-bucket',
       'workspace/root/',
-    )).rejects.toThrow('B2 list files failed (500)');
+    )).rejects.toThrow('B2 file listing failed with HTTP 500.');
   });
 });
