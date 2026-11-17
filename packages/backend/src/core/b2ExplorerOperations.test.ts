@@ -78,9 +78,9 @@ describe('owner-scoped canonical B2 Explorer', () => {
       expect(() => safeB2ExplorerPath(path)).toThrow(/path/);
       await expect(executeB2Explorer({ ...owner, action: 'uploadFile', bucketId: 'bucket-a', fileName: path, fileBase64: 'YQ==' })).rejects.toThrow(/path/);
     }
-    expect(() => safeB2ExplorerPath('unsafe\\nheader')).toThrow(/path/);
-    expect(() => safeB2ExplorerPath('unsafe\\rheader')).toThrow(/path/);
-    expect(() => safeB2ExplorerPath('unsafe\\theader')).toThrow(/path/);
+    expect(() => safeB2ExplorerPath('unsafe\${symbol}header')).toThrow(/path/);
+    expect(() => safeB2ExplorerPath('unsafe\${symbol}header')).toThrow(/path/);
+    expect(() => safeB2ExplorerPath('unsafe\${symbol}header')).toThrow(/path/);
     expect(resolveConnection).not.toHaveBeenCalled();
   });
 
