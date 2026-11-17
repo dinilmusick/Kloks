@@ -1,3 +1,5 @@
+export * from './smallScript.js';
+export * from './quickJsAdapter.js';
 export * from './types.js';
 export * from './endpointNodeProvider.js';
 export * from './flowStore.js';

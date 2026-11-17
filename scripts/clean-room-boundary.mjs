@@ -112,6 +112,24 @@ try {
     .map(([name]) => `${name}@${pkg.peerDependencies[name]}`);
   if (optionalPeers.length) execFileSync("npm", ["install", ...optionalPeers], {cwd: consumer, stdio: "pipe"});
 
+  const fodProbe = path.join(consumer, "fod-probe.mjs");
+  fs.writeFileSync(fodProbe, [
+    "const assert = (await import('node:assert/strict')).default;",
+    "const { executeSmallScript, DEFAULT_SMALL_SCRIPT_LIMITS } = await import(" + JSON.stringify(pkg.name + "/fod") + ");",
+    "const { createNodeQuickJsSmallScriptExecutor } = await import(" + JSON.stringify(pkg.name + "/fod/quickjs-node") + ");",
+    "const scriptExecutor = createNodeQuickJsSmallScriptExecutor();",
+    "assert.deepEqual(await executeSmallScript(scriptExecutor, 'return [inputs.answer, typeof process, typeof fetch]', { answer: 42 }), [42, 'undefined', 'undefined']);",
+    "const limits = { ...DEFAULT_SMALL_SCRIPT_LIMITS, wallMs: 30 };",
+    "await assert.rejects(executeSmallScript(scriptExecutor, 'while (true) {}', {}, undefined, limits), { code: 'SCRIPT_INTERRUPTED' });",
+    "const controller = new AbortController();",
+    "const pending = executeSmallScript(scriptExecutor, 'while (true) {}', {}, controller.signal);",
+    "setTimeout(() => controller.abort(), 10);",
+    "await assert.rejects(pending, { code: 'CANCELLED' });",
+    "assert.equal(await executeSmallScript(scriptExecutor, 'return 7;', {}), 7);",
+  ].join("\n") + "\n");
+  execFileSync(process.execPath, [fodProbe], {cwd: consumer, stdio: "pipe"});
+  console.log("PACKED NODE FOD QUICKJS PASSED: execution, capability isolation, timeout, cancellation, and recovery.");
+
   const typesProbe = path.join(consumer, "types-probe.mts");
   fs.writeFileSync(typesProbe, [
     "import { BaseApiRoute } from " + JSON.stringify(pkg.name + "/backend") + ";",

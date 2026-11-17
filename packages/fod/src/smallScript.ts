@@ -1,0 +1,113 @@
+import type { FodNodeDefinition } from './types.js';
+
+/** Host-independent contract for the opt-in small-JavaScript workflow node.
+ * No host eval/Function, Node APIs, or interpreter payload is imported here.
+ * The interpreter must interrupt itself; a Promise timeout cannot stop a JS loop.
+ */
+export interface SmallScriptLimits {
+  sourceBytes: number;
+  inputBytes: number;
+  outputBytes: number;
+  heapBytes: number;
+  wallMs: number;
+  maxInterruptChecks: number;
+  maxAttempts: 1;
+}
+
+export const DEFAULT_SMALL_SCRIPT_LIMITS: Readonly<SmallScriptLimits> = Object.freeze({
+  sourceBytes: 8 * 1024,
+  inputBytes: 64 * 1024,
+  outputBytes: 64 * 1024,
+  heapBytes: 32 * 1024 * 1024,
+  wallMs: 100,
+  // QuickJS interrupt callbacks are not one callback per JS instruction.
+  maxInterruptChecks: 100_000,
+  maxAttempts: 1,
+});
+
+export class SmallScriptLimitError extends Error {
+  constructor(readonly code: string, message: string) {
+    super(message);
+    this.name = 'SmallScriptLimitError';
+  }
+}
+
+export interface SmallScriptRequest {
+  code: string;
+  inputs: Record<string, unknown>;
+  limits: Readonly<SmallScriptLimits>;
+  signal?: AbortSignal;
+}
+
+export interface SmallScriptExecutor {
+  /** Trusted host adapter; must enforce heap, time, and interrupt limits itself. */
+  execute(request: SmallScriptRequest): Promise<unknown>;
+}
+
+function utf8Length(text: string): number {
+  return new TextEncoder().encode(text).byteLength;
+}
+
+/** Sanitizes values through the JSON boundary; functions, cycles and oversized values are rejected. */
+export function jsonBoundary(value: unknown, maxBytes: number, label: string): unknown {
+  let encoded: string | undefined;
+  try {
+    encoded = JSON.stringify(value, (_key, item: unknown) => {
+      if (item === undefined || typeof item === 'function' || typeof item === 'symbol' ||
+          (typeof item === 'number' && !Number.isFinite(item))) {
+        throw new TypeError('Invalid JSON value');
+      }
+      return item;
+    });
+  }
+  catch { throw new SmallScriptLimitError('INVALID_JSON', label + ' must be valid JSON.'); }
+  if (encoded === undefined) throw new SmallScriptLimitError('INVALID_JSON', label + ' must be JSON serializable.');
+  if (utf8Length(encoded) > maxBytes) {
+    throw new SmallScriptLimitError('PAYLOAD_TOO_LARGE', label + ' exceeds ' + maxBytes + ' bytes.');
+  }
+  const decoded: unknown = JSON.parse(encoded);
+  return decoded;
+}
+
+/** Does not execute untrusted code when the host has no verified interpreter. */
+export async function executeSmallScript(
+  executor: SmallScriptExecutor | undefined,
+  code: unknown,
+  input: Record<string, unknown>,
+  signal?: AbortSignal,
+  limits: Readonly<SmallScriptLimits> = DEFAULT_SMALL_SCRIPT_LIMITS,
+): Promise<unknown> {
+  if (!executor) throw new SmallScriptLimitError('EXECUTOR_UNAVAILABLE', 'Isolated JavaScript executor is not configured.');
+  for (const key of ['sourceBytes', 'inputBytes', 'outputBytes', 'heapBytes', 'wallMs', 'maxInterruptChecks'] as const) {
+    if (!Number.isSafeInteger(limits[key]) || limits[key] < 1 || limits[key] > DEFAULT_SMALL_SCRIPT_LIMITS[key]) {
+      throw new SmallScriptLimitError('INVALID_LIMITS', 'Invalid JavaScript execution budget for ' + key + '.');
+    }
+  }
+  if (limits.maxAttempts !== 1) throw new SmallScriptLimitError('INVALID_LIMITS', 'JavaScript execution allows one attempt.');
+  if (typeof code !== 'string' || !code.trim()) {
+    throw new SmallScriptLimitError('INVALID_SCRIPT', 'JavaScript source must be a non-empty string.');
+  }
+  if (utf8Length(code) > limits.sourceBytes) {
+    throw new SmallScriptLimitError('SCRIPT_TOO_LARGE', 'JavaScript source exceeds ' + limits.sourceBytes + ' UTF-8 bytes.');
+  }
+  if (signal?.aborted) throw new SmallScriptLimitError('CANCELLED', 'Execution was cancelled.');
+  const cleanInputs = jsonBoundary(input, limits.inputBytes, 'JavaScript input') as Record<string, unknown>;
+  if (!cleanInputs || typeof cleanInputs !== 'object' || Array.isArray(cleanInputs)) {
+    throw new SmallScriptLimitError('INVALID_JSON', 'JavaScript input must be a JSON object.');
+  }
+  // The engine invokes exactly once; node retries require a separate audited invocation.
+  const output = await executor.execute({ code, inputs: cleanInputs, limits, signal });
+  return jsonBoundary(output, limits.outputBytes, 'JavaScript output');
+}
+
+/** Built-in node descriptor. Execution remains disabled until an isolated adapter is provided. */
+export const SMALL_SCRIPT_NODE: FodNodeDefinition = {
+  type: 'system/javascript',
+  label: 'JavaScript',
+  description: 'Run a small, bounded JavaScript transform using an isolated executor.',
+  category: 'system',
+  group: 'Code',
+  inputs: [{ id: 'input', name: 'Input', direction: 'input', dataType: 'any' }],
+  outputs: [{ id: 'result', name: 'Result', direction: 'output', dataType: 'any' }],
+  metadata: { requiresIsolatedExecutor: true, maxSourceBytes: DEFAULT_SMALL_SCRIPT_LIMITS.sourceBytes },
+};
