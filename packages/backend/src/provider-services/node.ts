@@ -1,3 +1,4 @@
-/** Explicit server-side KrnlTS adapter. Keep these instances out of browser bundles. */
+/** Node-only KrnlTS facades. Portable imports must never instantiate services. */
 export * from './facades.js';
 export * from './storage-facades.js';
+export * from './storage-node.js';
