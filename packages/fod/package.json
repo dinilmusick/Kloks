@@ -24,7 +24,7 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts src/quickjs-node.ts --format esm --dts --clean --external @ultrst-armada/krnl",
+    "build": "tsup src/index.ts src/quickjs-node.ts src/quickjs-worker.ts --format esm --dts --clean --external @ultrst-armada/krnl",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "clean": "rm -rf dist"

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { executeFodFlow } from './executor.js';
-import { createNodeQuickJsSmallScriptExecutor } from './quickjs-node.js';
+import { createWorkerQuickJsSmallScriptExecutor } from './quickjs-worker.js';
 import { DEFAULT_SMALL_SCRIPT_LIMITS, executeSmallScript } from './smallScript.js';
 
-const executor = createNodeQuickJsSmallScriptExecutor();
+const executor = createWorkerQuickJsSmallScriptExecutor();
 const run = (code: string, inputs: Record<string, unknown> = {}) =>
   executeSmallScript(executor, code, inputs);
 

@@ -35,10 +35,23 @@ try {
     "if (!portableFunctions.LRUCache || !portableFunctions.SkipoBase) throw new Error('Portable functions subpath is incomplete');",
     "const nodeFunctions = await import(" + JSON.stringify(pkg.name + "/functions/node") + ");",
     "if (typeof nodeFunctions.readFile !== 'function' || typeof nodeFunctions.execCmd !== 'function' || typeof nodeFunctions.loadEnv !== 'function' || !nodeFunctions.FileCache) throw new Error('Node functions subpath is incomplete or requires an unrelated peer');",
+    "const assert = (await import('node:assert/strict')).default;",
+    "const { executeSmallScript, DEFAULT_SMALL_SCRIPT_LIMITS } = await import(" + JSON.stringify(pkg.name + "/fod") + ");",
+    "const { createNodeQuickJsSmallScriptExecutor } = await import(" + JSON.stringify(pkg.name + "/fod/quickjs-node") + ");",
+    "const scriptExecutor = createNodeQuickJsSmallScriptExecutor();",
+    "assert.deepEqual(await executeSmallScript(scriptExecutor, 'return [inputs.answer, typeof process, typeof fetch]', { answer: 42 }), [42, 'undefined', 'undefined']);",
+    "const limits = { ...DEFAULT_SMALL_SCRIPT_LIMITS, wallMs: 30 };",
+    "await assert.rejects(executeSmallScript(scriptExecutor, 'while (true) {}', {}, undefined, limits), { code: 'SCRIPT_INTERRUPTED' });",
+    "const controller = new AbortController();",
+    "const pending = executeSmallScript(scriptExecutor, 'while (true) {}', {}, controller.signal);",
+    "setTimeout(() => controller.abort(), 10);",
+    "await assert.rejects(pending, { code: 'CANCELLED' });",
+    "assert.equal(await executeSmallScript(scriptExecutor, 'return 7;', {}), 7);",
     "const nodeStorage = await import(" + JSON.stringify(pkg.name + "/backend/storage/node") + ");",
     "if (!nodeStorage.StorageAdapterFactory) throw new Error('Node storage adapter is missing its factory');",
   ].join("\n") + "\n");
   execFileSync(process.execPath, [portableProbe], {cwd: consumer, stdio: "pipe"});
+  console.log("PACKED NODE FOD QUICKJS PASSED: execution, capability isolation, timeout, cancellation, and recovery.");
 
   const workerEntry = path.join(consumer, "worker.mjs");
   fs.writeFileSync(workerEntry, [
