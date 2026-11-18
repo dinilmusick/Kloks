@@ -40,7 +40,7 @@ describe('durable FOD publication recovery',()=>{
       },
     }};
     const store=new FodFlowStore(ws,publication);
-    await store.save('ws',flow('to-delete'));
+    await store.save('ws',{...flow('to-delete'),metadata:{privateValue:'ERASE-ME'}});
     await store.publish('ws','to-delete');
     offline=true;
     await expect(store.delete('ws','to-delete')).rejects.toThrow('registry offline');
@@ -55,7 +55,18 @@ describe('durable FOD publication recovery',()=>{
     const restarted=new FodFlowStore(ws,publication);
     expect(await restarted.reconcilePublications('ws')).toBe(1);
     expect(events.at(-1)).toMatchObject({workflowId:'to-delete',version:1,state:'withdrawn'});
-    expect(ws.documents.has('ws:FOD/to-delete.json')).toBe(false);
+    // Retain a redacted ID/version tombstone, not the source graph. Prevent
+    // old caller grants from binding to a future workflow with the same ID.
+    const retired=ws.documents.get('ws:FOD/to-delete.json');
+    expect(retired).toBeDefined();
+    expect(retired).not.toContain('ERASE-ME');
+    const retiredRecord=JSON.parse(retired!);
+    expect(retiredRecord.__publication).toEqual({visible:false,deleted:true});
+    expect(retiredRecord.nodes).toEqual([]);
+    expect(retiredRecord.edges).toEqual([]);
+    expect(retiredRecord.__versions).toEqual([]);
+    await expect(restarted.save('ws',flow('to-delete'))).rejects.toThrow(/permanently retired/);
+    await expect(restarted.publish('ws','to-delete')).rejects.toThrow(/permanently retired/);
     expect(await restarted.reconcilePublications('ws')).toBe(0);
   });
 
