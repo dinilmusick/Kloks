@@ -197,3 +197,18 @@ export class ImmediateCallerRouter {
     }
   }
 }
+/**
+ * Bind a per-runtime cross-app adapter to one active router-issued parent.
+ * The context is captured by trusted host code and is never read from payload,
+ * HTTP headers or serialized ancestry supplied by a client.
+ */
+export function bindAikoCrossAppInvoker(
+  router:ImmediateCallerRouter,
+  parent:ChatCallContext,
+):(target:ChatTarget,input:unknown,signal?:AbortSignal)=>Promise<unknown> {
+  return async(target,input,signal)=>{
+    if (signal?.aborted) throw new Error('Cross-app invocation was cancelled.');
+    const reply=await router.callChild(parent,target,input);
+    return reply.result;
+  };
+}
