@@ -96,6 +96,9 @@ export interface FodRuntimeOptions {
   publication?:FodPublicationOptions;
   /** Must check the verified Luth principal and owning workspace; defaults to DENY. */
   authorizePublication?:(action:'publish'|'unpublish',workspaceId:string,flowId:string)=>Promise<void>;
+  /** Fresh trusted Luth principal and workspace ownership check for replay;
+   * mandatory for runtime reconciliation, repeated before every metadata write. */
+  authorizePublicationReconciliation?:(workspaceId:string)=>Promise<void>;
   /** Host-bound Luth principal, workspace ACL and active caller grant check. */
   authorizePublishedExecution?:(workspaceId:string,flowId:string,version:number)=>Promise<void>;
   workflowGrantStore?:FodWorkflowGrantStore;
