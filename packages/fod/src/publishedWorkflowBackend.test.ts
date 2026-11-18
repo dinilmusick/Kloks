@@ -1,6 +1,5 @@
 import {describe,expect,it,vi} from 'vitest';
-import {BackendRegistry} from '../../backend/src/connectivity/BackendRegistry.js';
-import {InProcessExecutor} from '../../backend/src/connectivity/InProcessExecutor.js';
+import {BackendRegistry,InProcessExecutor} from '@ultrst-armada/kloks/backend';
 import {FodRuntime} from './runtime.js';
 import type {FodExecutionResult} from './types.js';
 import {
