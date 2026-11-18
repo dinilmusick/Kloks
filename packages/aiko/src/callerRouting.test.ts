@@ -93,7 +93,7 @@ describe('ImmediateCallerRouter', () => {
         if (ctx.depth === 0) {
           await expect(runtime.callChild(ctx, { appId: 'aiko', agentId: 'loop' }, {}))
             .rejects.toThrow('Cyclic cross-app');
-          return runtime.callChild(ctx, { appId: 'kone', agentId: 'same-app' }, {});
+          return { status: 'completed', output: await runtime.callChild(ctx, { appId: 'kone', agentId: 'same-app' }, {}) } as const;
         }
         return { status: 'completed', output: ctx.target.agentId };
       },
