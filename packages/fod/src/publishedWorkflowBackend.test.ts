@@ -2,6 +2,7 @@ import {describe,expect,it,vi} from 'vitest';
 import {BackendRegistry} from '../../backend/src/connectivity/BackendRegistry.js';
 import {InProcessExecutor} from '../../backend/src/connectivity/InProcessExecutor.js';
 import {FodRuntime} from './runtime.js';
+import type {FodExecutionResult} from './types.js';
 import {
   publishedWorkflowChainKey,registerFodPublishedWorkflowBackendCommand,
   type FodPublishedWorkflowCall,type FodVerifiedPublishedInvocation,
@@ -37,6 +38,7 @@ const owner='alice';
 function createHarness() {
   const files=workspaceStore();
   let granted=true;
+  let grantedVersion=call.version;
   let verified:FodVerifiedPublishedInvocation={
     caller:{
       userId:owner,appId:'aiko',workspaceId:'source-workspace-1',
@@ -46,7 +48,7 @@ function createHarness() {
     targetAppOwnerUserId:owner,targetWorkspaceOwnerUserId:owner,chain:[],
   };
   const grantChecks=vi.fn(async(d:{callerUserId:string;version:number})=>
-    granted && d.callerUserId===owner && d.version===call.version);
+    granted && d.callerUserId===owner && d.version===grantedVersion);
   const grantStore:FodWorkflowGrantStore={
     grant:async()=>{},revoke:async()=>{granted=false;return true;},
     isGranted:grantChecks,
@@ -70,7 +72,7 @@ function createHarness() {
     withExecutionScope:withScope,maxDepth:4,timeoutMs:2000,
   });
   const executor=new InProcessExecutor(registry);
-  const execute=(payload:unknown=call)=>executor.execute({
+  const execute=(payload:unknown=call)=>executor.execute<unknown,FodExecutionResult>({
     id:'request-1',type:'COMMAND',operation:'fod.executePublishedWorkflow',
     timestamp:Date.now(),sessionId:'untrusted-session',payload,
   });
@@ -85,6 +87,7 @@ function createHarness() {
   return {
     files,publisher,save,execute,grantChecks,buildRuntime,withScope,verifyInvocation,
     setGranted:(value:boolean)=>{granted=value;},
+    setGrantedVersion:(value:number)=>{grantedVersion=value;},
     setVerified:(next:FodVerifiedPublishedInvocation)=>{verified=next;},
     getVerified:()=>verified,
   };
@@ -122,7 +125,7 @@ describe('Kloks BackendRegistry -> owning FOD published workflow command',()=>{
     const version2=await runtime.saveFlow({...result,name:'version two'});
     expect(version2.version).toBe(2);
     await expect(h.execute()).rejects.toThrow(/publication unavailable/);
-    h.setGranted(true);
+    h.setGrantedVersion(2);
     const updated={...call,version:2};
     // Grant now applies to v2; a v1 descriptor cannot execute v2.
     const out=await h.execute(updated);
