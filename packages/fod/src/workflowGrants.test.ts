@@ -154,9 +154,10 @@ describe('FOD owner grant controls',()=>{
       authorizeWorkflowGrant:async(request)=>{
         approvals.push(request);
         return {
-          userId:'luth-owner',targetAppOwnerUserId:'luth-owner',
-          targetWorkspaceOwnerUserId:'luth-owner',callerAppOwnerUserId:'luth-owner',
-          sourceWorkspaceOwnerUserId:'luth-owner',
+          userId:'luth-owner',targetAppId:'kone',targetWorkspaceId:'kone-workspace',
+          callerAppId:'aiko',sourceWorkspaceId:'aiko-workspace',
+          targetAppOwnerUserId:'luth-owner',targetWorkspaceOwnerUserId:'luth-owner',
+          callerAppOwnerUserId:'luth-owner',sourceWorkspaceOwnerUserId:'luth-owner',
         };
       },
     });
@@ -183,9 +184,10 @@ describe('FOD owner grant controls',()=>{
         grant:async()=>{writes++;},revoke:async()=>false,isGranted:async()=>false,
       },
       authorizeWorkflowGrant:async()=>({
-        userId:'luth-owner',targetAppOwnerUserId:'luth-owner',
-        targetWorkspaceOwnerUserId:'luth-owner',callerAppOwnerUserId:'other-user',
-        sourceWorkspaceOwnerUserId:'other-user',
+        userId:'luth-owner',targetAppId:'kone',targetWorkspaceId:'kone-workspace',
+        callerAppId:'aiko',sourceWorkspaceId:'other-workspace',
+        targetAppOwnerUserId:'luth-owner',targetWorkspaceOwnerUserId:'luth-owner',
+        callerAppOwnerUserId:'other-user',sourceWorkspaceOwnerUserId:'other-user',
       }),
     };
     const workspace=memoryWorkspace();
