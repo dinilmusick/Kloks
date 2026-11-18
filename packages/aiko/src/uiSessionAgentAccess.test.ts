@@ -4,7 +4,9 @@ import { createConsentedUiAgentAccess, type UiAgentConsentGrant } from './uiSess
 const tabA = '2743a144-98ac-4be0-a90b-f8868237d1cb';
 const tabB = 'f7d89b23-f537-4a54-a9b5-a462ad41d0e3';
 const rev = '63599882-203c-43e1-a9c7-60322e1507b1';
-const caller = { userId: 'alice', appId: 'aiko', workspaceId: 'workspace-A' };
+const caller = { userId: 'alice', appId: 'aiko', workspaceId: 'workspace-A',
+  sessionId: 'luth-session-alice', sessionExpiresAt: Date.now() + 60000,
+  appOrigin: 'https://aiko.example' };
 function fixture() {
   const grants = new Map<string,UiAgentConsentGrant>();
   const approve: string[] = [];
@@ -27,7 +29,7 @@ function fixture() {
       if (!grants.size || ![tabA,tabB].includes(tab)) return Response.json({}, {status:404});
       if (request.method === 'GET') return Response.json({session:{
         revision:rev,snapshot:{visible:tab,secret:'must-not-leak'} }});
-      return Response.json({actionId: 'queue-1'}, {status:202});
+      return Response.json({actionId: 'd50e46e9-1c4b-4dfa-88fa-dc6a0f03297e'}, {status:202});
     },
   });
   return {access, grants, approve, calls, stop:()=>{allowed=false;}, grant};
@@ -55,9 +57,9 @@ describe('consented UI agent access over existing Kloks UI session authority',()
     const f=fixture();
     const result=await f.access.action('alice-session','window-A',{
       revision:rev,componentId:'tiles',controlId:'select',payload:1});
-    expect(result).toEqual({windowId:'window-A',status:'queued',actionId:'queue-1'});
+    expect(result).toEqual({windowId:'window-A',status:'queued',actionId:'d50e46e9-1c4b-4dfa-88fa-dc6a0f03297e'});
     expect(f.approve).toEqual(['select']);
-    expect(f.calls).toEqual(['POST:/api/ui-session/'+tabA+'/action:alice']);
+    expect(f.calls).toEqual(['GET:/api/ui-session/'+tabA+':alice', 'POST:/api/ui-session/'+tabA+'/action:alice']);
     f.stop();
     await expect(f.access.action('alice-session','window-A',{
       revision:rev,componentId:'tiles',controlId:'select'})).rejects.toThrow('approval');
