@@ -56,6 +56,10 @@ This PR does **not** implement cross-app invocation or grant enforcement.
 All requests to read, discover or execute a workflow must recheck the target
 owner, workspace, active publication version, and owner-approved caller grant
 at the owning backend on every hop; metadata discovery is never sufficient.
+The global index is never an execution source: `FodRuntime.executeFlow` loads
+the exact workflow ID and optional pinned version from the caller-bound owner
+workspace store and fails when that workspace record is absent. A stale
+published descriptor therefore cannot supply a graph or authorize execution.
 Until those authorization services are deployed, this feature must remain
 disabled for unauthenticated and untrusted hosts.
 
