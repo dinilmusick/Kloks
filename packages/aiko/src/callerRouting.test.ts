@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { ImmediateCallerRouter, type ChatCallContext, type ChatResult } from './callerRouting.js';
 
-const alice = { userId: 'alice', appId: 'aiko', workspaceId: 'w-alice', sessionId: 'session-a' };
-const bob = { userId: 'bob', appId: 'aiko', workspaceId: 'w-bob', sessionId: 'session-b' };
+const alice = { userId: 'alice', appId: 'aiko', workspaceId: 'w-alice' };
+const bob = { userId: 'bob', appId: 'aiko', workspaceId: 'w-bob' };
 const target = { appId: 'kone', agentId: 'endpoint-1' };
 
 function router(overrides: Partial<ConstructorParameters<typeof ImmediateCallerRouter>[0]> = {}) {
   return new ImmediateCallerRouter({
-    verifyCaller: session => session === 'session-a' ? alice : session === 'session-b' ? bob : null,
+    verifyCaller: session => session === 'session-a' ? { ...alice, sessionId: 'private-auth-session' } : session === 'session-b' ? bob : null,
     authorize: (caller, _target, context) =>
       caller.userId === 'alice' && caller.workspaceId === 'w-alice' && context.traceId.length > 0,
     dispatch: async (_target, input) => ({ status: 'completed', output: input }),
@@ -20,6 +20,7 @@ describe('ImmediateCallerRouter', () => {
     const result = await router().call('session-a', target, { replyTo: 'bob', input: 42 });
     expect(result.result).toEqual({ status: 'completed', output: { replyTo: 'bob', input: 42 } });
     expect(result.replyTo).toEqual(alice);
+    expect(result.replyTo).not.toHaveProperty('sessionId');
     expect(result.callId).toBeTruthy();
     expect(result.traceId).toBeTruthy();
     await expect(router().call({ userId: 'alice', workspaceId: 'w-alice' }, target, {}))
