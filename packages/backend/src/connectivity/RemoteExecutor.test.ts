@@ -85,6 +85,8 @@ describe('RemoteExecutor request-scoped caller context', () => {
     expect(messages[1]?.authContext?.token).toBe('delegation-token');
     expect(messages[1]?.payload).toMatchObject({ target: 'storage', operation: 'delete' });
     expect(messages[1]?.payload).not.toHaveProperty('authContext');
+    expect(messages[1]?.payload).not.toHaveProperty('capabilityContext');
+    expect(JSON.stringify(messages[1]?.payload)).not.toContain('delegation-token');
     expect(getAuthContext).toHaveBeenCalledTimes(2);
   });
 
