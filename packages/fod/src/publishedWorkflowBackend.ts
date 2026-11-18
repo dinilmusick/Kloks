@@ -52,7 +52,9 @@ export interface FodPublishedWorkflowBackendOptions {
   /** Must validate the current Luth session and all canonical ownership records. */
   verifyInvocation:(transportContext:unknown,call:FodPublishedWorkflowCall)=>Promise<FodVerifiedPublishedInvocation>;
   /** Must construct a target-owned runtime bound to the same verified request. */
-  buildRuntime:(workspaceId:string,verified:FodVerifiedPublishedInvocation)=>Promise<FodRuntime>|FodRuntime;
+  /** Bind the ALREADY owning application workflow engine. Aiko hosts can
+   * supply a structural exact-version executor, not a duplicate FOD store. */
+  buildRuntime:(workspaceId:string,verified:FodVerifiedPublishedInvocation)=>Promise<Pick<FodRuntime,'executePublishedFlow'>>|Pick<FodRuntime,'executePublishedFlow'>;
   /**
    * Propagate trusted chain, deadline and abort signal to any nested calls.
    * The host must preserve these across authenticated transport boundaries.
