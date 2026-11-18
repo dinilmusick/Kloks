@@ -63,8 +63,13 @@ export class FodRuntime {
       approval.callerAppOwnerUserId,
       approval.sourceWorkspaceOwnerUserId,
     ].every(owner=>typeof owner==='string' && owner===publication.ownerUserId);
-    if (!sameOwner) {
-      throw new Error('Workflow grant denied: v1 requires the same verified Luth owner for both apps and workspaces.');
+    const exactScope=
+      approval.targetAppId===scope.appId &&
+      approval.targetWorkspaceId===scope.targetWorkspaceId &&
+      approval.callerAppId===scope.callerAppId &&
+      approval.sourceWorkspaceId===scope.sourceWorkspaceId;
+    if (!sameOwner || !exactScope) {
+      throw new Error('Workflow grant denied: v1 requires the same verified Luth owner and exact approved app/workspace scope.');
     }
     return scope;
   }
