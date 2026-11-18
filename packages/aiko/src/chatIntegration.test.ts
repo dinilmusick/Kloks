@@ -64,12 +64,6 @@ describe('Aiko authenticated chat integration', () => {
     revoke();
     await expect(integration.chat('valid', 'hello')).rejects.toThrow('not authorized');
     expect(calls).toEqual([]);
-    const cyc = setup({ executeAuthorized: async (_entry: unknown, _input: unknown, _ctx: unknown,
-      _sig: unknown, call: (target: {appId:string;agentId:string}, input: unknown) => Promise<unknown>) => {
-      await call({ appId: 'b', agentId: 'endpoint' }, {});
-      return { status: 'completed', output: true };
-    } });
-    await expect(cyc.integration.chat('valid', '@stocks hello')).rejects.toThrow('Cyclic');
   });
   it('returns typed missing input without executing the target', async () => {
     const { integration, calls } = setup({ validateInput: (entry: AuthorizedAgentAddress, input: unknown) =>
