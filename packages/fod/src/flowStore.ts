@@ -206,7 +206,7 @@ export class FodFlowStore {
     let count=0;
     const failures:string[]=[];
     for (const entry of entries) {
-      if (entry.isFolder || !entry.name.endsWith('.json') || !/^FOD\\/[^/]+\\.json$/.test(entry.path)) continue;
+      if (entry.isFolder || !entry.name.endsWith('.json') || !/^FOD\/[^/]+\.json$/.test(entry.path)) continue;
       const flowId=entry.name.slice(0,-5);
       try {
         await this.withLock(workspaceId,flowId,async()=>{
