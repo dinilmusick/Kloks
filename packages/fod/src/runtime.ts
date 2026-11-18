@@ -119,6 +119,6 @@ export class FodRuntime {
     // or edit invalidates a stale catalog entry before execution starts.
     const flow=await this.flowStore.getCurrentPublishedRevision(this.options.workspaceId,flowId,version);
     if (!flow) throw new Error('Current workflow publication unavailable.');
-    return executeFodFlow(flow,this.endpoints,this.options.onEvent,input,{scriptExecutor:this.options.scriptExecutor,signal:options.signal});
+    return executeFodFlow(flow,this.endpoints,this.options.onEvent,input,{scriptExecutor:this.options.scriptExecutor,signal:options.signal,appId:this.options.appId,invokeCrossApp:this.options.invokeCrossApp});
   }
 }
