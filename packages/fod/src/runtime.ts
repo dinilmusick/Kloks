@@ -103,7 +103,7 @@ export class FodRuntime {
   async executeFlow(flowId:string,input?:unknown,options:{signal?:AbortSignal;version?:number}={}):Promise<FodExecutionResult> {
     const flow=await this.getFlow(flowId,options.version);
     if(!flow) throw new Error(`FOD flow '${flowId}'${options.version===undefined?'':` version ${options.version}`} not found.`);
-    return executeFodFlow(flow,this.endpoints,this.options.onEvent,input,{scriptExecutor:this.options.scriptExecutor,signal:options.signal});
+    return executeFodFlow(flow,this.endpoints,this.options.onEvent,input,{scriptExecutor:this.options.scriptExecutor,signal:options.signal,appId:this.options.appId,invokeCrossApp:this.options.invokeCrossApp});
   }
 
   /** Remote published-workflow execution boundary for future cross-app callers.
