@@ -188,3 +188,19 @@ it('deduplicates retries by verified caller/workspace/target and rejects changed
   await expect(router().callIdempotent('session-a', target, {}, 'unique_request_2'))
     .rejects.toThrow('idempotency adapter');
 });
+
+it('reauthorizes cached replies after grant revocation', async () => {
+  let allowed = true;
+  let executions = 0;
+  let cached: Awaited<ReturnType<ImmediateCallerRouter['call']>> | undefined;
+  const rt = router({
+    authorize: () => allowed,
+    dispatch: async () => { executions += 1; return { status: 'completed', output: 'private' }; },
+    runOnce: async (_scope, _input, execute) => cached ??= await execute(),
+  });
+  await rt.callIdempotent('session-a', target, {}, 'unique_revoke_1');
+  allowed = false;
+  await expect(rt.callIdempotent('session-a', target, {}, 'unique_revoke_1'))
+    .rejects.toThrow('not authorized');
+  expect(executions).toBe(1);
+});
