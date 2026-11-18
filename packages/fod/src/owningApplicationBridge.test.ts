@@ -24,7 +24,7 @@ describe('owning-application workflow executor compatibility',()=>{
         errors:[],events:[],
       };
     });
-    const grant=vi.fn(async()=>true);
+    const grant=vi.fn(async(_scope:unknown)=>true);
     const grantStore={
       grant:async()=>{},revoke:async()=>false,isGranted:grant,
     };
