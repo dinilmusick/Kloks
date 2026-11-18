@@ -47,7 +47,7 @@ describe('consented UI agent access over existing Kloks UI session authority',()
   });
   it('denies missing consent, forged users, workspace switches, closed or revoked tabs',async()=>{
     const f=fixture();
-    await expect(f.access.inspect('invalid','window-A')).rejects.toThrow('verified Luth');
+    await expect(f.access.inspect('invalid','window-A')).rejects.toThrow('Luth session');
     await expect(f.access.inspect('other-workspace','window-A')).rejects.toThrow('consent');
     f.grants.delete('window-A');
     await expect(f.access.inspect('alice-session','window-A')).rejects.toThrow('consent');
@@ -75,7 +75,9 @@ describe('consented UI agent access over existing Kloks UI session authority',()
       authorizeWindow:(_,id)=>mutable.grants.get(id) ?? null,
       approveAction:()=>{ if(active) mutable.grants.delete('window-A');active=false;return true;},
       sanitizeSnapshot:()=>({}),
-      uiSession:async()=>Response.json({actionId:'impossible'},{status:202}),
+      uiSession:async(request)=> request.method === 'GET'
+        ? Response.json({session:{revision:rev,snapshot:{visible:'x'}}})
+        : Response.json({actionId:'d50e46e9-1c4b-4dfa-88fa-dc6a0f03297e'},{status:202}),
     });
     await expect(wrapped.action('alice-session','window-A',{
       revision:rev,componentId:'tiles',controlId:'select'})).rejects.toThrow('consent');
