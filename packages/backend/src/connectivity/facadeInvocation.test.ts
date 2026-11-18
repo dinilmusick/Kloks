@@ -372,4 +372,17 @@ describe('two-app BackendFacade invocation boundary', () => {
     expect((await mcp.json() as any).error.message).toBe('SERVICE_UNAVAILABLE');
   });
 
+  it('rejects forged MCP bearer tokens during initialization and notifications', async () => {
+    const { backend } = fixture();
+    const send = (body: unknown) => backend.mcp(new Request('https://app-b.example/mcp', {
+      method: 'POST', headers: { Authorization: 'Bearer forged-token', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }));
+    const initialize = await send({ jsonrpc: '2.0', id: 12, method: 'initialize' });
+    expect(initialize.status).toBe(401);
+    expect((await initialize.json() as any).error.message).toBe('AUTH_INVALID');
+    const notify = await send({ jsonrpc: '2.0', method: 'notifications/initialized' });
+    expect(notify.status).toBe(401);
+  });
+
 });
