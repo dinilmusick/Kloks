@@ -165,7 +165,7 @@ describe('Skipo/Luth-authorized cross-app remote facade client', () => {
     const { options } = harness();
     const sleepy = createFacadeRemoteClient({
       ...options,
-      fetch: async () => new Promise(resolve => setTimeout(() =>
+      fetch: async () => new Promise<Response>(resolve => setTimeout(() =>
         resolve(Response.json({ output: { tooLate: true }, invocationId: 'slow-1' })), 100)),
       maxRequestMs: 20,
     });
