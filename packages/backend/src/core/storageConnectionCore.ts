@@ -16,9 +16,13 @@ import {
   type GoogleDriveWorkspaceTokens,
 } from '../storage/GoogleDriveWorkspaceService.js';
 import { queryUnifiedDb } from './unifiedDb.js';
+import { createProviderClient } from '../provider-services/client.js';
+import { listGitHubRepositories, listDropboxFolder } from '../provider-services/storage-providers.js';
+import { createCanonicalStorageService } from '../provider-services/storage/service.js';
+import type { ProviderConnection } from '../provider-services/types.js';
 import { getGoogleDriveOAuthConfiguration, getOrCreateStorageConnectionEncryptionKey, getStorageConnectionEncryptionKey } from './systemCredentialsCore.js';
 
-export type StorageProviderId = 'backblaze_b2' | 'google_drive';
+export type StorageProviderId = 'backblaze_b2' | 'google_drive' | 'github' | 'dropbox';
 
 export interface StorageProviderCapability {
   id: StorageProviderId;
@@ -28,7 +32,7 @@ export interface StorageProviderCapability {
   canSelectExistingConnection: boolean;
   canCreateConnection: boolean;
   requiredConfigurationFields: string[];
-  authorizationMode: 'application_key' | 'oauth2';
+  authorizationMode: 'application_key' | 'oauth2' | 'api_token';
   discoveryCapabilities: {
     accounts: boolean;
     buckets: boolean;
@@ -55,6 +59,8 @@ export interface PublicStorageConnection {
   googleAccountId?: string;
   googleRootFolderId?: string;
   googleRootFolderName?: string;
+  providerAccountId?: string;
+  providerAccountName?: string;
 }
 
 type StorageQuery = (
@@ -83,6 +89,8 @@ const PUBLIC_FIELDS = [
   'googleAccountId',
   'googleRootFolderId',
   'googleRootFolderName',
+  'providerAccountId',
+  'providerAccountName',
 ] as const;
 
 function mergeProfileDocuments(primary: any, legacy: any): any {
@@ -149,6 +157,10 @@ const STORAGE_SECRET_FIELDS = [
   'googleAccessTokenExpiresAt',
   'googleRefreshToken',
   'googleTokenType',
+  'githubAccessToken',
+  'dropboxAccessToken',
+  'dropboxRefreshToken',
+  'dropboxAccessTokenExpiresAt',
 ] as const;
 
 function isMissingOptionalProfileTable(error: unknown): boolean {
@@ -787,6 +799,158 @@ async function persistStorageConnection(
   await persistStorageConnectionCollection(userId, next, query);
 }
 
+
+/** Verified provider account identity is established by live, fixed-origin APIs,
+ * never by a client-supplied account ID, scope string, or untrusted token claims.
+ * A successful read/list probe does not grant elevated/write permissions. */
+async function verifyRemoteStorageToken(
+  provider: 'github' | 'dropbox',
+  token: string,
+  transport: typeof fetch,
+): Promise<{ accountId: string; accountName: string }> {
+  const probe: ProviderConnection = { providerId: provider, accountId: 'onboarding', credential: token };
+  const client = createProviderClient(probe, transport);
+  if (provider === 'github') {
+    const { data } = await client.request<{ id?: number; login?: string }>({ path: '/user' });
+    if (!Number.isSafeInteger(data?.id) || Number(data.id) <= 0 || !data.login?.trim()) {
+      throw new Error('GitHub provider identity response was invalid.');
+    }
+    // This checks actual repository discovery rather than trusting OAuth scope
+    // strings supplied by a browser or by the token holder.
+    await listGitHubRepositories(probe, transport, 1);
+    return { accountId: String(data.id), accountName: data.login };
+  }
+  const { data } = await client.request<{
+    account_id?: string; name?: { display_name?: string };
+  }>({ path: '/2/users/get_current_account', method: 'POST' });
+  if (typeof data?.account_id !== 'string' || !data.account_id.startsWith('dbid:')) {
+    throw new Error('Dropbox provider identity response was invalid.');
+  }
+  // Dropbox enforces files.metadata.read at the provider API boundary.
+  await listDropboxFolder(probe, '', transport);
+  return {
+    accountId: data.account_id,
+    accountName: String(data.name?.display_name || data.account_id),
+  };
+}
+
+/** Create a named, owner-bound connection using the existing AES-GCM envelope.
+ * The caller must supply a Luth-verified userId and a server-side provider token.
+ * No credential or arbitrary OAuth scope reaches the public projection. */
+export async function createRemoteStorageConnection(
+  input: { userId: string; provider: 'github' | 'dropbox'; accessToken: string; label?: string },
+  query: StorageQuery = DEFAULT_QUERY,
+  transport: typeof fetch = fetch,
+): Promise<PublicStorageConnection> {
+  const userId = String(input.userId || '').trim();
+  const token = String(input.accessToken || '').trim();
+  if (!userId || !token || !['github', 'dropbox'].includes(input.provider)) {
+    throw new Error('A verified owner, supported provider, and bearer token are required.');
+  }
+  const owner = await findUserRecord(userId, query);
+  if (!owner) throw new Error('A canonical user profile was not found for this storage connection.');
+  const identity = await verifyRemoteStorageToken(input.provider, token, transport);
+  const existing = await listUserStorageConnectionsWithSecrets(owner.id, query);
+  const timestamp = new Date().toISOString();
+  const label = String(input.label || input.provider + ' — ' + identity.accountName).trim();
+  if (!label || label.length > 120) throw new Error('Storage connection label must be 1–120 characters.');
+  const record: Record<string, unknown> = {
+    id: 'conn_' + input.provider + '_' + crypto.randomUUID(),
+    provider: input.provider,
+    label,
+    role: existing.length === 0 ? 'primary' : 'redundant_clone',
+    enabled: true,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    testedAt: timestamp,
+    testStatus: 'ok',
+    providerAccountId: identity.accountId,
+    providerAccountName: identity.accountName,
+    ...(input.provider === 'github' ? { githubAccessToken: token } : { dropboxAccessToken: token }),
+  };
+  await persistStorageConnection(owner.id, record, query);
+  return toPublicStorageConnection(record)!;
+}
+
+/** Replace a saved bearer only when the provider still proves the SAME owner
+ * account; account switching requires an independently named new connection. */
+export async function rotateRemoteStorageConnectionToken(
+  input: { userId: string; connectionId: string; accessToken: string },
+  query: StorageQuery = DEFAULT_QUERY,
+  transport: typeof fetch = fetch,
+): Promise<PublicStorageConnection> {
+  const saved = await resolveUserStorageConnectionSecret(input.userId, input.connectionId, query);
+  if (!saved || !['github', 'dropbox'].includes(saved.provider) || saved.enabled === false) {
+    throw new Error('Owner-bound remote provider connection not found.');
+  }
+  const token = String(input.accessToken || '').trim();
+  if (!token) throw new Error('A replacement provider token is required.');
+  const identity = await verifyRemoteStorageToken(saved.provider as 'github' | 'dropbox', token, transport);
+  if (identity.accountId !== saved.providerAccountId) {
+    throw new Error('Replacement token belongs to a different provider account.');
+  }
+  const updated = {
+    ...saved,
+    ...(saved.provider === 'github' ? { githubAccessToken: token } : { dropboxAccessToken: token }),
+    providerAccountName: identity.accountName,
+    updatedAt: new Date().toISOString(),
+    testedAt: new Date().toISOString(),
+    testStatus: 'ok',
+  };
+  await persistStorageConnection(input.userId, updated, query);
+  return toPublicStorageConnection(updated)!;
+}
+
+/** Server-only delegate: re-resolve the exact owner and connection at EVERY call.
+ * Upstream HTTP/MCP routes must additionally verify Luth and workspace grants. */
+async function remoteStorageServiceForOwner(
+  userId: string, connectionId: string,
+  query: StorageQuery, transport: typeof fetch,
+) {
+  if (!userId?.trim() || !connectionId?.trim()) throw new Error('Verified owner and connection are required.');
+  const saved = await resolveUserStorageConnectionSecret(userId, connectionId, query);
+  if (!saved || saved.enabled === false || !['github', 'dropbox'].includes(saved.provider)) {
+    throw new Error('Remote storage connection is not available to this owner.');
+  }
+  const token = String(saved.provider === 'github' ? saved.githubAccessToken : saved.dropboxAccessToken || '').trim();
+  if (!token || !saved.providerAccountId) throw new Error('Saved provider authorization is incomplete.');
+  const connection: ProviderConnection = {
+    providerId: saved.provider,
+    accountId: String(saved.providerAccountId),
+    credential: token,
+  };
+  return saved.provider === 'github'
+    ? createCanonicalStorageService({ providerId: 'github', connection, transport })
+    : createCanonicalStorageService({ providerId: 'dropbox', connection, transport });
+}
+
+export async function listRemoteStorageConnectionEntries(
+  userId: string, connectionId: string, path = '', cursor?: string,
+  query: StorageQuery = DEFAULT_QUERY, transport: typeof fetch = fetch,
+) {
+  const service = await remoteStorageServiceForOwner(userId, connectionId, query, transport);
+  return service.list(path, cursor);
+}
+
+export async function readRemoteStorageConnectionFile(
+  userId: string, connectionId: string, path: string,
+  query: StorageQuery = DEFAULT_QUERY, transport: typeof fetch = fetch,
+): Promise<Uint8Array> {
+  const service = await remoteStorageServiceForOwner(userId, connectionId, query, transport);
+  return service.read(path);
+}
+
+/** Dropbox writes are authorized again by Dropbox on each operation.
+ * GitHub repository writes remain unsupported without an explicit SHA/commit contract. */
+export async function writeRemoteStorageConnectionFile(
+  userId: string, connectionId: string, path: string, content: Uint8Array | string,
+  query: StorageQuery = DEFAULT_QUERY, transport: typeof fetch = fetch,
+): Promise<void> {
+  const service = await remoteStorageServiceForOwner(userId, connectionId, query, transport);
+  if (service.providerId !== 'dropbox') throw new Error('GitHub write requires explicit commit authorization.');
+  await service.write(path, content);
+}
+
 export async function testBackblazeCredentials(
   keyId: string,
   applicationKey: string,
@@ -935,6 +1099,26 @@ export async function getStorageProviderCapabilities(
       requiredConfigurationFields: ['keyId', 'applicationKey', 'bucketName'],
       authorizationMode: 'application_key',
       discoveryCapabilities: { accounts: true, buckets: true, folders: false },
+    },
+    {
+      id: 'github',
+      displayName: 'GitHub',
+      enabled: true,
+      canSelectExistingConnection: true,
+      canCreateConnection: true,
+      requiredConfigurationFields: ['accessToken'],
+      authorizationMode: 'api_token',
+      discoveryCapabilities: { accounts: true, buckets: false, folders: true },
+    },
+    {
+      id: 'dropbox',
+      displayName: 'Dropbox',
+      enabled: true,
+      canSelectExistingConnection: true,
+      canCreateConnection: true,
+      requiredConfigurationFields: ['accessToken'],
+      authorizationMode: 'oauth2',
+      discoveryCapabilities: { accounts: true, buckets: false, folders: true },
     },
     {
       id: 'google_drive',
