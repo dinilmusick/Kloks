@@ -55,6 +55,13 @@ export interface FacadeInvocationOptions {
   facade: BackendFacade;
   /** Must validate Luth signature, audience, session status, revocation and delegation chain at each use. */
   verifyLuthCredential: (credential: string, targetAudience: string) => Promise<VerifiedFacadeCaller | null>;
+  /**
+   * Fresh, NON-CONSUMING Luth/session authority check for an already admitted caller.
+   * Must validate the live session, delegation/grant revocation, target app and
+   * audience against trusted state; must NEVER introspect or replay the one-use
+   * admission bearer. Return the current trusted identity or null.
+   */
+  revalidateLuthCaller: (admitted: Readonly<VerifiedFacadeCaller>, targetAudience: string) => Promise<VerifiedFacadeCaller | null>;
   /** Must return only current static definitions and explicitly published workflow references. */
   listCurrentOperations: (workspaceId: string) => Promise<FacadeOperationDescriptor[]>;
   /** Must re-read current owner, publication, ACL, grant, scopes, input and output rules. */
@@ -122,7 +129,7 @@ function parseJson(body: Request): Promise<unknown> {
  */
 export function createFacadeInvocationBoundary(options: FacadeInvocationOptions) {
   if (!validId(options.targetAppId)) throw new Error('Invalid target application identity');
-  for (const name of ['verifyLuthCredential', 'listCurrentOperations', 'authorize',
+  for (const name of ['verifyLuthCredential', 'revalidateLuthCaller', 'listCurrentOperations', 'authorize',
     'deploymentEligible', 'consumeInvocation', 'invokePublishedWorkflow', 'delegateCredential'] as const) {
     if (typeof options[name] !== 'function') throw new Error(`Missing required facade authority: ${name}`);
   }
@@ -208,7 +215,14 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
       // Do not release an output based solely on the authorization made before execution.
       // Session revocation, deployment expiry, workflow unpublication and operation
       // version/dispatch-reference replacement must all take effect while work is running.
-      const currentCaller = await callerFor(credential);
+      // Luth invocation bearers are single-use: a second consuming introspection
+      // would reject every legitimate result. Consult a distinct non-consuming
+      // live Luth/session authority instead; fail closed if it is unavailable.
+      const currentCaller = await options.revalidateLuthCaller(caller, options.targetAppId);
+      if (!currentCaller || !currentCaller.invoker || !Array.isArray(currentCaller.chain) ||
+        !Number.isFinite(currentCaller.expiresAt) || currentCaller.expiresAt <= Date.now() ||
+        !Number.isFinite(currentCaller.deadlineAt) || currentCaller.deadlineAt <= Date.now() ||
+        currentCaller.audience !== options.targetAppId) fail('AUTH_INVALID', 401);
       if (!sameCallerIdentity(caller, currentCaller)) fail('CALLER_CHANGED', 401);
       const currentOperations = await options.listCurrentOperations(request.targetWorkspaceId);
       if (!currentOperations.some(op => assertDescriptor(op) && sameDispatchReference(operation, op))) {
@@ -297,13 +311,14 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
     let id: unknown = null;
     try {
       const credential = bearer(request);
-      // Even MCP initialize and one-way notifications require a live,
-      // audience-bound Luth caller; a syntactically valid bearer is not proof.
-      await callerFor(credential);
+      // tools/list and tools/call perform their own admission verification
+      // inside discover/invoke. Do not consume a one-use Luth bearer twice.
       const body = await parseJson(request) as { jsonrpc?: unknown; id?: unknown; method?: unknown; params?: Record<string, unknown> };
       if (!body || typeof body !== 'object' || Array.isArray(body) || body.jsonrpc !== '2.0' ||
         typeof body.method !== 'string') fail('INVALID_MCP_REQUEST', 400);
       id = body.id ?? null;
+      // Administrative MCP methods still require authenticated admission.
+      if (body.method !== 'tools/list' && body.method !== 'tools/call') await callerFor(credential);
       if (body.method === 'notifications/initialized' && body.id === undefined) {
         return new Response(null, { status: 202 });
       }
