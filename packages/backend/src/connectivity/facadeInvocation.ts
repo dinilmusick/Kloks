@@ -316,7 +316,7 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
       }
       if (body.method === 'tools/list') {
         const workspace = body.params?.workspaceId;
-        if (typeof workspace !== 'string') fail('INVALID_WORKSPACE', 400);
+        if (typeof workspace !== 'string') throw new FacadeInvocationDenied('INVALID_WORKSPACE', 400);
         const operations = await discover(credential, workspace, 'mcp');
         return Response.json({ jsonrpc: '2.0', id, result: { tools: operations.map(op => ({
           name: op.id, description: op.name,
