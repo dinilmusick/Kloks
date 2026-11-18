@@ -28,14 +28,12 @@ export interface ChatCallContext {
   readonly ancestry: readonly string[];
   readonly deadlineAt: number;
 }
-
 export interface RoutedChatReply {
   readonly callId: string;
   readonly traceId: string;
   readonly replyTo: VerifiedChatCaller;
   readonly result: ChatResult;
 }
-
 export interface ImmediateCallerRouterOptions {
   /** Resolve and validate the Luth session and selected workspace server-side. */
   verifyCaller: (session: unknown) => Promise<VerifiedChatCaller | null> | VerifiedChatCaller | null;
@@ -52,13 +50,11 @@ export interface ImmediateCallerRouterOptions {
     workspaceId: string; targetAppId: string; agentId: string; requestKey: string }, input: unknown,
     execute: () => Promise<RoutedChatReply>) => Promise<RoutedChatReply>;
 }
-
 interface TraceBudget {
   traceId: string;
   deadlineAt: number;
   calls: number;
 }
-
 /** A router instance belongs to one trusted application runtime. */
 export class ImmediateCallerRouter {
   private readonly active = new WeakSet<ChatCallContext>();
@@ -67,7 +63,6 @@ export class ImmediateCallerRouter {
   private readonly maxDepth: number;
   private readonly maxCalls: number;
   private readonly timeoutMs: number;
-
   constructor(private readonly options: ImmediateCallerRouterOptions) {
     this.now = options.now ?? Date.now;
     this.maxDepth = options.maxDepth ?? 8;
@@ -78,7 +73,6 @@ export class ImmediateCallerRouter {
       throw new Error('Invalid Aiko chat invocation limits.');
     }
   }
-
   async call(session: unknown, target: ChatTarget, input: unknown): Promise<RoutedChatReply> {
     const verified = await this.options.verifyCaller(session);
     if (!verified || !verified.userId || !verified.appId || !verified.workspaceId) {
@@ -99,7 +93,6 @@ export class ImmediateCallerRouter {
     };
     return this.invoke(caller, target, input, budget, [], 0);
   }
-
   /** Replay-safe root call, only when the host provides transactional deduplication. */
   async callIdempotent(session: unknown, target: ChatTarget, input: unknown,
     requestKey: string): Promise<RoutedChatReply> {
@@ -127,7 +120,6 @@ export class ImmediateCallerRouter {
       agentId: target.agentId, requestKey };
     return this.options.runOnce(scope, input, () => this.call(session, target, input));
   }
-
   /** Can only be called with an active, router-issued invocation context. */
   async callChild(parent: ChatCallContext, target: ChatTarget, input: unknown): Promise<RoutedChatReply> {
     const budget = this.budgets.get(parent);
@@ -141,7 +133,6 @@ export class ImmediateCallerRouter {
     });
     return this.invoke(caller, target, input, budget, parent.ancestry, parent.depth + 1);
   }
-
   private async invoke(
     caller: VerifiedChatCaller, target: ChatTarget, input: unknown,
     budget: TraceBudget, ancestry: readonly string[], depth: number,
