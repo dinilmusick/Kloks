@@ -26,6 +26,19 @@ export interface FodNodeDefinition {
   metadata?:Record<string,unknown>;
 }
 
+export interface FodCrossAppTarget {
+  /** Canonical target app identity declared by the trusted backend facade. */
+  appId:string;
+  /** Stable operation/agent ID in the target application. */
+  agentId:string;
+}
+
+export type FodCrossAppInvoker=(
+  target:FodCrossAppTarget,
+  input:unknown,
+  signal?:AbortSignal,
+)=>Promise<unknown>;
+
 export interface FodEndpointDescriptor {
   id:string;
   serviceId:string;
@@ -37,6 +50,8 @@ export interface FodEndpointDescriptor {
   deployment?:string;
   inputSchema?:Record<string,unknown>;
   outputSchema?:Record<string,unknown>;
+  /** Set only from trusted service/operation registration metadata. */
+  targetApp?:FodCrossAppTarget;
   invoke:(input:unknown)=>Promise<unknown>;
 }
 
@@ -89,6 +104,10 @@ export interface FodExecutionResult {
 export interface FodRuntimeOptions {
   workspaceId:string;
   workspaceService:any;
+  /** Canonical local app ID supplied by the trusted host. */
+  appId?:string;
+  /** Host closure bound to the current router-issued parent context. */
+  invokeCrossApp?:FodCrossAppInvoker;
   endpoints?:FodEndpointDescriptor[];
   nodes?:FodNodeDefinition[];
   onEvent?:(event:FodExecutionEvent)=>void;
