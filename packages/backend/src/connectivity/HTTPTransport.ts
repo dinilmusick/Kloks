@@ -47,7 +47,20 @@ export class HTTPTransport implements ITransport {
     return this.connected;
   }
 
+  private operationEndpoint(operation: string): string {
+    // Remote operation IDs are dotted capability names, never arbitrary URL paths.
+    // Reject separators, encoded escapes, control characters and empty segments
+    // before URL normalization could route a scoped call outside its API endpoint.
+    if (typeof operation !== 'string' || !operation || operation.trim() !== operation ||
+      /[\/\\?#%\x00-\x1f\x7f]/.test(operation) ||
+      operation.split('.').some(segment => !segment || segment.trim() !== segment)) {
+      throw new Error('[HTTPTransport] Invalid remote operation identifier.');
+    }
+    return `${this.baseUrl}/api/${operation.split('.').map(encodeURIComponent).join('/')}`;
+  }
+
   async request<T = unknown, R = unknown>(message: Message<T>): Promise<Message<R>> {
+    const endpoint = this.operationEndpoint(message.operation);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
 
@@ -60,7 +73,6 @@ export class HTTPTransport implements ITransport {
     if (message.correlationId) headers['x-correlation-id'] = message.correlationId;
 
     try {
-      const endpoint = `${this.baseUrl}/api/${message.operation.replace(/\./g, '/')}`;
       const res = await fetch(endpoint, {
         method: message.type === 'QUERY' ? 'POST' : 'POST',
         headers,
