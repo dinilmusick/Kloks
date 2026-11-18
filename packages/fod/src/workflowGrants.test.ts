@@ -59,7 +59,9 @@ describe('SQL workflow grant store',()=>{
     expect(calls[0]!.sql).toContain('INSERT INTO skipo_ecosystem.workflow_grants');
     expect(calls[0]!.sql).toContain('granted_by_user_id');
     expect(calls[0]!.sql).toContain('ON CONFLICT');
-    expect(calls[0]!.sql).toContain("grant_state='active'");
+    expect(calls[0]!.sql).toContain("WHERE grant_state='active'");
+    expect(calls[0]!.sql).toContain("DO UPDATE SET grant_state='active'");
+    expect(calls[0]!.sql).not.toContain("revoked_at=NULL");
     expect(calls[0]!.args).toEqual([
       'kone','luth-owner','kone-workspace','report',3,'aiko','aiko-workspace',
     ]);
