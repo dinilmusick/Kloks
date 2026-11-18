@@ -15,7 +15,7 @@ describe('HTTPTransport bearer propagation', () => {
     vi.stubGlobal('fetch', fetchMock);
     const transport = new HTTPTransport({
       baseUrl: 'https://api.example.test',
-      defaultHeaders: { 'x-client-kind': 'web' },
+      defaultHeaders: { 'x-client-kind': 'web', authorization: 'Basic stale-default-credential' },
     });
     const token = 'eyJhbGciOiJIUzI1NiJ9.payload.signature';
     const payload = { workspaceId: 'workspace-1', operation: 'list' };
@@ -36,6 +36,8 @@ describe('HTTPTransport bearer propagation', () => {
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
     const headers = init.headers as Record<string, string>;
     expect(headers.Authorization).toBe(`Bearer ${token}`);
+    expect(headers.authorization).toBeUndefined();
+    expect(Object.keys(headers).filter(key => key.toLowerCase() === 'authorization')).toHaveLength(1);
     expect(headers['x-session-id']).toBe('opaque-session-id');
     expect(headers['x-correlation-id']).toBe('correlation-1');
     expect(headers['x-client-kind']).toBe('web');
