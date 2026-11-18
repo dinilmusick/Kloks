@@ -39,8 +39,8 @@ authorization grants for invoking workflows.
   tombstone with withdrawn publication intent. Reconciliation withdraws the
   registry entry before removing the workspace document; if either operation
   fails, the tombstone remains and the next reconnect retries it. A pending
-  delete cannot be edited, republished or separately unpublished, so a retry
-  cannot accidentally cancel deletion.
+  delete cannot be listed, read, executed, edited, republished or separately
+  unpublished, so a retry cannot accidentally cancel deletion or continue use.
 - Reconciliation finalizes pending deletes after the idempotent withdrawal,
   making a process restart safe even when the original delete call was
   interrupted between registry synchronization and workspace removal.
