@@ -126,16 +126,25 @@ export class ImmediateCallerRouter {
       depth,
       deadlineAt: budget.deadlineAt,
     });
-    if (!await this.options.authorize(caller, target, context)) {
+    if (!await this.options.authorize(caller, context.target, context)) {
       throw new Error('Agent invocation is not authorized for this caller and workspace.');
     }
     this.budgets.set(context, budget);
     this.active.add(context);
     const controller = new AbortController();
     const remaining = Math.max(1, budget.deadlineAt - this.now());
-    const timeout = setTimeout(() => controller.abort(new Error('Agent chat deadline exceeded.')), remaining);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_resolve, reject) => {
+      timeout = setTimeout(() => {
+        controller.abort(new Error('Agent chat deadline exceeded.'));
+        reject(new Error('Agent chat deadline exceeded.'));
+      }, remaining);
+    });
     try {
-      const result = await this.options.dispatch(target, input, context, controller.signal);
+      const result = await Promise.race([
+        this.options.dispatch(context.target, input, context, controller.signal),
+        deadline,
+      ]);
       if (controller.signal.aborted || this.now() > budget.deadlineAt) {
         throw new Error('Agent chat deadline exceeded.');
       }
@@ -153,7 +162,7 @@ export class ImmediateCallerRouter {
         result,
       });
     } finally {
-      clearTimeout(timeout);
+      if (timeout) clearTimeout(timeout);
       this.active.delete(context);
       this.budgets.delete(context);
     }
