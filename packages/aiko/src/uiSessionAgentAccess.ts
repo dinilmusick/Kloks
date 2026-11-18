@@ -85,6 +85,22 @@ function assertCaller(caller: VerifiedUiAgentCaller | null, now: number):
     throw new Error('A verified, unexpired Luth session and active workspace are required.');
   }
 }
+/** Capture the exact JSON action BEFORE consent; no mutable post-approval payloads. */
+function canonicalAction(input: UiAgentActionRequest): string {
+  let serialized: string;
+  try {
+    serialized = JSON.stringify({
+      revision: input.revision, componentId: input.componentId,
+      controlId: input.controlId, payload: input.payload,
+    });
+  } catch {
+    throw new Error('The UI action payload must be serializable JSON.');
+  }
+  if (new TextEncoder().encode(serialized).byteLength > 256 * 1024) {
+    throw new Error('The UI action payload exceeds the session request limit.');
+  }
+  return serialized;
+}
 /** Never reuse consent across users, sessions, workspaces, apps or tabs. */
 export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
   const now = options.now ?? Date.now;
@@ -184,6 +200,7 @@ export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
           !actionName.test(input.controlId)) {
         throw new Error('Invalid approved UI action.');
       }
+      const capturedAction = canonicalAction(input);
       let current = await checked(session, windowId, 'action', signal);
       // The tab must still be open and the revision current BEFORE prompting.
       const before = await readRevision(await callUi(current, 'GET', undefined, signal), signal);
@@ -191,14 +208,16 @@ export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
         throw new Error('UI action revision is stale.');
       }
       current = await rechecked(session, current, 'action', signal);
-      const approved = await options.approveAction(current.caller, current.grant, input);
+      const approved = await options.approveAction(
+        current.caller, current.grant, JSON.parse(capturedAction) as UiAgentActionRequest);
       assertNotCancelled(signal);
       if (!approved) throw new Error('User approval for the exact UI action was denied.');
       current = await rechecked(session, current, 'action', signal);
       // Backend rejects closed tabs, non-advertised controls and stale revisions.
       // Cancellation before dispatch prevents queueing. An already queued command
       // must be cancelled by the host UI action consumer, not this overlay.
-      const response = await callUi(current, 'POST', input, signal);
+      const response = await callUi(
+        current, 'POST', JSON.parse(capturedAction) as UiAgentActionRequest, signal);
       const result: unknown = await response.json();
       assertNotCancelled(signal);
       const actionId = result !== null && typeof result === 'object' && 'actionId' in result
