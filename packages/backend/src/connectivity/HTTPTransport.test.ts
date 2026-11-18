@@ -8,7 +8,7 @@ afterEach(() => {
 
 describe('HTTPTransport bearer propagation', () => {
   it('sends the request bearer in Authorization and never in the JSON body', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), {
+    const fetchMock = vi.fn(async (..._args: Parameters<typeof fetch>) => new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: { 'content-type': 'application/json' },
     }));
@@ -45,7 +45,7 @@ describe('HTTPTransport bearer propagation', () => {
   });
 
   it('rejects malformed bearer credentials before making a network request', async () => {
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn(async (..._args: Parameters<typeof fetch>) => new Response(null));
     vi.stubGlobal('fetch', fetchMock);
     const transport = new HTTPTransport({ baseUrl: 'https://api.example.test' });
     const message: Message = {
