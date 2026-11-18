@@ -6,8 +6,8 @@
 
 ## Host-supplied authorities (all mandatory)
 
-Import `createFacadeInvocationBoundary` from `@ultrst-armada/kloks/backend/connectivity`
-(or the package's compatible `/backend` export). Supply:
+Import `createFacadeInvocationBoundary` from `@ultrst-armada/kloks/backend`
+(or `@kloks/backend/connectivity` inside the monorepo). Supply:
 
 | Callback | Owner and required invariant |
 | --- | --- |
