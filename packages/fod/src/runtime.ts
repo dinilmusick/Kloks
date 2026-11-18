@@ -96,6 +96,14 @@ export class FodRuntime {
     const scope=await this.authorizeWorkflowGrant('revoke',flowId,callerAppId,sourceWorkspaceId);
     return this.options.workflowGrantStore!.revoke(scope);
   }
+  /** Read-only identity from the runtime's trusted host configuration.
+   * The replay coordinator compares this against fresh Luth workspace scope. */
+  getPublicationReconciliationScope():{appId:string;ownerUserId:string;workspaceId:string} {
+    const publication=this.options.publication;
+    if (!publication) throw new Error('Publication authority not configured.');
+    return {appId:publication.appId,ownerUserId:publication.ownerUserId,workspaceId:this.options.workspaceId};
+  }
+
   /** Host calls only after authenticated startup/reconnect. Recheck Luth
    * workspace ownership before each publication record is synchronized. */
   async reconcilePublications():Promise<number> {
