@@ -45,7 +45,8 @@ describe('InProcessExecutor delegated callback session boundary', () => {
       target: 'workspace', operation: 'export', payload,
       callbackHandle: handle, sessionId: 'owner-session',
     })).resolves.toEqual({ accepted: true, payload });
-    expect(callback).toHaveBeenCalledExactlyOnceWith(payload);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledWith(payload);
   });
 
   it('keeps command delegation without callbacks backward compatible', async () => {
