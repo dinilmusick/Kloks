@@ -24,6 +24,14 @@ export interface FodWorkflowGrantScope {
   sourceWorkspaceId:string;
 }
 
+export interface FodWorkflowGrantApprovalRequest extends FodWorkflowGrantScope {
+  action:'grant'|'revoke';
+}
+
+export type FodWorkflowGrantAuthorizer=(
+  request:FodWorkflowGrantApprovalRequest,
+)=>Promise<FodWorkflowGrantApproval>;
+
 export interface FodWorkflowGrantQueryResult {
   rows?:readonly Record<string,unknown>[];
   rowCount?:number;
@@ -107,7 +115,7 @@ export function validateFodWorkflowGrantDescriptor(d:FodWorkflowGrantDescriptor)
   positiveVersion(d.version);
 }
 
-function validateScope(s:FodWorkflowGrantScope):void {
+export function validateFodWorkflowGrantScope(s:FodWorkflowGrantScope):void {
   canonicalAppId('app_id',s.appId);
   canonicalAppId('caller_app_id',s.callerAppId);
   nonEmpty('owner',s.ownerUserId);
@@ -155,7 +163,7 @@ SELECT count(*)::integer AS affected FROM granted`;
     },
 
     async revoke(s) {
-      validateScope(s);
+      validateFodWorkflowGrantScope(s);
       // Revoke every version in this exact scope. This makes an old cached
       // descriptor unusable even if the owner has since published a new version.
       const sql=`
