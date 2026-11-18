@@ -34,6 +34,10 @@ export function scanBackendFacade(facade:Record<string,unknown>):FodEndpointDesc
         deployment:typeof service.deployment === 'string' ? service.deployment : undefined,
         inputSchema:operation.inputSchema as Record<string,unknown>|undefined,
         outputSchema:operation.outputSchema as Record<string,unknown>|undefined,
+        ...((typeof operation.targetAppId==='string' && operation.targetAppId.trim() &&
+             typeof operation.targetAgentId==='string' && operation.targetAgentId.trim())
+          ? {targetApp:{appId:operation.targetAppId,agentId:operation.targetAgentId}}
+          : {}),
         invoke:(input:unknown)=>service.execute(operationKey,input)
       });
     }
@@ -54,6 +58,7 @@ export function endpointToNode(endpoint:FodEndpointDescriptor):FodNodeDefinition
       endpointId:endpoint.id,
       serviceId:endpoint.serviceId,
       operationId:endpoint.operationId,
+      ...(endpoint.targetApp ? {targetApp:endpoint.targetApp} : {}),
       runtime:endpoint.runtime,
       deployment:endpoint.deployment
     }
