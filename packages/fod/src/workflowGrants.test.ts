@@ -100,7 +100,7 @@ describe('SQL workflow grant store',()=>{
     const calls:string[]=[];
     const store=createSqlFodWorkflowGrantStore(async(sql)=>{
       calls.push(sql);
-      if(sql.includes('WITH target_publication')) return {rows:[{affected:1}]};
+      if(sql.includes('WITH target_publication AS (')) return {rows:[{affected:1}]};
       if(sql.includes('UPDATE skipo_ecosystem.workflow_grants')) {
         active=false;
         return {rows:[{affected:1}]};
@@ -141,7 +141,7 @@ describe('FOD owner grant controls',()=>{
   it('creates and revokes the exact current-version cross-app workspace grant after owner authorization',async()=>{
     const grants:FodWorkflowGrantDescriptor[]=[];
     const revocations:FodWorkflowGrantScope[]=[];
-    const approvals:Array<Record<string,unknown>>=[];
+    const approvals:string[]=[];
     const runtime=new FodRuntime({
       workspaceId:'kone-workspace',workspaceService:memoryWorkspace(),
       publication:{appId:'kone',ownerUserId:'luth-owner',sink:{synchronize:async()=>{}}},
@@ -152,7 +152,7 @@ describe('FOD owner grant controls',()=>{
         isGranted:async()=>true,
       },
       authorizeWorkflowGrant:async(request)=>{
-        approvals.push(request);
+        approvals.push(request.action);
         return {
           userId:'luth-owner',targetAppId:'kone',targetWorkspaceId:'kone-workspace',
           callerAppId:'aiko',sourceWorkspaceId:'aiko-workspace',
@@ -174,7 +174,7 @@ describe('FOD owner grant controls',()=>{
     }]);
     expect(await runtime.revokeFlow('report','aiko','aiko-workspace')).toBe(true);
     expect(revocations).toEqual([scope]);
-    expect(approvals.map(a=>a.action)).toEqual(['grant','revoke']);
+    expect(approvals).toEqual(['grant','revoke']);
   });
 
   it('denies cross-user grants and fails closed when the owner authority is absent',async()=>{
@@ -194,6 +194,7 @@ describe('FOD owner grant controls',()=>{
     const denied=new FodRuntime({
       workspaceId:'kone-workspace',workspaceService:workspace,
       publication:{appId:'kone',ownerUserId:'luth-owner',sink:{synchronize:async()=>{}}},
+      authorizePublication:async()=>{},
       ...dependencies,
     });
     await denied.saveFlow(flow('report'));
