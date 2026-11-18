@@ -3,3 +3,4 @@ export * from './runtime.js';
 export * from './centralIntelligence.js';
 
 export * from './callerRouting.js';
+export * from './chatIntegration.js';
