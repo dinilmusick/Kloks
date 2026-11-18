@@ -47,6 +47,10 @@ export interface ImmediateCallerRouterOptions {
   maxCalls?: number;
   timeoutMs?: number;
   now?: () => number;
+  /** Canonical durable/transactional deduplication adapter; must reject key reuse with changed input. */
+  runOnce?: (scope: { userId: string; callerAppId: string; workspaceId: string;
+    targetAppId: string; agentId: string; requestKey: string }, input: unknown,
+    execute: () => Promise<RoutedChatReply>) => Promise<RoutedChatReply>;
 }
 
 interface TraceBudget {
@@ -94,6 +98,22 @@ export class ImmediateCallerRouter {
       calls: 0,
     };
     return this.invoke(caller, target, input, budget, [], 0);
+  }
+
+  /** Replay-safe root call, only when the host provides transactional deduplication. */
+  async callIdempotent(session: unknown, target: ChatTarget, input: unknown,
+    requestKey: string): Promise<RoutedChatReply> {
+    if (!this.options.runOnce || !/^[a-zA-Z0-9_-]{8,128}$/.test(requestKey)) {
+      throw new Error('A valid request key and trusted idempotency adapter are required.');
+    }
+    const caller = await this.options.verifyCaller(session);
+    if (!caller?.userId || !caller.appId || !caller.workspaceId) {
+      throw new Error('An authenticated caller and active workspace are required.');
+    }
+    const scope = { userId: caller.userId, callerAppId: caller.appId,
+      workspaceId: caller.workspaceId, targetAppId: target.appId,
+      agentId: target.agentId, requestKey };
+    return this.options.runOnce(scope, input, () => this.call(session, target, input));
   }
 
   /** Can only be called with an active, router-issued invocation context. */
