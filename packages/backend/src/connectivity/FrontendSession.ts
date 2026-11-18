@@ -21,6 +21,7 @@ export class FrontendSession {
   public readonly callbackRegistry: CallbackRegistry;
   public readonly sequenceTracker: SequenceTracker;
   private subscriptions: Set<() => void> = new Set();
+  private disposed = false;
 
   constructor(options: FrontendSessionOptions = {}) {
     this.sessionId = options.sessionId || `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -31,6 +32,7 @@ export class FrontendSession {
   }
 
   setCredential(key: string, value: string): this {
+    if (this.disposed) throw new Error('[FrontendSession] Cannot update a disposed session.');
     this.credentials[key] = value;
     return this;
   }
@@ -44,6 +46,7 @@ export class FrontendSession {
   }
 
   grantCapability(capability: string): this {
+    if (this.disposed) throw new Error('[FrontendSession] Cannot update a disposed session.');
     this.capabilities.add(capability);
     return this;
   }
@@ -53,6 +56,12 @@ export class FrontendSession {
   }
 
   trackSubscription(cleanup: () => void): () => void {
+    if (this.disposed) {
+      // Async subscription attachment can resolve after sign-out. Release it
+      // immediately rather than leaving a live listener on a closed session.
+      try { cleanup(); } catch {}
+      return () => {};
+    }
     this.subscriptions.add(cleanup);
     return () => {
       this.subscriptions.delete(cleanup);
@@ -68,6 +77,11 @@ export class FrontendSession {
   }
 
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    // Revoke credentials and in-memory grants before listener cleanup can run.
+    this.credentials = {};
+    this.capabilities.clear();
     this.clearSubscriptions();
     this.callbackRegistry.clear();
     this.sequenceTracker.reset();
