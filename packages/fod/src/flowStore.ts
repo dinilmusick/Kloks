@@ -1,7 +1,8 @@
 import type {FodFlow} from './types.js';
+import type {FodPublicationOptions,FodPublicationDescriptor} from './publicationSync.js';
 
 const ROOT='FOD';
-type StoredFlow=FodFlow & {__versions?:FodFlow[]};
+type StoredFlow=FodFlow & {__versions?:FodFlow[];__publication?:{visible:boolean}};
 const locks=new Map<string,Promise<void>>();
 
 function pathFor(flowId:string):string {
@@ -15,7 +16,7 @@ function assertWritableId(flowId:string):void {
   }
 }
 function publicFlow(stored:StoredFlow):FodFlow {
-  const {__versions: _versions,...flow}=stored;
+  const {__versions: _versions,__publication: _publication,...flow}=stored;
   return flow;
 }
 function isMissing(error:unknown):boolean {
@@ -39,7 +40,35 @@ function decodeFlow(raw:unknown):StoredFlow|null {
  * The global capability catalog must index metadata only, never this document.
  */
 export class FodFlowStore {
-  constructor(private readonly workspaceService:any) {}
+  constructor(
+    private readonly workspaceService:any,
+    private readonly publication?:FodPublicationOptions,
+  ) {}
+
+  private publicationDescriptor(workspaceId:string,stored:StoredFlow):FodPublicationDescriptor {
+    if (!this.publication) throw new Error('A trusted publication sink is required.');
+    return {
+      appId:this.publication.appId,
+      ownerUserId:this.publication.ownerUserId,
+      workspaceId,
+      workflowId:stored.id,
+      version:stored.version,
+      displayName:stored.name,
+      description:stored.description,
+      state:stored.__publication?.visible ? 'published' : 'withdrawn',
+    };
+  }
+
+  private async syncPublication(workspaceId:string,stored:StoredFlow):Promise<void> {
+    if (!stored.__publication) return; // Private flows are never indexed.
+    if (!this.publication) throw new Error('A trusted publication sink is required.');
+    await this.publication.sink.synchronize(this.publicationDescriptor(workspaceId,stored));
+  }
+
+  private async writeRecord(workspaceId:string,record:StoredFlow):Promise<void> {
+    const result=await this.workspaceService.writeFile(workspaceId,pathFor(record.id),JSON.stringify(record,null,2));
+    if (result?.success===false) throw new Error('Unable to persist workflow revision.');
+  }
 
   private async withLock<T>(workspaceId:string,flowId:string,action:()=>Promise<T>):Promise<T> {
     const key=workspaceId+'\0'+flowId;
@@ -104,15 +133,74 @@ export class FodFlowStore {
       if (history.some(item=>item.version===next.version)) {
         throw new Error('Flow revision already exists.');
       }
-      const record:StoredFlow={...next,__versions:[...history,next]};
-      const result=await this.workspaceService.writeFile(workspaceId,pathFor(flow.id),JSON.stringify(record,null,2));
-      if (result?.success===false) throw new Error('Unable to persist workflow revision.');
+      if (previous?.__publication && !this.publication) {
+        throw new Error('Cannot edit indexed workflow without a trusted publication sink.');
+      }
+      const record:StoredFlow={...next,__versions:[...history,next],__publication:previous?.__publication};
+      await this.writeRecord(workspaceId,record);
+      // Re-publish the latest pinned version (or retry a pending withdrawal).
+      // On failure the workspace document remains authoritative; reconcile on
+      // startup/reconnect will retry the idempotent metadata sync.
+      await this.syncPublication(workspaceId,record);
       return next;
     });
   }
 
+  /** Explicit opt-in only. A private save never publishes or grants access. */
+  async publish(workspaceId:string,flowId:string):Promise<FodFlow> {
+    if (!this.publication) throw new Error('A trusted publication sink is required.');
+    return this.withLock(workspaceId,flowId,async()=>{
+      const stored=await this.read(workspaceId,flowId);
+      if (!stored) throw new Error('Cannot publish a missing workspace workflow.');
+      const record:StoredFlow={...stored,__publication:{visible:true}};
+      await this.writeRecord(workspaceId,record);
+      await this.syncPublication(workspaceId,record);
+      return publicFlow(record);
+    });
+  }
+
+  async unpublish(workspaceId:string,flowId:string):Promise<boolean> {
+    if (!this.publication) throw new Error('A trusted publication sink is required.');
+    return this.withLock(workspaceId,flowId,async()=>{
+      const stored=await this.read(workspaceId,flowId);
+      if (!stored?.__publication) return false;
+      const record:StoredFlow={...stored,__publication:{visible:false}};
+      await this.writeRecord(workspaceId,record);
+      await this.syncPublication(workspaceId,record);
+      return true;
+    });
+  }
+
+  /** Replay workspace-owned publication intent after service reconnect/restart. */
+  async reconcilePublications(workspaceId:string):Promise<number> {
+    if (!this.publication) throw new Error('A trusted publication sink is required.');
+    const entries=await this.workspaceService.listFiles(workspaceId,ROOT);
+    let count=0;
+    for (const entry of entries) {
+      if (entry.isFolder || !entry.name.endsWith('.json') || !/^FOD\\/[^/]+\\.json$/.test(entry.path)) continue;
+      const flowId=entry.name.slice(0,-5);
+      await this.withLock(workspaceId,flowId,async()=>{
+        const stored=await this.read(workspaceId,flowId);
+        if (stored?.__publication) {
+          await this.syncPublication(workspaceId,stored);
+          count++;
+        }
+      });
+    }
+    return count;
+  }
+
   async delete(workspaceId:string,flowId:string):Promise<boolean> {
     return this.withLock(workspaceId,flowId,async()=>{
+      const stored=await this.read(workspaceId,flowId);
+      if (stored?.__publication) {
+        // Fail closed. Persist the unpublish intent BEFORE deleting the only
+        // workspace-owned definition, so an interrupted withdrawal is replayable.
+        if (!this.publication) throw new Error('Cannot delete indexed workflow without a trusted publication sink.');
+        const tombstone:StoredFlow={...stored,__publication:{visible:false}};
+        await this.writeRecord(workspaceId,tombstone);
+        await this.syncPublication(workspaceId,tombstone);
+      }
       const result=await this.workspaceService.deleteFile(workspaceId,pathFor(flowId));
       return Boolean(result?.success);
     });
