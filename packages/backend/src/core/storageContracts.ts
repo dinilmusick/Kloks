@@ -7,6 +7,8 @@ export type StorageProviderId =
   | 'local_fs'
   | 'backblaze_b2'
   | 'google_drive'
+  | 'github'
+  | 'dropbox'
   | 'cloudflare_r2'
   | 'aws_s3';
 
@@ -56,6 +58,8 @@ export interface StorageConnectionPublic {
   googleAccountId?: string;
   googleRootFolderId?: string;
   googleRootFolderName?: string;
+  providerAccountId?: string;
+  providerAccountName?: string;
   authorizationState?: 'connected' | 'expired' | 'pending' | 'error';
   metadata?: Record<string, unknown>;
 }
@@ -87,4 +91,8 @@ export interface StorageConnectionInternal extends StorageConnectionPublic {
   googleAccessToken?: string;
   googleAccessTokenExpiresAt?: number;
   googleRefreshToken?: string;
+  githubAccessToken?: string;
+  dropboxAccessToken?: string;
+  dropboxRefreshToken?: string;
+  dropboxAccessTokenExpiresAt?: number;
 }
