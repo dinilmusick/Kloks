@@ -177,7 +177,7 @@ export class FodFlowStore {
     const entries=await this.workspaceService.listFiles(workspaceId,ROOT);
     let count=0;
     for (const entry of entries) {
-      if (entry.isFolder || !entry.name.endsWith('.json') || !/^FOD\\/[^/]+\\.json$/.test(entry.path)) continue;
+      if (entry.isFolder || !entry.name.endsWith('.json') || !/^FOD\/[^/]+\.json$/.test(entry.path)) continue;
       const flowId=entry.name.slice(0,-5);
       await this.withLock(workspaceId,flowId,async()=>{
         const stored=await this.read(workspaceId,flowId);
