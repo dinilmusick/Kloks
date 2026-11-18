@@ -144,6 +144,18 @@ describe('caller-authorized Aiko agent directory', () => {
     ]);
   });
 
+
+  it('requires a server-resolved Luth caller before reading the registry', async () => {
+    const listAgents = vi.fn(() => []);
+    const directory = createAikoAgentDirectory({
+      resolveCaller: () => null,
+      listAgents,
+      authorize: () => true,
+    });
+    await expect(directory.list()).rejects.toThrow('verified Luth caller');
+    expect(listAgents).not.toHaveBeenCalled();
+  });
+
   it('rejects duplicate stable IDs from the canonical registry', async () => {
     const first = agent({ id: 'duplicate', sourceKind: 'endpoint', sourceId: 'one', name: 'One' });
     const second = agent({ id: 'duplicate', sourceKind: 'fod-flow', sourceId: 'two', name: 'Two' });
