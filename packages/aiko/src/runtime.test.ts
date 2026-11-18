@@ -120,3 +120,62 @@ it('refreshes a saved agent’s selected spec before parsing and stops on revoca
   await expect(runtime.executeAgent(saved.id, 'use current settings')).rejects.toThrow('access was denied');
   expect(deliveries).toEqual([8]);
 });
+
+
+describe('AikoRuntime trusted cross-app dispatch',()=>{
+  it('routes a current remote capability through the host-bound call-chain invoker',async()=>{
+    const direct:string[]=[];
+    const routed:Array<{appId:string;agentId:string;input:unknown}>=[];
+    const runtime=new AikoRuntime({
+      appId:'aiko',
+      capabilities:[{
+        id:'remote-report',name:'Report',sourceKind:'endpoint',sourceId:'remote-report',
+        targetApp:{appId:'kone',agentId:'FodService.executePublishedFlow'},
+        execute:async(input)=>{direct.push('direct');return input;},
+      }],
+      invokeCrossApp:async(target,input)=>{routed.push({...target,input});return {via:'router',input};},
+      resolver:{resolve:()=>({spec:{}})},
+      keys:{listKeys:async()=>[],getActiveKey:async()=>null,rotateKey:async()=>null,syncFromAikoEngine:async()=>({synced:0})},
+    });
+    await expect(runtime.executeAgent('aiko-endpoint-remote-report',{runId:'r1'})).resolves.toEqual({
+      via:'router',input:{runId:'r1'},
+    });
+    expect(routed).toEqual([{
+      appId:'kone',agentId:'FodService.executePublishedFlow',input:{runId:'r1'},
+    }]);
+    expect(direct).toEqual([]);
+  });
+
+  it('fails closed when a remote capability has no active trusted routing adapter',async()=>{
+    let invoked=0;
+    const runtime=new AikoRuntime({
+      appId:'aiko',
+      capabilities:[{
+        id:'remote',name:'Remote',sourceKind:'endpoint',sourceId:'remote',
+        targetApp:{appId:'kone',agentId:'workflow-1'},
+        execute:async()=>{invoked++;return 'unsafe-local-fallback';},
+      }],
+      resolver:{resolve:()=>({spec:{}})},
+      keys:{listKeys:async()=>[],getActiveKey:async()=>null,rotateKey:async()=>null,syncFromAikoEngine:async()=>({synced:0})},
+    });
+    await expect(runtime.executeAgent('aiko-endpoint-remote',{})).rejects.toThrow(/active trusted call-chain context/);
+    expect(invoked).toBe(0);
+  });
+
+  it('keeps same-app capabilities local and refreshes target binding before dispatch',async()=>{
+    let invoked=0;
+    const runtime=new AikoRuntime({
+      appId:'aiko',
+      capabilities:[{
+        id:'local',name:'Local',sourceKind:'endpoint',sourceId:'local',
+        targetApp:{appId:'aiko',agentId:'local-operation'},
+        execute:async(input)=>{invoked++;return input;},
+      }],
+      invokeCrossApp:async()=>{throw new Error('same app must not cross router');},
+      resolver:{resolve:()=>({spec:{}})},
+      keys:{listKeys:async()=>[],getActiveKey:async()=>null,rotateKey:async()=>null,syncFromAikoEngine:async()=>({synced:0})},
+    });
+    await expect(runtime.executeAgent('aiko-endpoint-local',{ok:true})).resolves.toEqual({ok:true});
+    expect(invoked).toBe(1);
+  });
+});
