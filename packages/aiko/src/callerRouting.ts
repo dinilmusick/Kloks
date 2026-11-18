@@ -110,8 +110,20 @@ export class ImmediateCallerRouter {
     if (!caller?.userId || !caller.appId || !caller.workspaceId) {
       throw new Error('An authenticated caller and active workspace are required.');
     }
-    const scope = { userId: caller.userId, callerAppId: caller.appId,
-      callerAgentId: caller.agentId, workspaceId: caller.workspaceId, targetAppId: target.appId,
+    if (!target.appId || !target.agentId) throw new Error('A target app and agent are required.');
+    // Recheck the current grant even when the durable adapter returns a cached reply.
+    const trusted = Object.freeze({ userId: caller.userId, appId: caller.appId,
+      workspaceId: caller.workspaceId, ...(caller.agentId ? { agentId: caller.agentId } : {}) });
+    const preflight: ChatCallContext = Object.freeze({
+      callId: crypto.randomUUID(), traceId: crypto.randomUUID(), caller: trusted,
+      target: Object.freeze({ ...target }), ancestry: Object.freeze([trusted.appId]),
+      depth: 0, deadlineAt: this.now() + this.timeoutMs,
+    });
+    if (!await this.options.authorize(trusted, preflight.target, preflight)) {
+      throw new Error('Agent invocation is not authorized for this caller and workspace.');
+    }
+    const scope = { userId: trusted.userId, callerAppId: trusted.appId,
+      callerAgentId: trusted.agentId, workspaceId: trusted.workspaceId, targetAppId: target.appId,
       agentId: target.agentId, requestKey };
     return this.options.runOnce(scope, input, () => this.call(session, target, input));
   }
