@@ -100,7 +100,7 @@ export class FodFlowStore {
       if (entry.isFolder || !entry.name.endsWith('.json') || !/^FOD\/[^/]+\.json$/.test(entry.path)) continue;
       try {
         const stored=decodeFlow(await this.workspaceService.readFile(workspaceId,entry.path));
-        if (stored) flows.push(publicFlow(stored));
+        if (stored && !stored.__deletePending) flows.push(publicFlow(stored));
       } catch { /* Preserve legacy behavior for unrelated/corrupt entries. */ }
     }
     return flows.sort((a,b)=>a.name.localeCompare(b.name));
@@ -111,7 +111,7 @@ export class FodFlowStore {
       throw new Error('Invalid requested flow version.');
     }
     const stored=await this.read(workspaceId,flowId);
-    if (!stored) return null;
+    if (!stored || stored.__deletePending) return null;
     const latest=publicFlow(stored);
     if (version===undefined || version===latest.version) return latest;
     return (stored.__versions??[]).find(flow=>flow.id===flowId && flow.version===version)??null;
