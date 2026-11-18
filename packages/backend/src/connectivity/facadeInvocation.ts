@@ -93,12 +93,39 @@ function assertDescriptor(operation: FacadeOperationDescriptor): boolean {
   return operation.kind === 'workflow' && validId(operation.workflowId);
 }
 
+/** Compare authority and immutable dispatch references, not mutable display labels. */
+function sameCallerIdentity(before: VerifiedFacadeCaller, after: VerifiedFacadeCaller): boolean {
+  return before.principalId === after.principalId &&
+    before.sessionId === after.sessionId &&
+    before.sourceAppId === after.sourceAppId &&
+    before.sourceWorkspaceId === after.sourceWorkspaceId &&
+    before.audience === after.audience &&
+    before.invoker.kind === after.invoker.kind && before.invoker.id === after.invoker.id &&
+    before.depth === after.depth && before.chain.length === after.chain.length &&
+    before.chain.every((id, index) => id === after.chain[index]);
+}
+function sameDispatchReference(before: FacadeOperationDescriptor, after: FacadeOperationDescriptor): boolean {
+  return before.id === after.id && before.version === after.version &&
+    before.targetWorkspaceId === after.targetWorkspaceId && before.kind === after.kind &&
+    (before.kind === 'workflow'
+      ? before.workflowId === after.workflowId
+      : before.serviceId === after.serviceId && before.serviceOperation === after.serviceOperation);
+}
+
+function parseJson(body: Request): Promise<unknown> {
+  return body.json().catch(() => fail('MALFORMED_JSON', 400));
+}
+
 /**
  * All four entry points call the same guard. No client-controlled user, app,
  * source workspace, parent caller or grant claim is accepted as authority.
  */
 export function createFacadeInvocationBoundary(options: FacadeInvocationOptions) {
   if (!validId(options.targetAppId)) throw new Error('Invalid target application identity');
+  for (const name of ['verifyLuthCredential', 'listCurrentOperations', 'authorize',
+    'deploymentEligible', 'consumeInvocation', 'invokePublishedWorkflow', 'delegateCredential'] as const) {
+    if (typeof options[name] !== 'function') throw new Error(`Missing required facade authority: ${name}`);
+  }
 
   async function callerFor(credential: string): Promise<VerifiedFacadeCaller> {
     if (!credential || typeof credential !== 'string') fail('AUTH_REQUIRED', 401);
@@ -154,11 +181,13 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
     parentSignal?.addEventListener('abort', abort, { once: true });
     if (parentSignal?.aborted) controller.abort();
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
+    const abortError = () => new FacadeInvocationDenied(timedOut ? 'DEADLINE_EXCEEDED' : 'CANCELLED', 408);
     try {
       const stopped = new Promise<never>((_, reject) => {
-        controller.signal.addEventListener('abort', () => reject(new FacadeInvocationDenied('CANCELLED', 408)), { once: true });
-        timer = setTimeout(() => { controller.abort(); }, remaining);
-        if (controller.signal.aborted) reject(new FacadeInvocationDenied('CANCELLED', 408));
+        controller.signal.addEventListener('abort', () => reject(abortError()), { once: true });
+        timer = setTimeout(() => { timedOut = true; controller.abort(); }, remaining);
+        if (controller.signal.aborted) reject(abortError());
       });
       const work = async () => {
         if (operation.kind === 'workflow') {
@@ -171,8 +200,20 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
         return service.execute(operation.serviceOperation!, request.input, { signal: controller.signal, transport });
       };
       const output = await Promise.race([work(), stopped]);
-      if (!await options.authorize(decision, 'output', output)) fail('ACCESS_REVOKED');
-      return { output, replyTo: { ...caller.invoker }, invocationId: request.invocationId };
+      // Do not release an output based solely on the authorization made before execution.
+      // Session revocation, deployment expiry, workflow unpublication and operation
+      // version/dispatch-reference replacement must all take effect while work is running.
+      const currentCaller = await callerFor(credential);
+      if (!sameCallerIdentity(caller, currentCaller)) fail('CALLER_CHANGED', 401);
+      const currentOperations = await options.listCurrentOperations(request.targetWorkspaceId);
+      if (!currentOperations.some(op => assertDescriptor(op) && sameDispatchReference(operation, op))) {
+        fail('OPERATION_REVOKED', 403);
+      }
+      const currentDecision: FacadeDecision = { caller: currentCaller, operation, transport };
+      if (!await options.deploymentEligible(currentDecision)) fail('DEPLOYMENT_UNAVAILABLE', 503);
+      if (!await options.authorize(currentDecision, 'output', output)) fail('ACCESS_REVOKED');
+      if (controller.signal.aborted) throw abortError();
+      return { output, replyTo: { ...currentCaller.invoker }, invocationId: request.invocationId };
     } finally {
       if (timer) clearTimeout(timer);
       parentSignal?.removeEventListener('abort', abort);
@@ -213,7 +254,7 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
         return Response.json({ operations: await discover(credential, new URL(request.url).searchParams.get('workspace') ?? '', 'http') }, { headers: { 'Cache-Control': 'no-store' } });
       }
       if (path === '/api/crossapp/invoke' && request.method === 'POST') {
-        return Response.json(await invoke(credential, await request.json() as FacadeInvocation, 'http', request.signal), { headers: { 'Cache-Control': 'no-store' } });
+        return Response.json(await invoke(credential, await parseJson(request) as FacadeInvocation, 'http', request.signal), { headers: { 'Cache-Control': 'no-store' } });
       }
       return errorResponse(new FacadeInvocationDenied('NOT_FOUND', 404));
     } catch (error) { return errorResponse(error); }
@@ -223,20 +264,76 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
     let id: unknown = null;
     try {
       const credential = bearer(request);
-      const body = await request.json() as { id?: unknown; method?: string; params?: Record<string, unknown> };
+      const body = await parseJson(request) as { jsonrpc?: unknown; id?: unknown; method?: unknown; params?: Record<string, unknown> };
+      if (!body || typeof body !== 'object' || Array.isArray(body) || body.jsonrpc !== '2.0' ||
+        typeof body.method !== 'string') fail('INVALID_MCP_REQUEST', 400);
       id = body.id ?? null;
+      if (body.method === 'notifications/initialized' && body.id === undefined) {
+        return new Response(null, { status: 202 });
+      }
+      if (body.id === undefined || (typeof body.id !== 'string' && typeof body.id !== 'number')) {
+        fail('INVALID_MCP_REQUEST', 400);
+      }
+      if (body.method === 'initialize') {
+        return Response.json({ jsonrpc: '2.0', id, result: {
+          protocolVersion: '2025-06-18',
+          capabilities: { tools: { listChanged: false } },
+          serverInfo: { name: 'kloks-backend-facade', version: '1.0.0' },
+        } }, { headers: { 'Cache-Control': 'no-store' } });
+      }
       if (body.method === 'tools/list') {
         const workspace = body.params?.workspaceId;
-        return Response.json({ jsonrpc: '2.0', id, result: { tools: (await discover(credential, String(workspace ?? ''), 'mcp')).map(op => ({ name: op.id, description: op.name, _meta: { version: op.version, targetWorkspaceId: op.targetWorkspaceId } })) } });
+        if (typeof workspace !== 'string') fail('INVALID_WORKSPACE', 400);
+        const operations = await discover(credential, workspace, 'mcp');
+        return Response.json({ jsonrpc: '2.0', id, result: { tools: operations.map(op => ({
+          name: op.id, description: op.name,
+          inputSchema: {
+            type: 'object',
+            properties: {
+              version: { type: 'string', const: op.version },
+              targetWorkspaceId: { type: 'string', const: op.targetWorkspaceId },
+              invocationId: { type: 'string', minLength: 1, maxLength: 128 },
+              input: {},
+            },
+            required: ['version', 'targetWorkspaceId', 'invocationId', 'input'],
+            additionalProperties: false,
+          },
+          _meta: { version: op.version, targetWorkspaceId: op.targetWorkspaceId },
+        })) } }, { headers: { 'Cache-Control': 'no-store' } });
       }
       if (body.method === 'tools/call') {
-        const result = await invoke(credential, body.params?.invocation as FacadeInvocation, 'mcp', request.signal);
-        return Response.json({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(result.output) }], structuredContent: result.output } });
+        const params = body.params;
+        let invocation: FacadeInvocation;
+        if (typeof params?.name === 'string') {
+          const args = params.arguments;
+          if (!args || typeof args !== 'object' || Array.isArray(args) ||
+            Object.keys(args).some(key => !['version', 'targetWorkspaceId', 'invocationId', 'input'].includes(key)) ||
+            own(params, 'invocation')) fail('INVALID_MCP_REQUEST', 400);
+          const values = args as Record<string, unknown>;
+          invocation = {
+            operationId: params.name,
+            version: values.version as string,
+            targetWorkspaceId: values.targetWorkspaceId as string,
+            invocationId: values.invocationId as string,
+            input: values.input,
+          };
+        } else {
+          // Temporary legacy adapter; both request forms share the same target guard.
+          invocation = params?.invocation as FacadeInvocation;
+        }
+        const result = await invoke(credential, invocation, 'mcp', request.signal);
+        const output = result.output ?? null;
+        const structuredContent = output && typeof output === 'object' && !Array.isArray(output)
+          ? output : { value: output };
+        return Response.json({ jsonrpc: '2.0', id, result: {
+          content: [{ type: 'text', text: JSON.stringify(output) }], structuredContent, isError: false,
+        } }, { headers: { 'Cache-Control': 'no-store' } });
       }
       return Response.json({ jsonrpc: '2.0', id, error: { code: -32601, message: 'Method not found' } }, { status: 404 });
     } catch (error) {
       const denied = error instanceof FacadeInvocationDenied ? error : new FacadeInvocationDenied('INTERNAL_ERROR', 500);
-      return Response.json({ jsonrpc: '2.0', id, error: { code: denied.status, message: denied.code } }, { status: denied.status });
+      return Response.json({ jsonrpc: '2.0', id, error: { code: denied.status, message: denied.code } },
+        { status: denied.status, headers: { 'Cache-Control': 'no-store' } });
     }
   }
 
