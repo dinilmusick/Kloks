@@ -1,5 +1,5 @@
 import { SMALL_SCRIPT_NODE, type SmallScriptExecutor } from './smallScript.js';
-import type {FodEndpointDescriptor,FodExecutionResult,FodFlow,FodNodeDefinition} from './types.js';
+import type {FodEndpointDescriptor,FodExecutionResult,FodFlow,FodNodeDefinition,FodRuntimeOptions} from './types.js';
 import {FodFlowStore} from './flowStore.js';
 import type {FodPublicationOptions} from './publicationSync.js';
 import {validateFodWorkflowGrantScope,type FodWorkflowGrantApproval,type FodWorkflowGrantAuthorizer,type FodWorkflowGrantStore} from './workflowGrants.js';
@@ -10,21 +10,7 @@ export class FodRuntime {
   private endpoints=new Map<string,FodEndpointDescriptor>();
   private nodes:FodNodeDefinition[]=[];
 
-  constructor(private readonly options:{
-    workspaceId:string;workspaceService:any;
-    onEvent?:(event:any)=>void;scriptExecutor?:SmallScriptExecutor;
-    publication?:FodPublicationOptions;
-    /** Must check the Luth principal and owning workspace; defaults to DENY. */
-    authorizePublication?:(action:'publish'|'unpublish',workspaceId:string,flowId:string)=>Promise<void>;
-    /** Host-bound Luth principal, workspace ACL and caller grant check.
-     * The discovery index is never authority; absent authorization denies.
-     */
-    authorizePublishedExecution?:(workspaceId:string,flowId:string,version:number)=>Promise<void>;
-    /** Server-side SQL store for owner-approved workflow grants. */
-    workflowGrantStore?:FodWorkflowGrantStore;
-    /** Must return identities resolved from Luth and canonical workspace/app ACLs. */
-    authorizeWorkflowGrant?:FodWorkflowGrantAuthorizer;
-  }) {
+  constructor(private readonly options:FodRuntimeOptions) {
     this.flowStore=new FodFlowStore(options.workspaceService,options.publication);
   }
 
