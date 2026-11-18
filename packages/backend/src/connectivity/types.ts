@@ -63,6 +63,10 @@ export interface Delegation<T = unknown> {
   eventChannel?: string;
   sessionId?: string;
   correlationId?: string;
+  /** Request-scoped caller context; token is transported only as an Authorization header. */
+  authContext?: AuthContext;
+  /** Non-authoritative capability routing metadata for the selected request. */
+  capabilityContext?: CapabilityContext;
 }
 
 export type JobState =
