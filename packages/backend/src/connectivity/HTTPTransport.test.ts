@@ -62,7 +62,7 @@ describe('HTTPTransport bearer propagation', () => {
   });
 
   it('keeps unauthenticated requests backward compatible without inventing caller identity', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), {
+    const fetchMock = vi.fn(async (..._args: Parameters<typeof fetch>) => new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: { 'content-type': 'application/json' },
     }));
