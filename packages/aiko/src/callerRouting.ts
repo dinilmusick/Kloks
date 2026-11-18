@@ -81,7 +81,14 @@ export class ImmediateCallerRouter {
     if (!verified || !verified.userId || !verified.appId || !verified.workspaceId) {
       throw new Error('An authenticated caller and active workspace are required.');
     }
-    const caller = Object.freeze({ ...verified });
+    // Never put a session token, cookie, or private verifier output into a
+    // cross-app invocation context or its returned routing metadata.
+    const caller: VerifiedChatCaller = Object.freeze({
+      userId: verified.userId,
+      appId: verified.appId,
+      workspaceId: verified.workspaceId,
+      ...(verified.agentId ? { agentId: verified.agentId } : {}),
+    });
     const budget: TraceBudget = {
       traceId: crypto.randomUUID(),
       deadlineAt: this.now() + this.timeoutMs,
