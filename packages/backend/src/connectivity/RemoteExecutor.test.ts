@@ -1,7 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { HTTPTransport } from './HTTPTransport.js';
 import { RemoteExecutor } from './RemoteExecutor.js';
 import type { ITransport } from './Transport.js';
 import type { Message } from './types.js';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function createTransport() {
   const messages: Message[] = [];
@@ -88,6 +93,52 @@ describe('RemoteExecutor request-scoped caller context', () => {
     expect(messages[1]?.payload).not.toHaveProperty('capabilityContext');
     expect(JSON.stringify(messages[1]?.payload)).not.toContain('delegation-token');
     expect(getAuthContext).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends distinct per-request bearers for remote command, query and delegation calls', async () => {
+    const fetchMock = vi.fn(async (..._args: Parameters<typeof fetch>) => new Response(JSON.stringify({ accepted: true }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const tokens = ['command-token', 'query-token', 'delegate-token'];
+    const getAuthContext = vi.fn()
+      .mockReturnValueOnce({ token: tokens[0], userId: 'caller-1' })
+      .mockReturnValueOnce({ token: tokens[1], userId: 'caller-1' })
+      .mockReturnValueOnce({ token: tokens[2], userId: 'caller-1' });
+    const executor = new RemoteExecutor({
+      transport: new HTTPTransport({ baseUrl: 'https://api.example.test' }),
+      getAuthContext,
+    });
+
+    await executor.execute({
+      id: 'command',
+      type: 'COMMAND',
+      operation: 'storage.list',
+      payload: { workspaceId: 'w-1' },
+      timestamp: 1,
+    });
+    await executor.query({
+      id: 'query',
+      type: 'QUERY',
+      operation: 'storage.get',
+      payload: { key: 'doc-1' },
+      timestamp: 2,
+    });
+    await executor.delegate({
+      target: 'workflow',
+      operation: 'run',
+      payload: { workflowId: 'wf-1' },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const headers = fetchMock.mock.calls.map(([, init]) => init?.headers as Record<string, string>);
+    expect(headers.map(item => item.Authorization)).toEqual(tokens.map(token => `Bearer ${token}`));
+    const bodies = fetchMock.mock.calls.map(([, init]) => String(init?.body));
+    for (const token of tokens) {
+      expect(bodies.join(' ')).not.toContain(token);
+    }
+    expect(getAuthContext).toHaveBeenCalledTimes(3);
   });
 
   it('prefers delegation-scoped context over the ambient provider', async () => {
