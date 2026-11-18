@@ -153,7 +153,8 @@ WITH target_publication AS (
     FROM target_publication
   ON CONFLICT
     (publication_id,caller_app_id,source_workspace_id,target_workspace_id)
-  DO UPDATE SET grant_state='active',revoked_at=NULL,revoked_by_user_id=NULL
+    WHERE grant_state='active'
+  DO UPDATE SET grant_state='active'
   RETURNING id
 )
 SELECT count(*)::integer AS affected FROM granted`;
