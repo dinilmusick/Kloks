@@ -2,6 +2,7 @@ import { SMALL_SCRIPT_NODE, type SmallScriptExecutor } from './smallScript.js';
 import type {FodEndpointDescriptor,FodExecutionResult,FodFlow,FodNodeDefinition} from './types.js';
 import {FodFlowStore} from './flowStore.js';
 import type {FodPublicationOptions} from './publicationSync.js';
+import {validateFodWorkflowGrantScope,type FodWorkflowGrantApproval,type FodWorkflowGrantAuthorizer,type FodWorkflowGrantStore} from './workflowGrants.js';
 import {executeFodFlow} from './executor.js';
 
 export class FodRuntime {
@@ -19,6 +20,10 @@ export class FodRuntime {
      * The discovery index is never authority; absent authorization denies.
      */
     authorizePublishedExecution?:(workspaceId:string,flowId:string,version:number)=>Promise<void>;
+    /** Server-side SQL store for owner-approved workflow grants. */
+    workflowGrantStore?:FodWorkflowGrantStore;
+    /** Must return identities resolved from Luth and canonical workspace/app ACLs. */
+    authorizeWorkflowGrant?:FodWorkflowGrantAuthorizer;
   }) {
     this.flowStore=new FodFlowStore(options.workspaceService,options.publication);
   }
@@ -44,6 +49,64 @@ export class FodRuntime {
     if (!this.options.authorizePublication) throw new Error('Publication authorization not configured.');
     await this.options.authorizePublication('unpublish',this.options.workspaceId,flowId);
     return this.flowStore.unpublish(this.options.workspaceId,flowId);
+  }
+
+  private async authorizeWorkflowGrant(
+    action:'grant'|'revoke',
+    flowId:string,
+    callerAppId:string,
+    sourceWorkspaceId:string,
+  ):Promise<{appId:string;ownerUserId:string;targetWorkspaceId:string;workflowId:string;callerAppId:string;sourceWorkspaceId:string}> {
+    const publication=this.options.publication;
+    if (!publication) throw new Error('Workflow grant authority is not configured.');
+    if (!this.options.workflowGrantStore) throw new Error('Workflow grant store is not configured.');
+    if (!this.options.authorizeWorkflowGrant) throw new Error('Workflow grant authorization not configured.');
+    const scope={
+      appId:publication.appId,
+      ownerUserId:publication.ownerUserId,
+      targetWorkspaceId:this.options.workspaceId,
+      workflowId:flowId,
+      callerAppId,
+      sourceWorkspaceId,
+    };
+    validateFodWorkflowGrantScope(scope);
+    const approval:FodWorkflowGrantApproval=await this.options.authorizeWorkflowGrant({...scope,action});
+    const sameOwner=[
+      approval.userId,
+      approval.targetAppOwnerUserId,
+      approval.targetWorkspaceOwnerUserId,
+      approval.callerAppOwnerUserId,
+      approval.sourceWorkspaceOwnerUserId,
+    ].every(owner=>typeof owner==='string' && owner===publication.ownerUserId);
+    if (!sameOwner) {
+      throw new Error('Workflow grant denied: v1 requires the same verified Luth owner for both apps and workspaces.');
+    }
+    return scope;
+  }
+
+  /** Grant one currently published version to an app/workspace owned by the same Luth principal. */
+  async grantFlow(flowId:string,callerAppId:string,sourceWorkspaceId:string):Promise<{
+    workflowId:string;version:number;callerAppId:string;sourceWorkspaceId:string;targetWorkspaceId:string;state:'active'
+  }> {
+    const scope=await this.authorizeWorkflowGrant('grant',flowId,callerAppId,sourceWorkspaceId);
+    const current=await this.flowStore.getCurrentPublishedRevision(scope.targetWorkspaceId,flowId,Number.MAX_SAFE_INTEGER)
+      .catch(error=>{throw error;});
+    // Read the workspace's current published version without trusting an index row.
+    const latest=await this.flowStore.get(scope.targetWorkspaceId,flowId);
+    if (!latest) throw new Error('Cannot grant a missing or retired workflow.');
+    const published=await this.flowStore.getCurrentPublishedRevision(scope.targetWorkspaceId,flowId,latest.version);
+    if (!published) throw new Error('Cannot grant an unpublished or stale workflow version.');
+    await this.options.workflowGrantStore!.grant({...scope,version:published.version});
+    return {
+      workflowId:published.id,version:published.version,callerAppId,
+      sourceWorkspaceId,targetWorkspaceId:scope.targetWorkspaceId,state:'active',
+    };
+  }
+
+  /** Revokes every version of the exact caller app/source workspace scope. */
+  async revokeFlow(flowId:string,callerAppId:string,sourceWorkspaceId:string):Promise<boolean> {
+    const scope=await this.authorizeWorkflowGrant('revoke',flowId,callerAppId,sourceWorkspaceId);
+    return this.options.workflowGrantStore!.revoke(scope);
   }
   /** Host calls after authenticated startup and reconnect to replay pending metadata. */
   async reconcilePublications():Promise<number> {
