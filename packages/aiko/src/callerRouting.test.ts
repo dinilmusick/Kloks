@@ -72,7 +72,6 @@ describe('ImmediateCallerRouter', () => {
     expect(b.result).toEqual({ status: 'completed', output: 'bob' });
     expect(a.traceId).not.toBe(b.traceId);
   });
-
   it('rechecks grants on nested hops and rejects revocation', async () => {
     let approvals = 0;
     let runtime!: ImmediateCallerRouter;
@@ -86,7 +85,6 @@ describe('ImmediateCallerRouter', () => {
     await expect(runtime.call('session-a', target, {})).rejects.toThrow('not authorized');
     expect(approvals).toBe(2);
   });
-
   it('blocks cross-app returns, while permitting legitimate same-app nesting', async () => {
     let runtime!: ImmediateCallerRouter;
     runtime = router({
@@ -103,7 +101,6 @@ describe('ImmediateCallerRouter', () => {
     expect((result.result as Extract<ChatResult, { status: 'completed' }>).output)
       .toMatchObject({ result: { status: 'completed', output: 'same-app' } });
   });
-
   it('rejects forged or reused parent contexts', async () => {
     const rt = router();
     await expect(rt.callChild({ callId: 'forged' } as ChatCallContext, target, {}))
@@ -115,7 +112,6 @@ describe('ImmediateCallerRouter', () => {
     await activeRouter.call('session-a', target, {});
     await expect(activeRouter.callChild(saved, target, {})).rejects.toThrow('active trusted parent');
   });
-
   it('enforces shared trace call and depth budgets, including sibling calls', async () => {
     let runtime!: ImmediateCallerRouter;
     runtime = router({
@@ -132,7 +128,6 @@ describe('ImmediateCallerRouter', () => {
     });
     await expect(runtime.call('session-a', target, {})).resolves.toMatchObject({ result: { output: 0 } });
   });
-
   it('cancels a pending target at its deadline and rejects malformed clarification', async () => {
     let aborted = false;
     const rt = router({
@@ -152,7 +147,6 @@ describe('ImmediateCallerRouter', () => {
     await expect(malformed.call('session-a', target, {})).rejects.toThrow('clarification question');
   });
 });
-
 it('deduplicates retries by verified caller/workspace/target and rejects changed inputs', async () => {
   const cached = new Map<string, { input: string; reply: Promise<unknown> }>();
   let executions = 0;
@@ -188,7 +182,6 @@ it('deduplicates retries by verified caller/workspace/target and rejects changed
   await expect(router().callIdempotent('session-a', target, {}, 'unique_request_2'))
     .rejects.toThrow('idempotency adapter');
 });
-
 it('reauthorizes cached replies after grant revocation', async () => {
   let allowed = true;
   let executions = 0;
