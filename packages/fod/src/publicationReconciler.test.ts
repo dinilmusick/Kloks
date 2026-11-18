@@ -32,12 +32,18 @@ function flow(id:string) {
     metadata:{privateToken:'DO-NOT-INDEX'},
   };
 }
+function stub(scope:FodVerifiedReconciliationWorkspace,replay:()=>Promise<number>=async()=>1) {
+  return {
+    getPublicationReconciliationScope:()=>({appId:scope.appId,ownerUserId:scope.userId,workspaceId:scope.workspaceId}),
+    reconcilePublications:replay,
+  };
+}
 function reconciler(overrides:Partial<ConstructorParameters<typeof FodPublicationReconciler>[0]>={}) {
   return new FodPublicationReconciler({
     targetAppId:'aiko',
     resolveAuthenticatedWorkspaces:async()=>[ownerScope],
     verifyStillAuthorized:async()=>{},
-    createRuntime:async()=>({reconcilePublications:async()=>1}),
+    createRuntime:async(scope)=>stub(scope),
     ...overrides,
   });
 }
@@ -54,7 +60,7 @@ describe('authenticated FOD publication replay',()=>{
     let runtimeBuilds=0;
     const coordinator=reconciler({
       resolveAuthenticatedWorkspaces:async()=>null,
-      createRuntime:()=>{runtimeBuilds++;return {reconcilePublications:async()=>1};},
+      createRuntime:(scope)=>{runtimeBuilds++;return stub(scope);},
     });
     expect(await coordinator.reconcile()).toBe(0);
     expect(runtimeBuilds).toBe(0);
@@ -67,7 +73,7 @@ describe('authenticated FOD publication replay',()=>{
         ownerScope,
         {...ownerScope,workspaceId:'another-workspace',workspaceOwnerUserId:'different-owner'},
       ],
-      createRuntime:()=>{calls++;return {reconcilePublications:async()=>1};},
+      createRuntime:(scope)=>{calls++;return stub(scope);},
     });
     await expect(candidate.reconcile()).rejects.toThrow(/same-owner/);
     expect(calls).toBe(0);
@@ -135,6 +141,17 @@ describe('authenticated FOD publication replay',()=>{
     expect(events).toHaveLength(2);
   });
 
+  it('rejects a runtime bound to a different owner or workspace before any replay',async()=>{
+    let events=0;
+    const candidate=reconciler({
+      createRuntime:async()=>stub({...ownerScope,workspaceId:'other-workspace'},async()=>{
+        events++;return 1;
+      }),
+    });
+    await expect(candidate.reconcile()).rejects.toThrow(/does not match verified Luth workspace/);
+    expect(events).toBe(0);
+  });
+
   it('aborts after a session or workspace is revoked between two workspace replays',async()=>{
     let allowed=true,operations=0;
     const two={...ownerScope,workspaceId:'other-workspace'};
@@ -143,7 +160,7 @@ describe('authenticated FOD publication replay',()=>{
       verifyStillAuthorized:async()=>{
         if(!allowed) throw new Error('Luth workspace access revoked');
       },
-      createRuntime:async()=>({reconcilePublications:async()=>{operations++;allowed=false;return 1;}}),
+      createRuntime:async(scope)=>stub(scope,async()=>{operations++;allowed=false;return 1;}),
     });
     await expect(candidate.reconcile()).rejects.toThrow(/access revoked/);
     expect(operations).toBe(1);
@@ -178,10 +195,10 @@ describe('authenticated FOD publication replay',()=>{
       resolveAuthenticatedWorkspaces:async()=>{
         resolveCalls++;return authorized?[ownerScope]:null;
       },
-      createRuntime:async()=>({reconcilePublications:async()=>{
+      createRuntime:async(scope)=>stub(scope,async()=>{
         active++;maximumActive=Math.max(maximumActive,active);
         await hold;active--;return 1;
-      }}),
+      }),
     });
     const first=candidate.reconcile(),second=candidate.reconcile();
     await new Promise<void>(resolve=>setTimeout(resolve,0));
