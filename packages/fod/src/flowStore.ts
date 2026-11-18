@@ -2,7 +2,7 @@ import type {FodFlow} from './types.js';
 import type {FodPublicationOptions,FodPublicationDescriptor} from './publicationSync.js';
 
 const ROOT='FOD';
-type StoredFlow=FodFlow & {__versions?:FodFlow[];__publication?:{visible:boolean;deletePending?:boolean}};
+type StoredFlow=FodFlow & {__versions?:FodFlow[];__publication?:{visible:boolean;deletePending?:boolean;deleted?:boolean}};
 const locks=new Map<string,Promise<void>>();
 
 function pathFor(flowId:string):string {
@@ -65,6 +65,20 @@ export class FodFlowStore {
     await this.publication.sink.synchronize(this.publicationDescriptor(workspaceId,stored));
   }
 
+  /** Retain only the workflow identity/version after deletion.
+   * A durable retired ID prevents recreating version 1 under an old grant.
+   * Nodes, edges, revision history and arbitrary metadata are erased.
+   */
+  private async retireRecord(workspaceId:string,stored:StoredFlow):Promise<void> {
+    const tombstone:StoredFlow={
+      id:stored.id,name:'Retired workflow',version:stored.version,
+      createdAt:stored.createdAt,updatedAt:new Date().toISOString(),
+      nodes:[],edges:[],__versions:[],
+      __publication:{visible:false,deleted:true},
+    };
+    await this.writeRecord(workspaceId,tombstone);
+  }
+
   private async writeRecord(workspaceId:string,record:StoredFlow):Promise<void> {
     const result=await this.workspaceService.writeFile(workspaceId,pathFor(record.id),JSON.stringify(record,null,2));
     if (result?.success===false) throw new Error('Unable to persist workflow revision.');
@@ -100,7 +114,7 @@ export class FodFlowStore {
       if (entry.isFolder || !entry.name.endsWith('.json') || !/^FOD\/[^/]+\.json$/.test(entry.path)) continue;
       try {
         const stored=decodeFlow(await this.workspaceService.readFile(workspaceId,entry.path));
-        if (stored && !stored.__publication?.deletePending) flows.push(publicFlow(stored));
+        if (stored && !stored.__publication?.deletePending && !stored.__publication?.deleted) flows.push(publicFlow(stored));
       } catch { /* Preserve legacy behavior for unrelated/corrupt entries. */ }
     }
     return flows.sort((a,b)=>a.name.localeCompare(b.name));
@@ -111,7 +125,7 @@ export class FodFlowStore {
       throw new Error('Invalid requested flow version.');
     }
     const stored=await this.read(workspaceId,flowId);
-    if (!stored || stored.__publication?.deletePending) return null;
+    if (!stored || stored.__publication?.deletePending || stored.__publication?.deleted) return null;
     const latest=publicFlow(stored);
     if (version===undefined || version===latest.version) return latest;
     return (stored.__versions??[]).find(flow=>flow.id===flowId && flow.version===version)??null;
@@ -125,7 +139,7 @@ export class FodFlowStore {
   async getCurrentPublishedRevision(workspaceId:string,flowId:string,version:number):Promise<FodFlow|null> {
     if (!Number.isSafeInteger(version) || version<1) throw new Error('Invalid requested flow version.');
     const stored=await this.read(workspaceId,flowId);
-    if (!stored || stored.__publication?.visible!==true || stored.__publication.deletePending) return null;
+    if (!stored || stored.__publication?.visible!==true || stored.__publication.deletePending || stored.__publication.deleted) return null;
     if (stored.version!==version) return null;
     return publicFlow(stored);
   }
@@ -134,6 +148,7 @@ export class FodFlowStore {
     assertWritableId(flow.id);
     return this.withLock(workspaceId,flow.id,async()=>{
       const previous=await this.read(workspaceId,flow.id);
+      if (previous?.__publication?.deleted) throw new Error('Workflow ID is permanently retired; create a new workflow ID.');
       if (previous?.__publication?.deletePending) throw new Error('Workflow deletion is pending reconciliation.');
       const latest=previous ? publicFlow(previous) : null;
       if (latest && flow.version!==latest.version) {
@@ -166,6 +181,7 @@ export class FodFlowStore {
     return this.withLock(workspaceId,flowId,async()=>{
       const stored=await this.read(workspaceId,flowId);
       if (!stored) throw new Error('Cannot publish a missing workspace workflow.');
+      if (stored.__publication?.deleted) throw new Error('Workflow ID is permanently retired; create a new workflow ID.');
       if (stored.__publication?.deletePending) throw new Error('Workflow deletion is pending reconciliation.');
       // N5 registry withdrawals are permanent. An explicit republish after
       // withdrawal must allocate the NEXT immutable workspace-owned version;
@@ -191,6 +207,7 @@ export class FodFlowStore {
     return this.withLock(workspaceId,flowId,async()=>{
       const stored=await this.read(workspaceId,flowId);
       if (!stored?.__publication) return false;
+      if (stored.__publication.deleted) return false;
       if (stored.__publication.deletePending) throw new Error('Workflow deletion is pending reconciliation.');
       const record:StoredFlow={...stored,__publication:{visible:false}};
       await this.writeRecord(workspaceId,record);
@@ -211,13 +228,12 @@ export class FodFlowStore {
       try {
         await this.withLock(workspaceId,flowId,async()=>{
           const stored=await this.read(workspaceId,flowId);
-          if (!stored?.__publication) return;
+          if (!stored?.__publication || stored.__publication.deleted) return;
           // Replay only the latest workspace-owned state. Tombstones win
           // over delayed equal-version publish events in the registry.
           await this.syncPublication(workspaceId,stored);
           if (stored.__publication.deletePending) {
-            const deleted=await this.workspaceService.deleteFile(workspaceId,pathFor(flowId));
-            if (deleted?.success===false) throw new Error('Unable to finish pending workflow deletion.');
+            await this.retireRecord(workspaceId,stored);
           }
           count++;
         });
@@ -236,6 +252,7 @@ export class FodFlowStore {
   async delete(workspaceId:string,flowId:string):Promise<boolean> {
     return this.withLock(workspaceId,flowId,async()=>{
       const stored=await this.read(workspaceId,flowId);
+      if (stored?.__publication?.deleted) return false;
       if (stored?.__publication) {
         // Fail closed. Persist the unpublish intent BEFORE deleting the only
         // workspace-owned definition, so an interrupted withdrawal is replayable.
@@ -243,6 +260,8 @@ export class FodFlowStore {
         const tombstone:StoredFlow={...stored,__publication:{visible:false,deletePending:true}};
         await this.writeRecord(workspaceId,tombstone);
         await this.syncPublication(workspaceId,tombstone);
+        await this.retireRecord(workspaceId,tombstone);
+        return true;
       }
       const result=await this.workspaceService.deleteFile(workspaceId,pathFor(flowId));
       return Boolean(result?.success);
