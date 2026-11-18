@@ -152,7 +152,19 @@ export class FodFlowStore {
     return this.withLock(workspaceId,flowId,async()=>{
       const stored=await this.read(workspaceId,flowId);
       if (!stored) throw new Error('Cannot publish a missing workspace workflow.');
-      const record:StoredFlow={...stored,__publication:{visible:true}};
+      // N5 registry withdrawals are permanent. An explicit republish after
+      // withdrawal must allocate the NEXT immutable workspace-owned version;
+      // retrying a failed first publish keeps the same version.
+      let record:StoredFlow;
+      if (stored.__publication?.visible===false) {
+        if (!Number.isSafeInteger(stored.version+1)) throw new Error('Workflow revision limit reached.');
+        const latest=publicFlow(stored);
+        const next:FodFlow={...latest,version:latest.version+1,updatedAt:new Date().toISOString()};
+        const history=stored.__versions??[latest];
+        record={...next,__versions:[...history,next],__publication:{visible:true}};
+      } else {
+        record={...stored,__publication:{visible:true}};
+      }
       await this.writeRecord(workspaceId,record);
       await this.syncPublication(workspaceId,record);
       return publicFlow(record);
