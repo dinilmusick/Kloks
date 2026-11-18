@@ -7,6 +7,7 @@ export * from './publicationSync.js';
 export * from './workflowGrants.js';
 export * from './publishedWorkflowBackend.js';
 export * from './publicationReconciler.js';
+export * from './workflowDiscovery.js';
 export * from './executor.js';
 export * from './runtime.js';
 
