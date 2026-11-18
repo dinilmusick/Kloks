@@ -131,6 +131,11 @@ describe('workspace-owned FOD publication lifecycle',()=>{
     expect((await store.get('owner-workspace','private',2))?.name).toBe('Changed name');
     expect(await store.unpublish('owner-workspace','private')).toBe(true);
     expect(remote.events.at(-1)).toMatchObject({state:'withdrawn',version:2});
+    // One-way registry withdrawal requires a new immutable version to republish.
+    const republished=await store.publish('owner-workspace','private');
+    expect(republished.version).toBe(3);
+    expect(remote.events.at(-1)).toMatchObject({state:'published',version:3});
+    expect((await store.get('owner-workspace','private',2))?.name).toBe('Changed name');
     expect(await store.delete('owner-workspace','private')).toBe(true);
     expect(await store.get('owner-workspace','private')).toBeNull();
     expect(remote.events.at(-1)).toMatchObject({state:'withdrawn'});
@@ -221,7 +226,11 @@ describe('workspace-owned FOD publication lifecycle',()=>{
     expect(calls).toHaveLength(1);
     expect(calls[0]!.sql).toContain('UPDATE skipo_ecosystem.workflow_publications');
     expect(calls[0]!.sql).toContain('ON CONFLICT');
-    expect(calls[0]!.sql).toContain('version<>$5::integer');
+    expect(calls[0]!.sql).toContain('version<$5::integer');
+    expect(calls[0]!.sql).toContain('version<=$5::integer');
+    expect(calls[0]!.sql).toContain('ON CONFLICT (app_id,owner_user_id,workspace_id,workflow_id,version)');
+    expect(calls[0]!.sql).toContain('DO NOTHING');
+    expect(calls[0]!.sql).toContain('NOT EXISTS');
     expect(calls[0]!.args).toEqual(['aiko','owner','ws','flow',2,'Display','Summary','published']);
     expect(JSON.stringify(calls)).not.toMatch(/nodes|edges|credential|secret|api_key/i);
     await expect(sink.synchronize({...record,appId:'https://bad'})).rejects.toThrow('app_id');
