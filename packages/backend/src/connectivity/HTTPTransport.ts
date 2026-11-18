@@ -6,7 +6,7 @@
 import { ITransport, MessageHandler, ErrorHandler } from './Transport.js';
 import { Message } from './types.js';
 
-const bearerTokenPattern = /^[A-Za-z0-9\\-._~+/]+=*$/;
+const bearerTokenPattern = /^[A-Za-z0-9._~+\\/-]+=*$/;
 
 /** Validate a raw RFC 6750 bearer token before any network request is made. */
 function validateBearerToken(value: unknown): string | undefined {
