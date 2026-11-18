@@ -174,7 +174,7 @@ describe('workspace-owned FOD publication lifecycle',()=>{
     expect(await store.unpublish('ws','saved')).toBe(true);
   });
 
-  it('tombstones before delete, blocks deletion on failed withdrawal and replays on reconnect',async()=>{
+  it('tombstones before delete and finalizes an interrupted delete on reconnect',async()=>{
     const ws=memoryWorkspace(), remote=registry();
     const store=new FodFlowStore(ws,publication(remote.sink));
     await store.save('ws',flow('protected'));
@@ -182,10 +182,36 @@ describe('workspace-owned FOD publication lifecycle',()=>{
     remote.failOnce();
     await expect(store.delete('ws','protected')).rejects.toThrow('registry temporarily offline');
     expect(await store.get('ws','protected')).not.toBeNull();
-    expect(await store.reconcilePublications('ws')).toBe(1);
-    expect(remote.events.at(-1)).toMatchObject({state:'withdrawn'});
-    expect(await store.delete('ws','protected')).toBe(true);
-    expect(await store.get('ws','protected')).toBeNull();
+    const restarted=new FodFlowStore(ws,publication(remote.sink));
+    expect(await restarted.reconcilePublications('ws')).toBe(1);
+    expect(remote.events.at(-1)).toMatchObject({state:'withdrawn',version:1});
+    expect(await restarted.get('ws','protected')).toBeNull();
+    // Once the source tombstone is finalized, repeated replay is a no-op.
+    expect(await restarted.reconcilePublications('ws')).toBe(0);
+  });
+
+  it('keeps delete intent durable when workspace removal fails and blocks edits until replay',async()=>{
+    const ws=memoryWorkspace(), remote=registry();
+    const store=new FodFlowStore(ws,publication(remote.sink));
+    await store.save('ws',flow('retry-delete'));
+    await store.publish('ws','retry-delete');
+    const remove=ws.deleteFile.bind(ws);
+    let fail=true;
+    ws.deleteFile=async(id:string,path:string)=>{
+      if(fail){fail=false;return {success:false};}
+      return remove(id,path);
+    };
+    expect(await store.delete('ws','retry-delete')).toBe(false);
+    const tombstone=await store.get('ws','retry-delete');
+    expect(tombstone).not.toBeNull();
+    await expect(store.save('ws',tombstone!)).rejects.toThrow(/deletion is pending/);
+    await expect(store.publish('ws','retry-delete')).rejects.toThrow(/deletion is pending/);
+    await expect(store.unpublish('ws','retry-delete')).rejects.toThrow(/deletion is pending/);
+    const restarted=new FodFlowStore(ws,publication(remote.sink));
+    expect(await restarted.reconcilePublications('ws')).toBe(1);
+    expect(await restarted.get('ws','retry-delete')).toBeNull();
+    expect(await restarted.reconcilePublications('ws')).toBe(0);
+    expect(remote.events.at(-1)).toMatchObject({state:'withdrawn',version:1});
   });
 
   it('fails closed when an indexed workflow is reopened without its trusted publication sink',async()=>{
