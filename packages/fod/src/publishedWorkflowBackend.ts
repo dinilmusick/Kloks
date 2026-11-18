@@ -162,13 +162,16 @@ export function registerFodPublishedWorkflowBackendCommand(
     const nextChain=[...verified.chain,key];
     try {
       const runtime=await options.buildRuntime(call.targetWorkspaceId,verified);
+      if (controller.signal.aborted) throw new Error('Published workflow cancelled or deadline exceeded.');
       // Fail closed unless the target runtime has its own per-call Luth/grant
       // guard. executePublishedFlow reloads the exact workspace revision
       // AFTER that authorization, rejecting withdrawn or outdated versions.
-      return await options.withExecutionScope(
+      const result=await options.withExecutionScope(
         verified,nextChain,controller.signal,
         ()=>runtime.executePublishedFlow(call.workflowId,call.version,call.input,{signal:controller.signal}),
       );
+      if (controller.signal.aborted) throw new Error('Published workflow cancelled or deadline exceeded.');
+      return result;
     } finally {
       clearTimeout(timeout);
       verified.signal?.removeEventListener('abort',onAbort);
