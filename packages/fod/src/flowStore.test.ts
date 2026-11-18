@@ -181,7 +181,8 @@ describe('workspace-owned FOD publication lifecycle',()=>{
     await store.publish('ws','protected');
     remote.failOnce();
     await expect(store.delete('ws','protected')).rejects.toThrow('registry temporarily offline');
-    expect(await store.get('ws','protected')).not.toBeNull();
+    expect(await store.get('ws','protected')).toBeNull();
+    expect(await store.list('ws')).toEqual([]);
     const restarted=new FodFlowStore(ws,publication(remote.sink));
     expect(await restarted.reconcilePublications('ws')).toBe(1);
     expect(remote.events.at(-1)).toMatchObject({state:'withdrawn',version:1});
@@ -202,9 +203,11 @@ describe('workspace-owned FOD publication lifecycle',()=>{
       return remove(id,path);
     };
     expect(await store.delete('ws','retry-delete')).toBe(false);
-    const tombstone=await store.get('ws','retry-delete');
-    expect(tombstone).not.toBeNull();
-    await expect(store.save('ws',tombstone!)).rejects.toThrow(/deletion is pending/);
+    const rawTombstone=JSON.parse(await ws.readFile('ws','FOD/retry-delete.json')) as {__deletePending?:boolean};
+    expect(rawTombstone.__deletePending).toBe(true);
+    expect(await store.get('ws','retry-delete')).toBeNull();
+    expect(await store.list('ws')).toEqual([]);
+    await expect(store.save('ws',flow('retry-delete'))).rejects.toThrow(/deletion is pending/);
     await expect(store.publish('ws','retry-delete')).rejects.toThrow(/deletion is pending/);
     await expect(store.unpublish('ws','retry-delete')).rejects.toThrow(/deletion is pending/);
     const restarted=new FodFlowStore(ws,publication(remote.sink));
