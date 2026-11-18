@@ -70,7 +70,14 @@ export class HTTPTransport implements ITransport {
       'x-request-id': message.id,
       ...this.defaultHeaders,
     };
-    if (bearerToken) headers.Authorization = `Bearer ${bearerToken}`;
+    if (bearerToken) {
+      // Header names are case-insensitive; remove any stale default credential
+      // before applying the request-scoped Luth bearer.
+      for (const key of Object.keys(headers)) {
+        if (key.toLowerCase() === 'authorization') delete headers[key];
+      }
+      headers.Authorization = `Bearer ${bearerToken}`;
+    }
     if (message.sessionId) headers['x-session-id'] = message.sessionId;
     if (message.correlationId) headers['x-correlation-id'] = message.correlationId;
 
