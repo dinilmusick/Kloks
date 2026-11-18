@@ -26,3 +26,5 @@ export * from './BackendClient.js';
 
 /** Target-side, host-authorized BackendFacade invocation guard (HTTP/MCP/graph/agent). */
 export * from './facadeInvocation.js';
+/** Caller-side Skipo/Luth-authorized HTTP bridge for the same facade boundary. */
+export * from './facadeRemoteClient.js';
