@@ -303,4 +303,28 @@ describe('two-app BackendFacade invocation boundary', () => {
     expect((await mcp.json() as any).error.message).toBe('MALFORMED_JSON');
   });
 
+  it('propagates cancellation through delegated transport and suppresses late replies', async () => {
+    const { a } = fixture();
+    const cancel = new AbortController();
+    let remoteSignal: AbortSignal | undefined;
+    const pending = a.delegate('token-A', 'app-B', request('delegate-cancel-1'),
+      async (_credential, _request, signal) => {
+        remoteSignal = signal;
+        return new Promise(resolve => setTimeout(() => resolve('late-result'), 100));
+      }, cancel.signal);
+    await new Promise(resolve => setTimeout(resolve, 10));
+    cancel.abort();
+    await expect(pending).rejects.toMatchObject({ code: 'CANCELLED' });
+    expect(remoteSignal?.aborted).toBe(true);
+  });
+
+  it('rejects a changed signed caller during output verification', async () => {
+    const { backend, proofs, state, principal } = fixture();
+    state.slow = true;
+    const pending = backend.invoke('token-B', request('caller-switch-1'), 'http');
+    await new Promise(resolve => setTimeout(resolve, 15));
+    proofs.set('token-B', principal({ principalId: 'user-2' }));
+    await expect(pending).rejects.toMatchObject({ code: 'CALLER_CHANGED' });
+  });
+
 });
