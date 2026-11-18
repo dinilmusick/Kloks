@@ -1,7 +1,7 @@
 import { executeSmallScript, SmallScriptLimitError, type SmallScriptExecutor } from './smallScript.js';
 import type {FodEndpointDescriptor,FodExecutionEvent,FodExecutionResult,FodFlow} from './types.js';
 
-export async function executeFodFlow(flow:FodFlow,endpoints:Map<string,FodEndpointDescriptor>,onEvent?:(event:FodExecutionEvent)=>void,initialInput?:unknown,options:{scriptExecutor?:SmallScriptExecutor;signal?:AbortSignal}={}):Promise<FodExecutionResult> {
+export async function executeFodFlow(flow:FodFlow,endpoints:Map<string,FodEndpointDescriptor>,onEvent?:(event:FodExecutionEvent)=>void,initialInput?:unknown,options:{scriptExecutor?:SmallScriptExecutor;signal?:AbortSignal;appId?:string;invokeCrossApp?:import('./types.js').FodCrossAppInvoker}={}):Promise<FodExecutionResult> {
   const events:FodExecutionEvent[]=[];
   const errors:FodExecutionResult['errors']=[];
   const emit=(event:FodExecutionEvent)=>{events.push(event);onEvent?.(event);};
@@ -45,9 +45,16 @@ export async function executeFodFlow(flow:FodFlow,endpoints:Map<string,FodEndpoi
         }
         const configured=(node.data?.inputs ?? {}) as Record<string,unknown>;
         Object.assign(input,configured);
+        const targetApp=endpoint?.targetApp;
+        const remote=Boolean(targetApp && targetApp.appId!==options.appId);
+        if (remote && (!options.appId || !options.invokeCrossApp)) {
+          throw new Error('Cross-app FOD node requires an active trusted call-chain context.');
+        }
         const result=isJavaScript
           ? await executeSmallScript(options.scriptExecutor,node.data?.code,input,options.signal)
-          : await endpoint!.invoke(input);
+          : remote
+            ? await options.invokeCrossApp!(targetApp!,input,options.signal)
+            : await endpoint!.invoke(input);
         outputs[node.id]=result;
         values.set(`${node.id}:result`,result);
         if(result && typeof result === 'object') {
