@@ -61,8 +61,12 @@ export interface FodVerifiedWorkflowCaller {
 }
 
 export interface FodWorkflowGrantApproval {
-  /** Verified Luth principal and canonical ownership read by the host. */
+  /** Verified Luth principal and exact canonical scope read by the host. */
   userId:string;
+  targetAppId:string;
+  targetWorkspaceId:string;
+  callerAppId:string;
+  sourceWorkspaceId:string;
   targetAppOwnerUserId:string;
   targetWorkspaceOwnerUserId:string;
   callerAppOwnerUserId:string;
