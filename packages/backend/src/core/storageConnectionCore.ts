@@ -912,7 +912,7 @@ async function remoteStorageServiceForOwner(
   if (!saved || saved.enabled === false || !['github', 'dropbox'].includes(saved.provider)) {
     throw new Error('Remote storage connection is not available to this owner.');
   }
-  const token = String(saved.provider === 'github' ? saved.githubAccessToken : saved.dropboxAccessToken || '').trim();
+  const token = String((saved.provider === 'github' ? saved.githubAccessToken : saved.dropboxAccessToken) || '').trim();
   if (!token || !saved.providerAccountId) throw new Error('Saved provider authorization is incomplete.');
   const connection: ProviderConnection = {
     providerId: saved.provider,
