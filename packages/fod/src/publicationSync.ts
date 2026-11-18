@@ -43,7 +43,7 @@ export function validatePublicationDescriptor(d:FodPublicationDescriptor):void {
 /**
  * One parameterized statement makes withdrawal of old published revisions and
  * publication of the selected revision atomic. The operation is idempotent,
- * so an interrupted local save can be reconciled at startup/reconnect.
+ * so an interrupted local save can be reconciled at startup/reconnect.\n * Stale events cannot unpublish newer versions or revive withdrawn versions;\n * republishing after withdrawal must create a new immutable version.
  *
  * Caller must be a trusted server-side registry writer. Grant verification,
  * owner/workspace ACL and version checks are independently enforced at the
@@ -59,19 +59,25 @@ WITH withdrawn AS (
      SET publication_state='withdrawn', withdrawn_at=clock_timestamp()
    WHERE app_id=$1 AND owner_user_id=$2 AND workspace_id=$3 AND workflow_id=$4
      AND publication_state='published'
-     AND ($8::text='withdrawn' OR version<>$5::integer)
+     -- Delayed old events may withdraw only their own/older revisions.
+     AND (($8::text='withdrawn' AND version<=$5::integer)
+       OR ($8::text='published' AND version<$5::integer))
   RETURNING id
 ), published AS (
   INSERT INTO skipo_ecosystem.workflow_publications
     (app_id,owner_user_id,workspace_id,workflow_id,version,display_name,description,publication_state)
   SELECT $1,$2,$3,$4,$5,$6,$7,'published'
    WHERE $8::text='published'
+     -- Never replay an older version after a newer one has been observed.
+     AND NOT EXISTS (
+       SELECT 1 FROM skipo_ecosystem.workflow_publications newer
+        WHERE newer.app_id=$1 AND newer.owner_user_id=$2 AND newer.workspace_id=$3
+          AND newer.workflow_id=$4 AND newer.version>$5::integer
+     )
+  -- Publication identity, description, timestamps and withdrawal are immutable.
+  -- An old withdrawn version can never be reactivated by a delayed retry.
   ON CONFLICT (app_id,owner_user_id,workspace_id,workflow_id,version)
-    DO UPDATE SET display_name=EXCLUDED.display_name,
-                  description=EXCLUDED.description,
-                  publication_state='published',
-                  withdrawn_at=NULL,
-                  published_at=clock_timestamp()
+    DO NOTHING
   RETURNING id
 )
 SELECT (SELECT count(*) FROM withdrawn) AS withdrawn_count,
