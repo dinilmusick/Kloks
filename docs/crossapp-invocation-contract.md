@@ -84,6 +84,56 @@ reserving retry budget against the same durable invocation identity. Generic tra
 exceptions are **not** non-delivery proof. Until the compatible host-owned
 idempotency/retry adapter is integrated, fail closed rather than duplicate effects.
 
+## Caller-side verified remote wire adapter
+
+`createFacadeRemoteClient` is exported from `@ultrst-armada/kloks/backend`.
+This is the HTTP wire adapter to the SAME existing target guard; it neither
+registers capabilities nor substitutes for the BackendFacade runtime.
+
+```ts
+const remote = createFacadeRemoteClient({
+  environment: 'production',
+  // Skipo must attest app/deployment/workspace/operation revision, lease and environment.
+  resolveDeployment: async (appId, workspaceId, operation, signal) =>
+    skipo.resolveAttestedDeployment({ appId, workspaceId, operation, signal }),
+  // Enforce registry-attested origin and independent server-side egress/DNS policy.
+  approveOrigin: (origin, deployment) =>
+    skipo.isAttestedAllowedOrigin(origin, deployment),
+  // Luth must mint a signed, scope-checked bearer for the resolved *target app*.
+  getAudienceBearer: (deployment, operation, signal) =>
+    luth.getAudienceBoundBearer({ deployment, operation, signal }),
+});
+const operations = await remote.discover('app-B', 'workspace-B');
+const result = await remote.invoke('app-B', {
+  operationId: 'Math.add', version: 'v1', targetWorkspaceId: 'workspace-B',
+  invocationId: 'unique-request-key', input: { a: 2, b: 3 },
+}, abortSignal);
+```
+
+The `skipo` and `luth` names above are integration placeholders, **not**
+claimed or bundled implementations. Owning apps must bind the real adapters
+without reading private workflow graphs from the registry.
+
+The remote client verifies the attested target app/deployment/workspace,
+environment, HTTPS origin, active lease and trusted origin approval before
+sending any bearer. It refuses redirects; sends bearer only in Authorization,
+never in URL/JSON; caps the request deadline; enforces explicit cancellation;
+rechecks current deployment before releasing output; and validates the
+`invocationId` correlation. The remote `replyTo` is **discarded** on the
+client side: only the locally verified ImmediateCallerRouter determines where
+the response returns. Discovery strips any extra response keys to a public
+metadata projection.
+
+The target remains the authorization authority: it verifies signed Luth
+principal and delegated scopes on every hop and rechecks workspace, grant,
+input/output policy and publication before execution and output delivery.
+Transport failures do not prove non-delivery; the client **does not retry**.
+
+Security caveat: an approved URL string alone cannot prevent DNS rebinding.
+Production hosts MUST enforce network-level egress restrictions and verify
+that selected origins belong to Skipo-attested deployments; never let
+end-user input determine an origin.
+
 ## Required independent integration certification
 
 Before treating this as production-ready: run an actual two-deployment test
