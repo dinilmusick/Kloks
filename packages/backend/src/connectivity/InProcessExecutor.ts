@@ -83,6 +83,12 @@ export class InProcessExecutor implements BackendExecutor {
 
   async delegate<T = unknown, R = unknown>(delegation: Delegation<T>): Promise<R> {
     if (delegation.callbackHandle) {
+      // CallbackRegistry intentionally skips its mismatch check when the caller
+      // session is absent. Do not turn an omitted delegation context into a
+      // cross-session callback invocation.
+      if (typeof delegation.sessionId !== 'string' || !delegation.sessionId.trim()) {
+        throw new Error('[InProcessExecutor] Delegated callback requires caller session identity.');
+      }
       return await this.callbackRegistry.invoke(
         delegation.callbackHandle,
         [delegation.payload],
