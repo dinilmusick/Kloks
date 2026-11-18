@@ -21,7 +21,7 @@ const request = (id: string, changes: Partial<FacadeInvocation> = {}): FacadeInv
 });
 
 function fixture() {
-  const state = { grant: true, deployed: true, published: true, owner: 'user-1', version: 'v1', workspace: 'workspace-B', slow: false };
+  const state = { grant: true, deployed: true, published: true, owner: 'user-1', version: 'v1', workspace: 'workspace-B', slow: false, fail: false };
   const calls: Array<{ operation: string; signal?: AbortSignal }> = [];
   const used = new Set<string>();
   const now = Date.now();
@@ -55,6 +55,7 @@ function fixture() {
         math: {
           execute: async (operation: string, input: any, context: any) => {
             calls.push({ operation, signal: context?.signal });
+            if (state.fail) throw new FacadeInvocationDenied('SERVICE_UNAVAILABLE', 503);
             if (state.slow) return new Promise(resolve => setTimeout(() => resolve({ result: 5 }), 300));
             return { result: Number(input.a) + Number(input.b) };
           },
@@ -342,6 +343,33 @@ describe('two-app BackendFacade invocation boundary', () => {
       replyTo: { kind: 'workflow-agent', id: 'flow-B' },
     });
     expect(calls).toHaveLength(2);
+  });
+
+  it('denies audience-mismatched credentials before operation lookup', async () => {
+    const { a } = fixture();
+    await expect(a.invoke('token-B', request('wrong-audience-1'), 'agent'))
+      .rejects.toMatchObject({ code: 'AUTH_INVALID', status: 401 });
+  });
+
+  it('propagates typed target operation failures through HTTP and MCP without reporting success', async () => {
+    const { backend, state } = fixture();
+    state.fail = true;
+    const headers = { Authorization: 'Bearer token-B', 'Content-Type': 'application/json' };
+    const http = await backend.http(new Request('https://app-b.example/api/crossapp/invoke', {
+      method: 'POST', headers, body: JSON.stringify(request('error-http-1')),
+    }));
+    expect(http.status).toBe(503);
+    expect((await http.json() as any).error).toBe('SERVICE_UNAVAILABLE');
+    const mcp = await backend.mcp(new Request('https://app-b.example/mcp', {
+      method: 'POST', headers, body: JSON.stringify({
+        jsonrpc: '2.0', id: 'error-mcp-1', method: 'tools/call',
+        params: { name: 'Math.add', arguments: {
+          version: 'v1', targetWorkspaceId: 'workspace-B', invocationId: 'error-mcp-1', input: { a: 2, b: 3 },
+        } },
+      }),
+    }));
+    expect(mcp.status).toBe(503);
+    expect((await mcp.json() as any).error.message).toBe('SERVICE_UNAVAILABLE');
   });
 
 });
