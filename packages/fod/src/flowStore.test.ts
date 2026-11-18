@@ -181,7 +181,10 @@ describe('workspace-owned FOD publication lifecycle',()=>{
     await store.publish('ws','protected');
     remote.failOnce();
     await expect(store.delete('ws','protected')).rejects.toThrow('registry temporarily offline');
-    expect(await store.get('ws','protected')).not.toBeNull();
+    // The pending-delete tombstone stays durable but is no longer readable
+    // through the normal workflow API or any published execution path.
+    expect(await store.get('ws','protected')).toBeNull();
+    expect(ws.files.has('ws:FOD/protected.json')).toBe(true);
     expect(await store.reconcilePublications('ws')).toBe(1);
     expect(remote.events.at(-1)).toMatchObject({state:'withdrawn'});
     expect(await store.delete('ws','protected')).toBe(true);
