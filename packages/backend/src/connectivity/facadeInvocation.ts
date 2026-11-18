@@ -297,6 +297,9 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
     let id: unknown = null;
     try {
       const credential = bearer(request);
+      // Even MCP initialize and one-way notifications require a live,
+      // audience-bound Luth caller; a syntactically valid bearer is not proof.
+      await callerFor(credential);
       const body = await parseJson(request) as { jsonrpc?: unknown; id?: unknown; method?: unknown; params?: Record<string, unknown> };
       if (!body || typeof body !== 'object' || Array.isArray(body) || body.jsonrpc !== '2.0' ||
         typeof body.method !== 'string') fail('INVALID_MCP_REQUEST', 400);
