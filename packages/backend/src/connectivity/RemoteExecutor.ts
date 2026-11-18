@@ -3,7 +3,7 @@
  * @description Transport-mediated executor encapsulating connection lifecycle, correlation IDs, and callback routing.
  */
 
-import { BackendExecutor, Message, Delegation, Job, CallbackHandle } from './types.js';
+import { BackendExecutor, Message, Delegation, Job, CallbackHandle, AuthContext, CapabilityContext } from './types.js';
 import { ITransport } from './Transport.js';
 import { CallbackRegistry, CallbackFn } from './CallbackRegistry.js';
 import { LoadBalancer } from './LoadBalancer.js';
@@ -13,6 +13,10 @@ export interface RemoteExecutorOptions {
   loadBalancer?: LoadBalancer;
   callbackRegistry?: CallbackRegistry;
   sessionId?: string;
+  /** Resolve the current Luth caller context for each request when the message has none. */
+  getAuthContext?: () => AuthContext | undefined;
+  /** Resolve optional request-scoped capability metadata without treating it as authority. */
+  getCapabilityContext?: () => CapabilityContext | undefined;
 }
 
 export class RemoteExecutor implements BackendExecutor {
@@ -60,7 +64,12 @@ export class RemoteExecutor implements BackendExecutor {
     });
   }
 
-  private prepareMessage<T>(type: Message['type'], operation: string, payload?: T): Message<T> {
+  private prepareMessage<T>(
+    type: Message['type'],
+    operation: string,
+    payload?: T,
+    requestContext?: Pick<Message, 'authContext' | 'capabilityContext'>,
+  ): Message<T> {
     const id = `req-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     return {
       id,
@@ -70,11 +79,17 @@ export class RemoteExecutor implements BackendExecutor {
       sessionId: this.sessionId,
       correlationId: id,
       timestamp: Date.now(),
+      ...(requestContext?.authContext ?? this.getAuthContext()
+        ? { authContext: requestContext?.authContext ?? this.getAuthContext() }
+        : {}),
+      ...(requestContext?.capabilityContext ?? this.options.getCapabilityContext?.()
+        ? { capabilityContext: requestContext?.capabilityContext ?? this.options.getCapabilityContext?.() }
+        : {}),
     };
   }
 
   async execute<T = unknown, R = unknown>(command: Message<T>): Promise<R> {
-    const msg = this.prepareMessage<T>('COMMAND', command.operation, command.payload);
+    const msg = this.prepareMessage<T>('COMMAND', command.operation, command.payload, command);
     const res = await this.transport.request<T, R>(msg);
     if (res.type === 'ERROR') {
       throw new Error(res.error?.message || `Command "${command.operation}" failed.`);
@@ -83,7 +98,7 @@ export class RemoteExecutor implements BackendExecutor {
   }
 
   async query<T = unknown, R = unknown>(query: Message<T>): Promise<R> {
-    const msg = this.prepareMessage<T>('QUERY', query.operation, query.payload);
+    const msg = this.prepareMessage<T>('QUERY', query.operation, query.payload, query);
     const res = await this.transport.request<T, R>(msg);
     if (res.type === 'ERROR') {
       throw new Error(res.error?.message || `Query "${query.operation}" failed.`);
@@ -96,7 +111,7 @@ export class RemoteExecutor implements BackendExecutor {
   }
 
   async emit(event: Message): Promise<void> {
-    const msg = this.prepareMessage('EVENT', event.operation, event.payload);
+    const msg = this.prepareMessage('EVENT', event.operation, event.payload, event);
     await this.transport.send(msg);
   }
 
@@ -105,7 +120,7 @@ export class RemoteExecutor implements BackendExecutor {
   }
 
   async delegate<T = unknown, R = unknown>(delegation: Delegation<T>): Promise<R> {
-    const msg = this.prepareMessage('COMMAND', `${delegation.target}.${delegation.operation}`, delegation);
+    const msg = this.prepareMessage('COMMAND', `${delegation.target}.${delegation.operation}`, delegation, delegation);
     const res = await this.transport.request<Delegation<T>, R>(msg);
     return res.payload as R;
   }
