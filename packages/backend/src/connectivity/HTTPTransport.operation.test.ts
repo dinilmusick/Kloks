@@ -13,7 +13,7 @@ function command(operation: string): Message {
 
 describe('HTTPTransport remote capability path boundaries', () => {
   it('routes ordinary dotted operation identifiers to the canonical API path', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ accepted: true }), { status: 200 }));
+    const fetchMock = vi.fn(async (..._args: Parameters<typeof fetch>) => new Response(JSON.stringify({ accepted: true }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     const transport = new HTTPTransport({ baseUrl: 'https://example.test/' });
     await transport.request(command('workflow.execute.version2'));
@@ -29,7 +29,7 @@ describe('HTTPTransport remote capability path boundaries', () => {
     'workflow.run\r\nx-injected: true',
     ' workflow.run', 'workflow.run ',
   ])('rejects malformed operation %s without sending credentials or payload', async (operation) => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ accepted: true }), { status: 200 }));
+    const fetchMock = vi.fn(async (..._args: Parameters<typeof fetch>) => new Response(JSON.stringify({ accepted: true }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     const transport = new HTTPTransport({
       baseUrl: 'https://example.test',
@@ -40,7 +40,7 @@ describe('HTTPTransport remote capability path boundaries', () => {
   });
 
   it('percent-encodes safe reserved characters within one operation segment', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ accepted: true }), { status: 200 }));
+    const fetchMock = vi.fn(async (..._args: Parameters<typeof fetch>) => new Response(JSON.stringify({ accepted: true }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     const transport = new HTTPTransport({ baseUrl: 'https://example.test' });
     await transport.request(command('workflow.run:version2'));
