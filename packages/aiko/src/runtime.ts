@@ -155,7 +155,9 @@ export class AikoRuntime {
   private async requireCurrentCapability({ id, sourceKind, sourceId }: AikoTool): Promise<AikoCapability> {
     const matches = (await this.listCapabilities()).filter(item => item.id === id);
     const [current] = matches;
-    if (matches.length !== 1 || current.sourceKind !== sourceKind || current.sourceId !== sourceId) {
+    if (matches.length !== 1 || current.sourceKind !== sourceKind || current.sourceId !== sourceId ||
+        (current.targetApp?.appId ?? null)!==(arguments[0] as AikoTool & {targetApp?:{appId:string;agentId:string}}).targetApp?.appId ||
+        (current.targetApp?.agentId ?? null)!==(arguments[0] as AikoTool & {targetApp?:{appId:string;agentId:string}}).targetApp?.agentId) {
       throw new Error('Aiko capability is no longer permitted.');
     }
     return current;
