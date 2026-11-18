@@ -24,6 +24,34 @@ const BACKBLAZE_B2: StorageProviderCapability = {
   ],
 };
 
+const GITHUB: StorageProviderCapability = {
+  id: 'github',
+  displayName: 'GitHub',
+  description: 'Owner-bound GitHub account with server-validated repository discovery.',
+  enabled: true,
+  canSelectExistingConnection: true,
+  canCreateConnection: true,
+  authorizationMode: 'credentials',
+  supportsAccountDiscovery: true,
+  supportsBucketDiscovery: false,
+  supportsFolderDiscovery: true,
+  configurationFields: [{ id: 'accessToken', label: 'Fine-grained token', type: 'password', required: true, secret: true }],
+};
+
+const DROPBOX: StorageProviderCapability = {
+  id: 'dropbox',
+  displayName: 'Dropbox',
+  description: 'Owner-bound Dropbox OAuth token, with account and metadata access checked remotely.',
+  enabled: true,
+  canSelectExistingConnection: true,
+  canCreateConnection: true,
+  authorizationMode: 'oauth2',
+  supportsAccountDiscovery: true,
+  supportsBucketDiscovery: false,
+  supportsFolderDiscovery: true,
+  configurationFields: [{ id: 'accessToken', label: 'OAuth access token', type: 'password', required: true, secret: true }],
+};
+
 const GOOGLE_DRIVE: StorageProviderCapability = {
   id: 'google_drive',
   displayName: 'Google Drive',
@@ -52,6 +80,8 @@ export async function getStorageProviderCapabilities(
 
   return [
     { ...BACKBLAZE_B2 },
+    { ...GITHUB },
+    { ...DROPBOX },
     {
       ...GOOGLE_DRIVE,
       enabled: googleConfigured,
