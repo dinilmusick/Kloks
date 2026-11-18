@@ -152,3 +152,39 @@ describe('ImmediateCallerRouter', () => {
     await expect(malformed.call('session-a', target, {})).rejects.toThrow('clarification question');
   });
 });
+
+it('deduplicates retries by verified caller/workspace/target and rejects changed inputs', async () => {
+  const cached = new Map<string, { input: string; reply: Promise<unknown> }>();
+  let executions = 0;
+  const rt = router({
+    authorize: () => true,
+    dispatch: async (_target, input) => {
+      executions += 1;
+      return { status: 'completed', output: input };
+    },
+    runOnce: async (scope, input, execute) => {
+      expect(scope).not.toHaveProperty('sessionId');
+      const id = JSON.stringify(scope);
+      const existing = cached.get(id);
+      if (existing) {
+        if (existing.input !== JSON.stringify(input)) throw new Error('Conflicting idempotency request');
+        return await existing.reply as Awaited<ReturnType<typeof execute>>;
+      }
+      const reply = execute();
+      cached.set(id, { input: JSON.stringify(input), reply });
+      return reply;
+    },
+  });
+  const [a, b] = await Promise.all([
+    rt.callIdempotent('session-a', target, 12, 'unique_request_1'),
+    rt.callIdempotent('session-a', target, 12, 'unique_request_1'),
+  ]);
+  expect(executions).toBe(1);
+  expect(a).toEqual(b);
+  await expect(rt.callIdempotent('session-a', target, 13, 'unique_request_1'))
+    .rejects.toThrow('Conflicting idempotency');
+  await rt.callIdempotent('session-b', target, 12, 'unique_request_1');
+  expect(executions).toBe(2);
+  await expect(router().callIdempotent('session-a', target, {}, 'unique_request_2'))
+    .rejects.toThrow('idempotency adapter');
+});
