@@ -8,7 +8,6 @@ export interface VerifiedChatCaller {
   readonly appId: string;
   readonly workspaceId: string;
   readonly agentId?: string;
-  readonly sessionId?: string;
 }
 
 export interface ChatTarget {
