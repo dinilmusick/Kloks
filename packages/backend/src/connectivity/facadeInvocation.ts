@@ -66,7 +66,7 @@ export interface FacadeInvocationOptions {
   /** Resolve the workflow from its owning workspace, then invoke via existing FOD runtime. */
   invokePublishedWorkflow: (reference: { workspaceId: string; workflowId: string; version: string }, input: unknown, signal: AbortSignal) => Promise<unknown>;
   /** Issue a new Luth-verifiable, audience-scoped delegated credential after atomic budget reservation. */
-  delegateCredential: (caller: VerifiedFacadeCaller, targetAppId: string, invocationId: string) => Promise<string>;
+  delegateCredential: (caller: VerifiedFacadeCaller, targetAppId: string, invocationId: string, signal?: AbortSignal) => Promise<string>;
 }
 
 export class FacadeInvocationDenied extends Error {
@@ -162,7 +162,12 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
 
   async function invoke(credential: string, request: FacadeInvocation, transport: FacadeTransport, parentSignal?: AbortSignal) {
     assertInvocation(request);
-    const caller = await callerFor(credential);
+    const verified = await callerFor(credential);
+    // Snapshot the signed caller so a host adapter cannot mutate the original
+    // object during a long-running operation and bypass the final identity check.
+    const caller: VerifiedFacadeCaller = {
+      ...verified, invoker: { ...verified.invoker }, chain: [...verified.chain],
+    };
     const current = await options.listCurrentOperations(request.targetWorkspaceId);
     const operation = current.find(op => assertDescriptor(op) && op.id === request.operationId &&
       op.targetWorkspaceId === request.targetWorkspaceId && op.version === request.version);
@@ -230,9 +235,37 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
     if (caller.chain.includes(targetAppId) && caller.chain.at(-1) !== targetAppId) fail('APP_CYCLE');
     if (caller.depth + 1 >= caller.maxDepth || caller.remainingCalls <= 1) fail('BUDGET_EXCEEDED', 429);
     // Luth must mint the audience-bound child proof and atomically reserve budget.
-    const delegated = await options.delegateCredential(caller, targetAppId, request.invocationId);
-    if (!delegated) fail('DELEGATION_DENIED');
-    return dispatch(delegated, request, signal);
+    // The same deadline/cancellation applies while minting and while dispatching.
+    // Never retry an uncertain delivery: the target's durable invocation ID protects
+    // side-effectful operations and retries need a separately proven delivery budget.
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
+    const abortError = () => new FacadeInvocationDenied(timedOut ? 'DEADLINE_EXCEEDED' : 'CANCELLED', 408);
+    const abort = () => controller.abort();
+    signal?.addEventListener('abort', abort, { once: true });
+    if (signal?.aborted) controller.abort();
+    try {
+      const remaining = Math.min(caller.deadlineAt, caller.expiresAt, Date.now() + 30_000) - Date.now();
+      if (remaining <= 0) fail('DEADLINE_EXCEEDED', 408);
+      const stopped = new Promise<never>((_, reject) => {
+        controller.signal.addEventListener('abort', () => reject(abortError()), { once: true });
+        timer = setTimeout(() => { timedOut = true; controller.abort(); }, remaining);
+        if (controller.signal.aborted) reject(abortError());
+      });
+      const forward = async () => {
+        if (controller.signal.aborted) throw abortError();
+        const delegated = await options.delegateCredential(caller, targetAppId, request.invocationId, controller.signal);
+        if (controller.signal.aborted) throw abortError();
+        if (!delegated) fail('DELEGATION_DENIED');
+        return dispatch(delegated, request, controller.signal);
+      };
+      return await Promise.race([forward(), stopped]);
+    } finally {
+      if (timer) clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+      controller.abort();
+    }
   }
 
   const bearer = (request: Request): string => {
