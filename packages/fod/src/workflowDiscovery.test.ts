@@ -21,10 +21,10 @@ function indexRow(overrides:Record<string,unknown>={}) {
   };
 }
 function harness() {
-  let principal=alice,grantActive=true,currentVersion=1,publicationVisible=true;
+  let principal=alice,grantActive=true,luthActive=true,currentVersion=1,publicationVisible=true;
   const query=vi.fn(async(_sql:string,_args:readonly unknown[])=>({rows:[indexRow()]}));
   const fresh=vi.fn(async()=>{
-    if(!grantActive) throw new Error('Luth owner session no longer verified');
+    if(!luthActive) throw new Error('Luth owner session no longer verified');
   });
   const grantStore:Pick<FodWorkflowGrantStore,'isGranted'>={
     isGranted:vi.fn(async()=>grantActive),
@@ -42,6 +42,7 @@ function harness() {
     discovery,query,fresh,grantStore,source,
     setPrincipal:(value:FodVerifiedWorkflowDiscovery)=>{principal=value;},
     setGrant:(value:boolean)=>{grantActive=value;},
+    setLuth:(value:boolean)=>{luthActive=value;},
     setVersion:(value:number)=>{currentVersion=value;},
     setPublished:(value:boolean)=>{publicationVisible=value;},
   };
@@ -83,6 +84,12 @@ describe('grant-filtered FOD publication discovery',()=>{
       await expect(h.discovery.discover({})).rejects.toThrow(/FOD discovery denied/);
     }
     expect(h.query).not.toHaveBeenCalled();
+  });
+
+  it('denies discovery after the current Luth session is revoked',async()=>{
+    const h=harness();
+    h.setLuth(false);
+    await expect(h.discovery.discover({})).rejects.toThrow(/Luth owner session/);
   });
 
   it('returns no discovery data for no verified accessible target workspaces',async()=>{
