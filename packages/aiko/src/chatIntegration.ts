@@ -89,6 +89,9 @@ export function createAikoChatIntegration(options: AikoChatIntegrationOptions) {
       if (!entry || !await options.authorizeOperation(context.caller, entry, context)) {
         throw new Error('Agent operation grant was revoked.');
       }
+      if (typeof input === 'string' && !input.trim()) {
+        return { status: 'needs_input', question: 'What should this agent do?' };
+      }
       if (options.validateInput) {
         const missing = await options.validateInput(entry, input, context);
         if (missing.length) {
@@ -135,8 +138,8 @@ export function createAikoChatIntegration(options: AikoChatIntegrationOptions) {
       }
       const selected = matches[0];
       const input = direct ? direct.input : message;
-      if (!input) return { callId: '', traceId: '', replyTo: caller,
-        result: { status: 'needs_input', question: 'What should this agent do?' } };
+      // Even clarifications receive a router-issued invocation ID and verified caller.
+      if (!input) return root(session, { appId: selected.appId, agentId: selected.id }, input, requestKey);
       return root(session, { appId: selected.appId, agentId: selected.id }, input, requestKey);
     },
     /** Graph, HTTP and natural-language callers use this same authorized execution path. */
