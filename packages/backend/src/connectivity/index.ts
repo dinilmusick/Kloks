@@ -23,3 +23,6 @@ export * from './RemoteExecutor.js';
 export * from './BackendResolver.js';
 export * from './FrontendSession.js';
 export * from './BackendClient.js';
+
+/** Target-side, host-authorized BackendFacade invocation guard (HTTP/MCP/graph/agent). */
+export * from './facadeInvocation.js';
