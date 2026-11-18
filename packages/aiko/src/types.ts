@@ -1,5 +1,18 @@
 export type AikoSourceKind='endpoint'|'fod-flow'|'gutts-api'|'custom';
 
+export interface AikoCrossAppTarget {
+  /** Canonical target app identity from the trusted server capability catalog. */
+  appId:string;
+  /** Stable operation/agent identity in the target application. */
+  agentId:string;
+}
+
+export type AikoCrossAppInvoker=(
+  target:AikoCrossAppTarget,
+  input:unknown,
+  signal?:AbortSignal,
+)=>Promise<unknown>;
+
 export interface AikoIntelligenceSpec { [key:string]: unknown; }
 
 export interface AikoTool {
@@ -84,4 +97,8 @@ export interface AikoRuntimeOptions {
   resolveNaturalLanguage?: (agent:AikoAgentDefinition,input:string)=>Promise<unknown>;
   parseNaturalLanguage?: (target:AikoNaturalLanguageTarget,input:string)=>Promise<AikoNaturalLanguageCandidate>;
   keys:AikoKeyRuntime;
+  /** Canonical local app ID supplied by the trusted host, never request data. */
+  appId?:string;
+  /** Host closure bound to the active router-issued parent context. */
+  invokeCrossApp?:AikoCrossAppInvoker;
 }
