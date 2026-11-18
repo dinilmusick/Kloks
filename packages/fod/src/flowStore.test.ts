@@ -240,6 +240,22 @@ describe('workspace-owned FOD publication lifecycle',()=>{
     expect(remote.events).toHaveLength(1);
   });
 
+  it('does not let stale discovery metadata authorize execution without the owner workspace flow',async()=>{
+    const ws=memoryWorkspace(), remote=registry();
+    const store=new FodFlowStore(ws,publication(remote.sink));
+    await store.save('owner-workspace',flow('stale-index'));
+    await store.publish('owner-workspace','stale-index');
+    expect(remote.events.at(-1)).toMatchObject({state:'published',version:1});
+    // Simulate an index lagging behind the authoritative workspace deletion.
+    await ws.deleteFile('owner-workspace','FOD/stale-index.json');
+    const runtime=new FodRuntime({
+      workspaceId:'owner-workspace',workspaceService:ws,
+      publication:publication(remote.sink),
+    });
+    await expect(runtime.executeFlow('stale-index')).rejects.toThrow(/not found/);
+    expect(remote.events.at(-1)).toMatchObject({state:'published',version:1});
+  });
+
   it('only sends parameterized allowlisted metadata in one atomic SQL statement',async()=>{
     const calls:Array<{sql:string,args:readonly unknown[]}>=[];
     const sink=createSqlFodPublicationSink(async(sql,args)=>{calls.push({sql,args});});
