@@ -327,4 +327,21 @@ describe('two-app BackendFacade invocation boundary', () => {
     await expect(pending).rejects.toMatchObject({ code: 'CALLER_CHANGED' });
   });
 
+  it('preserves distinct immediate replies and correlation IDs across parallel invocations', async () => {
+    const { backend, calls } = fixture();
+    const [first, second] = await Promise.all([
+      backend.invoke('token-B', request('parallel-one', { input: { a: 4, b: 5 } }), 'agent'),
+      backend.invoke('token-B-nested', request('parallel-two', { input: { a: 10, b: 20 } }), 'graph'),
+    ]);
+    expect(first).toMatchObject({
+      output: { result: 9 }, invocationId: 'parallel-one',
+      replyTo: { kind: 'app-agent', id: 'aiko-A' },
+    });
+    expect(second).toMatchObject({
+      output: { result: 30 }, invocationId: 'parallel-two',
+      replyTo: { kind: 'workflow-agent', id: 'flow-B' },
+    });
+    expect(calls).toHaveLength(2);
+  });
+
 });
