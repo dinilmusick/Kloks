@@ -227,7 +227,8 @@ describe('workspace-owned FOD publication lifecycle',()=>{
     expect(calls[0]!.sql).toContain('UPDATE skipo_ecosystem.workflow_publications');
     expect(calls[0]!.sql).toContain('ON CONFLICT');
     expect(calls[0]!.sql).toContain('version<$5::integer');
-    expect(calls[0]!.sql).toContain('version<=$5::integer');
+    expect(calls[0]!.sql).toContain('withdrawal_marker AS');
+    expect(calls[0]!.sql).not.toContain('version<=$5::integer');
     expect(calls[0]!.sql).toContain('ON CONFLICT (app_id,owner_user_id,workspace_id,workflow_id,version)');
     expect(calls[0]!.sql).toContain('DO NOTHING');
     expect(calls[0]!.sql).toContain('NOT EXISTS');
