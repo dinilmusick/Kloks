@@ -217,7 +217,7 @@ export class FodFlowStore {
   }
 
   /** Replay workspace-owned publication intent after service reconnect/restart. */
-  async reconcilePublications(workspaceId:string):Promise<number> {
+  async reconcilePublications(workspaceId:string,authorizeReplay?:()=>Promise<void>):Promise<number> {
     if (!this.publication) throw new Error('A trusted publication sink is required.');
     const entries=await this.workspaceService.listFiles(workspaceId,ROOT);
     let count=0;
@@ -229,6 +229,9 @@ export class FodFlowStore {
         await this.withLock(workspaceId,flowId,async()=>{
           const stored=await this.read(workspaceId,flowId);
           if (!stored?.__publication || stored.__publication.deleted) return;
+          // A target host may require a fresh Luth/workspace check before EACH
+          // metadata write; a stale authenticated bootstrap is not authority.
+          await authorizeReplay?.();
           // Replay only the latest workspace-owned state. Tombstones win
           // over delayed equal-version publish events in the registry.
           await this.syncPublication(workspaceId,stored);
