@@ -187,7 +187,11 @@ describe('workspace-owned FOD publication lifecycle',()=>{
     expect(ws.files.has('ws:FOD/protected.json')).toBe(true);
     expect(await store.reconcilePublications('ws')).toBe(1);
     expect(remote.events.at(-1)).toMatchObject({state:'withdrawn'});
-    expect(await store.delete('ws','protected')).toBe(true);
+    // Reconciliation already finalized the deletion. Retired IDs cannot be
+    // deleted again or reused under an old cross-app publication grant.
+    expect(await store.delete('ws','protected')).toBe(false);
+    const retired=JSON.parse(ws.files.get('ws:FOD/protected.json')!);
+    expect(retired.__publication).toEqual({visible:false,deleted:true});
     expect(await store.get('ws','protected')).toBeNull();
   });
 
