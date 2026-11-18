@@ -6,6 +6,17 @@
 import { ITransport, MessageHandler, ErrorHandler } from './Transport.js';
 import { Message } from './types.js';
 
+const bearerTokenPattern = /^[A-Za-z0-9\\-._~+/]+=*$/;
+
+/** Validate a raw RFC 6750 bearer token before any network request is made. */
+function validateBearerToken(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || value.length === 0 || value.trim() !== value || !bearerTokenPattern.test(value)) {
+    throw new Error('[HTTPTransport] Invalid bearer token in request context.');
+  }
+  return value;
+}
+
 export interface HTTPTransportOptions {
   baseUrl: string;
   defaultHeaders?: Record<string, string>;
@@ -48,6 +59,9 @@ export class HTTPTransport implements ITransport {
   }
 
   async request<T = unknown, R = unknown>(message: Message<T>): Promise<Message<R>> {
+    // Resolve credentials before creating timers or calling fetch. The bearer is
+    // deliberately excluded from the JSON payload below.
+    const bearerToken = validateBearerToken(message.authContext?.token);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
 
@@ -56,6 +70,7 @@ export class HTTPTransport implements ITransport {
       'x-request-id': message.id,
       ...this.defaultHeaders,
     };
+    if (bearerToken) headers.Authorization = `Bearer ${bearerToken}`;
     if (message.sessionId) headers['x-session-id'] = message.sessionId;
     if (message.correlationId) headers['x-correlation-id'] = message.correlationId;
 
