@@ -20,7 +20,19 @@ export interface CentralAikoIntelligenceOptions {
   readonly send?: typeof globalThis.fetch;
 }
 
-function parseDocument(value: unknown, specId: string): CentralAikoIntelligenceSpec {
+/** Match Aiko's publisher envelope and JSON property order byte-for-byte. */
+async function contentVersion(content: {
+  readonly schemaVersion: 1;
+  readonly specId: string;
+  readonly spec: AikoIntelligenceSpec;
+  readonly routingPolicy: CentralAikoIntelligenceSpec['routingPolicy'];
+}): Promise<string> {
+  const bytes = new TextEncoder().encode(JSON.stringify(content));
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function parseDocument(value: unknown, specId: string): Promise<CentralAikoIntelligenceSpec> {
   const invalid = new Error('Central Aiko returned an invalid IntelligenceSpec.');
   if (!value || typeof value !== 'object') throw invalid;
   const document = value as Partial<CentralAikoIntelligenceSpec>;
@@ -33,14 +45,25 @@ function parseDocument(value: unknown, specId: string): CentralAikoIntelligenceS
       typeof routingPolicy.prioritiseDeterminism !== 'boolean' || typeof routingPolicy.avoidPaidProviders !== 'boolean') {
     throw invalid;
   }
-  return {
-    schemaVersion: 1, specId, version, spec,
+
+  // Normalize the envelope in the same insertion order used by Aiko's
+  // publishedSpec.ts before verifying its content-addressed version.
+  const content = {
+    schemaVersion: 1 as const,
+    specId,
+    spec,
     routingPolicy: {
       prioritiseReasoning: routingPolicy.prioritiseReasoning,
       prioritiseDeterminism: routingPolicy.prioritiseDeterminism,
       avoidPaidProviders: routingPolicy.avoidPaidProviders,
     },
   };
+  try {
+    if (await contentVersion(content) !== version) throw invalid;
+  } catch {
+    throw invalid;
+  }
+  return { ...content, version };
 }
 
 /** A server-side resolver that checks the authority on every use, including after revocation. */
