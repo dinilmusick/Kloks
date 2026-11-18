@@ -89,8 +89,6 @@ export class FodRuntime {
     workflowId:string;version:number;callerAppId:string;sourceWorkspaceId:string;targetWorkspaceId:string;state:'active'
   }> {
     const scope=await this.authorizeWorkflowGrant('grant',flowId,callerAppId,sourceWorkspaceId);
-    const current=await this.flowStore.getCurrentPublishedRevision(scope.targetWorkspaceId,flowId,Number.MAX_SAFE_INTEGER)
-      .catch(error=>{throw error;});
     // Read the workspace's current published version without trusting an index row.
     const latest=await this.flowStore.get(scope.targetWorkspaceId,flowId);
     if (!latest) throw new Error('Cannot grant a missing or retired workflow.');
