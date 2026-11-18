@@ -42,10 +42,10 @@ function fixture() {
   });
   const proofs = new Map<string, VerifiedFacadeCaller>([
     ['token-B', principal()],
-    ['token-other-user', principal({ principalId: 'user-2' })],
-    ['token-bad-workspace', principal({ sourceWorkspaceId: 'workspace-other' })],
-    ['token-B-nested', principal({ sourceAppId: 'app-B', chain: ['app-A', 'app-B'], depth: 2, invoker: { kind: 'workflow-agent', id: 'flow-B' } })],
-    ['token-B-expired', principal({ expiresAt: now - 1 })],
+    ['token-other-user', principal({ principalId: 'user-2', sessionId: 'session-2' })],
+    ['token-bad-workspace', principal({ sourceWorkspaceId: 'workspace-other', sessionId: 'session-other' })],
+    ['token-B-nested', principal({ sourceAppId: 'app-B', sessionId: 'session-nested', chain: ['app-A', 'app-B'], depth: 2, invoker: { kind: 'workflow-agent', id: 'flow-B' } })],
+    ['token-B-expired', principal({ expiresAt: now - 1, sessionId: 'session-expired' })],
   ]);
 
   const backend = createFacadeInvocationBoundary({
@@ -66,6 +66,18 @@ function fixture() {
     verifyLuthCredential: async (credential, audience) => {
       const found = proofs.get(credential);
       return found?.audience === audience ? { ...found, chain: [...found.chain] } : null;
+    },
+    // Model a trusted non-consuming Luth session/identity lookup. Distinct
+    // sessions in these fixtures avoid ambiguous per-token lookup semantics.
+    revalidateLuthCaller: async (admitted, audience) => {
+      const current = [...proofs.values()].find(value =>
+        value.sessionId === admitted.sessionId &&
+        value.sourceAppId === admitted.sourceAppId &&
+        value.sourceWorkspaceId === admitted.sourceWorkspaceId &&
+        value.invoker.id === admitted.invoker.id &&
+        value.audience === audience);
+      return current && current.expiresAt > Date.now()
+        ? { ...current, chain: [...current.chain], invoker: { ...current.invoker } } : null;
     },
     listCurrentOperations: async workspace => workspace === state.workspace
       ? [{ ...staticOp, version: state.version }, ...(state.published ? [workflow] : [])]
@@ -93,6 +105,7 @@ function fixture() {
   const a = createFacadeInvocationBoundary({
     targetAppId: 'app-A', facade: { services: {}, orchestrations: {} },
     verifyLuthCredential: async (credential, audience) => credential === 'token-A' && audience === 'app-A' ? rootCaller : null,
+    revalidateLuthCaller: async (admitted, audience) => audience === 'app-A' ? admitted : null,
     listCurrentOperations: async () => [],
     deploymentEligible: async () => true,
     authorize: async () => true,
