@@ -2,7 +2,7 @@ import type {FodFlow} from './types.js';
 import type {FodPublicationOptions,FodPublicationDescriptor} from './publicationSync.js';
 
 const ROOT='FOD';
-type StoredFlow=FodFlow & {__versions?:FodFlow[];__publication?:{visible:boolean}};
+type StoredFlow=FodFlow & {__versions?:FodFlow[];__publication?:{visible:boolean;deletePending?:boolean}};
 const locks=new Map<string,Promise<void>>();
 
 function pathFor(flowId:string):string {
@@ -100,7 +100,7 @@ export class FodFlowStore {
       if (entry.isFolder || !entry.name.endsWith('.json') || !/^FOD\/[^/]+\.json$/.test(entry.path)) continue;
       try {
         const stored=decodeFlow(await this.workspaceService.readFile(workspaceId,entry.path));
-        if (stored) flows.push(publicFlow(stored));
+        if (stored && !stored.__publication?.deletePending) flows.push(publicFlow(stored));
       } catch { /* Preserve legacy behavior for unrelated/corrupt entries. */ }
     }
     return flows.sort((a,b)=>a.name.localeCompare(b.name));
@@ -111,16 +111,30 @@ export class FodFlowStore {
       throw new Error('Invalid requested flow version.');
     }
     const stored=await this.read(workspaceId,flowId);
-    if (!stored) return null;
+    if (!stored || stored.__publication?.deletePending) return null;
     const latest=publicFlow(stored);
     if (version===undefined || version===latest.version) return latest;
     return (stored.__versions??[]).find(flow=>flow.id===flowId && flow.version===version)??null;
+  }
+
+  /**
+   * The owning workspace document, never the possibly stale catalog, decides
+   * whether the current version is still callable. Grant/owner verification
+   * remains mandatory at the caller's trusted target execution boundary.
+   */
+  async getCurrentPublishedRevision(workspaceId:string,flowId:string,version:number):Promise<FodFlow|null> {
+    if (!Number.isSafeInteger(version) || version<1) throw new Error('Invalid requested flow version.');
+    const stored=await this.read(workspaceId,flowId);
+    if (!stored || stored.__publication?.visible!==true || stored.__publication.deletePending) return null;
+    if (stored.version!==version) return null;
+    return publicFlow(stored);
   }
 
   async save(workspaceId:string,flow:FodFlow):Promise<FodFlow> {
     assertWritableId(flow.id);
     return this.withLock(workspaceId,flow.id,async()=>{
       const previous=await this.read(workspaceId,flow.id);
+      if (previous?.__publication?.deletePending) throw new Error('Workflow deletion is pending reconciliation.');
       const latest=previous ? publicFlow(previous) : null;
       if (latest && flow.version!==latest.version) {
         throw new Error('Stale flow revision: reload the current workspace flow before saving.');
@@ -152,6 +166,7 @@ export class FodFlowStore {
     return this.withLock(workspaceId,flowId,async()=>{
       const stored=await this.read(workspaceId,flowId);
       if (!stored) throw new Error('Cannot publish a missing workspace workflow.');
+      if (stored.__publication?.deletePending) throw new Error('Workflow deletion is pending reconciliation.');
       // N5 registry withdrawals are permanent. An explicit republish after
       // withdrawal must allocate the NEXT immutable workspace-owned version;
       // retrying a failed first publish keeps the same version.
@@ -176,6 +191,7 @@ export class FodFlowStore {
     return this.withLock(workspaceId,flowId,async()=>{
       const stored=await this.read(workspaceId,flowId);
       if (!stored?.__publication) return false;
+      if (stored.__publication.deletePending) throw new Error('Workflow deletion is pending reconciliation.');
       const record:StoredFlow={...stored,__publication:{visible:false}};
       await this.writeRecord(workspaceId,record);
       await this.syncPublication(workspaceId,record);
@@ -188,16 +204,31 @@ export class FodFlowStore {
     if (!this.publication) throw new Error('A trusted publication sink is required.');
     const entries=await this.workspaceService.listFiles(workspaceId,ROOT);
     let count=0;
+    const failures:string[]=[];
     for (const entry of entries) {
-      if (entry.isFolder || !entry.name.endsWith('.json') || !/^FOD\/[^/]+\.json$/.test(entry.path)) continue;
+      if (entry.isFolder || !entry.name.endsWith('.json') || !/^FOD\\/[^/]+\\.json$/.test(entry.path)) continue;
       const flowId=entry.name.slice(0,-5);
-      await this.withLock(workspaceId,flowId,async()=>{
-        const stored=await this.read(workspaceId,flowId);
-        if (stored?.__publication) {
+      try {
+        await this.withLock(workspaceId,flowId,async()=>{
+          const stored=await this.read(workspaceId,flowId);
+          if (!stored?.__publication) return;
+          // Replay only the latest workspace-owned state. Tombstones win
+          // over delayed equal-version publish events in the registry.
           await this.syncPublication(workspaceId,stored);
+          if (stored.__publication.deletePending) {
+            const deleted=await this.workspaceService.deleteFile(workspaceId,pathFor(flowId));
+            if (deleted?.success===false) throw new Error('Unable to finish pending workflow deletion.');
+          }
           count++;
-        }
-      });
+        });
+      } catch {
+        // One broken document/sink cannot starve unrelated workflows. Failed
+        // publication intent remains durable and will replay on reconnect.
+        failures.push(flowId);
+      }
+    }
+    if (failures.length) {
+      throw new Error('Publication reconciliation incomplete: '+count+' replayed, '+failures.length+' failed.');
     }
     return count;
   }
@@ -209,7 +240,7 @@ export class FodFlowStore {
         // Fail closed. Persist the unpublish intent BEFORE deleting the only
         // workspace-owned definition, so an interrupted withdrawal is replayable.
         if (!this.publication) throw new Error('Cannot delete indexed workflow without a trusted publication sink.');
-        const tombstone:StoredFlow={...stored,__publication:{visible:false}};
+        const tombstone:StoredFlow={...stored,__publication:{visible:false,deletePending:true}};
         await this.writeRecord(workspaceId,tombstone);
         await this.syncPublication(workspaceId,tombstone);
       }
