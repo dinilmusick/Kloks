@@ -21,6 +21,8 @@ export interface AikoDirectoryEntry {
 }
 
 export interface AikoAgentDirectoryOptions {
+  /** Resolve the current caller from the server-side Luth session; never accept request-body identity. */
+  readonly resolveCaller: () => Promise<AikoDirectoryCaller | null> | AikoDirectoryCaller | null;
   /** The canonical request-time Aiko registry projection. No directory catalog is persisted. */
   readonly listAgents: () => Promise<readonly AikoAgentDefinition[]> | readonly AikoAgentDefinition[];
   /** Must authorize the current caller against each current agent on every list request. */
@@ -65,11 +67,13 @@ function collisionKey(value: string): string {
  */
 export function createAikoAgentDirectory(options: AikoAgentDirectoryOptions) {
   return {
-    async list(caller: AikoDirectoryCaller): Promise<readonly AikoDirectoryEntry[]> {
+    async list(): Promise<readonly AikoDirectoryEntry[]> {
+      const caller = await options.resolveCaller();
+      if (!caller) throw new Error('A verified Luth caller and active workspace are required.');
       const trustedCaller = Object.freeze({
-        userId: requiredText(caller?.userId, 'caller user ID'),
-        appId: requiredText(caller?.appId, 'caller app ID'),
-        workspaceId: requiredText(caller?.workspaceId, 'caller workspace ID'),
+        userId: requiredText(caller.userId, 'caller user ID'),
+        appId: requiredText(caller.appId, 'caller app ID'),
+        workspaceId: requiredText(caller.workspaceId, 'caller workspace ID'),
       });
       const agents = await options.listAgents();
       if (!Array.isArray(agents)) throw new Error('The canonical Aiko registry returned an invalid agent collection.');
