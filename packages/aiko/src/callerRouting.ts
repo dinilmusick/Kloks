@@ -48,8 +48,8 @@ export interface ImmediateCallerRouterOptions {
   timeoutMs?: number;
   now?: () => number;
   /** Canonical durable/transactional deduplication adapter; must reject key reuse with changed input. */
-  runOnce?: (scope: { userId: string; callerAppId: string; workspaceId: string;
-    targetAppId: string; agentId: string; requestKey: string }, input: unknown,
+  runOnce?: (scope: { userId: string; callerAppId: string; callerAgentId?: string;
+    workspaceId: string; targetAppId: string; agentId: string; requestKey: string }, input: unknown,
     execute: () => Promise<RoutedChatReply>) => Promise<RoutedChatReply>;
 }
 
@@ -111,7 +111,7 @@ export class ImmediateCallerRouter {
       throw new Error('An authenticated caller and active workspace are required.');
     }
     const scope = { userId: caller.userId, callerAppId: caller.appId,
-      workspaceId: caller.workspaceId, targetAppId: target.appId,
+      callerAgentId: caller.agentId, workspaceId: caller.workspaceId, targetAppId: target.appId,
       agentId: target.agentId, requestKey };
     return this.options.runOnce(scope, input, () => this.call(session, target, input));
   }
