@@ -22,7 +22,9 @@ FodPublicationReconciler:
   canonical owner/app scope and server-side SQL publication sink. Supply
   authorizePublicationReconciliation(workspaceId) that checks fresh Luth
   and workspace ownership. It is mandatory for runtime reconciliation,
-  including checks before **each flow's** metadata write.
+  including checks before **each flow's** metadata write. The coordinator
+  also compares the runtime's host-configured app, owner and workspace
+  scope against the independently verified Luth scope before any replay.
 
 Call reconciler.reconcile() after each authenticated startup/reconnect.
 Overlapping lifecycle notifications are serialized, not dropped. Each queued
