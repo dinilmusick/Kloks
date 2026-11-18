@@ -148,8 +148,8 @@ describe('workspace-owned FOD publication lifecycle',()=>{
     await b.publish('two','identical');
     expect(remote.events).toHaveLength(2);
     expect(remote.events[1]).toMatchObject({ownerUserId:'owner-b',workspaceId:'two'});
-    expect(await a.get('one','identical')).not.toBeNull();
-    expect(await a.get('two','identical')).not.toBeNull(); // Reads do not grant remote access.
+    expect((await a.get('one','identical'))?.name).toBe('Same name');
+    expect((await b.get('two','identical'))?.name).toBe('Same name');
     expect(remote.events[0]?.workspaceId).not.toBe(remote.events[1]?.workspaceId);
   });
 
