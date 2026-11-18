@@ -206,7 +206,7 @@ describe('two-app BackendFacade invocation boundary', () => {
     const { backend, proofs, state, calls, principal } = fixture();
     state.slow = true;
     proofs.set('token-short', principal({ deadlineAt: Date.now() + 20 }));
-    await expect(backend.invoke('token-short', request('deadline-1'), 'graph')).rejects.toMatchObject({ code: 'CANCELLED' });
+    await expect(backend.invoke('token-short', request('deadline-1'), 'graph')).rejects.toMatchObject({ code: 'DEADLINE_EXCEEDED' });
     expect(calls[0].signal?.aborted).toBe(true);
     const controller = new AbortController();
     const pending = backend.invoke('token-B', request('cancel-1'), 'agent', controller.signal);
@@ -218,4 +218,89 @@ describe('two-app BackendFacade invocation boundary', () => {
     const { backend } = fixture();
     await expect(backend.invoke('', request('missing'), 'http')).rejects.toBeInstanceOf(FacadeInvocationDenied);
   });
+  it('rechecks live Luth credentials before returning in-flight operation results', async () => {
+    const { backend, proofs, state } = fixture();
+    state.slow = true;
+    const call = backend.invoke('token-B', request('revoke-session-in-flight'), 'agent');
+    await new Promise(resolve => setTimeout(resolve, 15));
+    proofs.delete('token-B');
+    await expect(call).rejects.toMatchObject({ code: 'AUTH_INVALID' });
+  });
+
+  it('drops in-flight output when its grant or deployment lease is revoked', async () => {
+    const { backend, state } = fixture();
+    state.slow = true;
+    const first = backend.invoke('token-B', request('revoke-grant-in-flight'), 'http');
+    await new Promise(resolve => setTimeout(resolve, 15));
+    state.grant = false;
+    await expect(first).rejects.toMatchObject({ code: 'ACCESS_REVOKED' });
+
+    state.grant = true;
+    const second = backend.invoke('token-B', request('revoke-lease-in-flight'), 'agent');
+    await new Promise(resolve => setTimeout(resolve, 15));
+    state.deployed = false;
+    await expect(second).rejects.toMatchObject({ code: 'DEPLOYMENT_UNAVAILABLE' });
+  });
+
+  it('does not disclose output after an immutable operation revision is retired', async () => {
+    const { backend, state } = fixture();
+    state.slow = true;
+    const pending = backend.invoke('token-B', request('retire-in-flight'), 'mcp');
+    await new Promise(resolve => setTimeout(resolve, 15));
+    state.version = 'v2';
+    await expect(pending).rejects.toMatchObject({ code: 'OPERATION_REVOKED' });
+  });
+
+  it('negotiates MCP and dispatches standard tools/list and tools/call via the guarded facade', async () => {
+    const { backend } = fixture();
+    const send = (body: unknown) => backend.mcp(new Request('https://app-b.example/mcp', {
+      method: 'POST', headers: { Authorization: 'Bearer token-B', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }));
+    const init = await send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } });
+    expect(init.status).toBe(200);
+    expect((await init.json() as any).result.capabilities.tools).toBeDefined();
+    const ready = await send({ jsonrpc: '2.0', method: 'notifications/initialized' });
+    expect(ready.status).toBe(202);
+    const listing = await send({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: { workspaceId: 'workspace-B' } });
+    expect(listing.status).toBe(200);
+    const tools = (await listing.json() as any).result.tools;
+    expect(tools[0].name).toBe('Math.add');
+    expect(tools[0].inputSchema.required).toContain('invocationId');
+    expect(JSON.stringify(tools)).not.toContain('report-123');
+
+    const called = await send({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: {
+      name: 'Math.add', arguments: {
+        version: 'v1', targetWorkspaceId: 'workspace-B', invocationId: 'mcp-standard-1',
+        input: { a: 7, b: 8 },
+      },
+    } });
+    expect(called.status).toBe(200);
+    expect((await called.json() as any).result.structuredContent).toEqual({ result: 15 });
+
+    const forged = await send({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: {
+      name: 'Math.add', arguments: {
+        version: 'v1', targetWorkspaceId: 'workspace-B', invocationId: 'mcp-forged-1',
+        input: {}, principalId: 'user-2',
+      },
+    } });
+    expect(forged.status).toBe(400);
+    expect((await forged.json() as any).error.message).toBe('INVALID_MCP_REQUEST');
+  });
+
+  it('rejects malformed HTTP and MCP JSON at the adapter boundary with 400 instead of 500', async () => {
+    const { backend } = fixture();
+    const headers = { Authorization: 'Bearer token-B', 'Content-Type': 'application/json' };
+    const response = await backend.http(new Request('https://app-b.example/api/crossapp/invoke', {
+      method: 'POST', headers, body: '{"operationId":',
+    }));
+    expect(response.status).toBe(400);
+    expect((await response.json() as any).error).toBe('MALFORMED_JSON');
+    const mcp = await backend.mcp(new Request('https://app-b.example/mcp', {
+      method: 'POST', headers, body: '{broken',
+    }));
+    expect(mcp.status).toBe(400);
+    expect((await mcp.json() as any).error.message).toBe('MALFORMED_JSON');
+  });
+
 });
