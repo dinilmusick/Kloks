@@ -57,7 +57,11 @@ function createHarness() {
     workspaceId,workspaceService:files,publication,authorizePublication:async()=>{},
   });
   const registry=new BackendRegistry();
-  const withScope=vi.fn(async<T>(_verified:FodVerifiedPublishedInvocation,_chain:readonly string[],_signal:AbortSignal,run:()=>Promise<T>)=>run());
+  const scopeChains:string[][]=[];
+  const withScope=async<T>(_verified:FodVerifiedPublishedInvocation,chain:readonly string[],_signal:AbortSignal,run:()=>Promise<T>):Promise<T>=>{
+    scopeChains.push([...chain]);
+    return run();
+  };
   const buildRuntime=vi.fn(async(workspaceId:string,current:FodVerifiedPublishedInvocation)=>new FodRuntime({
     workspaceId,workspaceService:files,publication,
     authorizePublishedExecution:createSqlFodPublishedWorkflowAuthorizer({
@@ -84,7 +88,7 @@ function createHarness() {
     return {runtime,result};
   };
   return {
-    files,publisher,save,execute,grantChecks,buildRuntime,withScope,verifyInvocation,
+    files,publisher,save,execute,grantChecks,buildRuntime,scopeChains,verifyInvocation,
     setGranted:(value:boolean)=>{granted=value;},
     setGrantedVersion:(value:number)=>{grantedVersion=value;},
     setVerified:(next:FodVerifiedPublishedInvocation)=>{verified=next;},
@@ -104,7 +108,7 @@ describe('Kloks BackendRegistry -> owning FOD published workflow command',()=>{
     // mandatory target-side Luth and publication/grant reauthorization.
     expect(h.grantChecks).toHaveBeenCalledTimes(2);
     expect(h.buildRuntime).toHaveBeenCalledWith(call.targetWorkspaceId,h.getVerified());
-    expect(h.withScope.mock.calls[0]?.[1]).toEqual([publishedWorkflowChainKey(call)]);
+    expect(h.scopeChains[0]).toEqual([publishedWorkflowChainKey(call)]);
   });
 
   it('denies private workflows and withdrawn workflows despite a cached descriptor',async()=>{
@@ -164,7 +168,7 @@ describe('Kloks BackendRegistry -> owning FOD published workflow command',()=>{
     await expect(h.execute()).rejects.toThrow(/same-owner/);
     await expect(h.execute({...call,targetAppId:'srkl'})).rejects.toThrow(/target app mismatch/);
     await expect(h.execute({...call,workflowId:'../secrets'})).rejects.toThrow(/Invalid published workflow handle/);
-    h.setVerified({...h.getVerified(),chain:null as unknown as string[]});
+    h.setVerified({...h.getVerified(),targetWorkspaceOwnerUserId:owner,chain:null as unknown as string[]});
     await expect(h.execute()).rejects.toThrow(/call chain is required/);
   });
 
