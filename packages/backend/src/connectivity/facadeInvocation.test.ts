@@ -83,7 +83,7 @@ function fixture() {
       return { executed: reference.workflowId, version: reference.version, input };
     },
     delegateCredential: async (_caller, targetAppId) => {
-      if (targetAppId === 'app-B') return 'token-B';
+      if (targetAppId === 'app-B') return _caller.sourceAppId === 'app-B' ? 'token-B-nested' : 'token-B';
       return '';
     },
   });
@@ -198,7 +198,7 @@ describe('two-app BackendFacade invocation boundary', () => {
   it('allows bounded same-app nested calls without a cross-app cycle', async () => {
     const { backend } = fixture();
     const output = await backend.delegate('token-B-nested', 'app-B', request('nested-1'),
-      (_credential, payload, signal) => backend.invoke('token-B-nested', payload, 'agent', signal));
+      (credential, payload, signal) => backend.invoke(credential, payload, 'agent', signal));
     expect((output as any).output).toEqual({ result: 5 });
   });
 
