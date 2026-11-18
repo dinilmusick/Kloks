@@ -24,8 +24,10 @@ export class RemoteExecutor implements BackendExecutor {
   private loadBalancer?: LoadBalancer;
   private callbackRegistry: CallbackRegistry;
   private sessionId: string;
+  private options: RemoteExecutorOptions;
 
   constructor(options: RemoteExecutorOptions) {
+    this.options = options;
     this.transport = options.transport;
     this.loadBalancer = options.loadBalancer;
     this.callbackRegistry = options.callbackRegistry || new CallbackRegistry();
@@ -71,6 +73,8 @@ export class RemoteExecutor implements BackendExecutor {
     requestContext?: Pick<Message, 'authContext' | 'capabilityContext'>,
   ): Message<T> {
     const id = `req-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const authContext = requestContext?.authContext ?? this.options.getAuthContext?.();
+    const capabilityContext = requestContext?.capabilityContext ?? this.options.getCapabilityContext?.();
     return {
       id,
       type,
@@ -79,12 +83,8 @@ export class RemoteExecutor implements BackendExecutor {
       sessionId: this.sessionId,
       correlationId: id,
       timestamp: Date.now(),
-      ...(requestContext?.authContext ?? this.getAuthContext()
-        ? { authContext: requestContext?.authContext ?? this.getAuthContext() }
-        : {}),
-      ...(requestContext?.capabilityContext ?? this.options.getCapabilityContext?.()
-        ? { capabilityContext: requestContext?.capabilityContext ?? this.options.getCapabilityContext?.() }
-        : {}),
+      ...(authContext ? { authContext } : {}),
+      ...(capabilityContext ? { capabilityContext } : {}),
     };
   }
 
