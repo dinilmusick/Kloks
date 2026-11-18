@@ -39,10 +39,11 @@ describe('caller-authorized Aiko agent directory', () => {
       agent({ id: 'aiko-fod-flow-onboarding', sourceKind: 'fod-flow', sourceId: 'onboarding', name: 'Onboarding Flow Agent' }),
     ];
     const directory = createAikoAgentDirectory({
+      resolveCaller: () => caller,
       listAgents: () => agents,
       authorize: () => true,
     });
-    const entries = await directory.list(caller);
+    const entries = await directory.list();
     expect(entries.map(item => [item.id, item.kind, item.sourceId])).toEqual([
       ['aiko-gutts-api-depm', 'app', 'depm'],
       ['aiko-endpoint-kone-api', 'endpoint', 'kone-api'],
@@ -58,12 +59,13 @@ describe('caller-authorized Aiko agent directory', () => {
     const target = agent({ id: 'stable-agent-1', sourceKind: 'endpoint', sourceId: 'endpoint-1', name: 'Endpoint One' });
     const authorize = vi.fn(() => !revoked);
     const directory = createAikoAgentDirectory({
+      resolveCaller: () => caller,
       listAgents: () => [target],
       authorize,
     });
-    expect(await directory.list(caller)).toHaveLength(1);
+    expect(await directory.list()).toHaveLength(1);
     revoked = true;
-    expect(await directory.list(caller)).toEqual([]);
+    expect(await directory.list()).toEqual([]);
     expect(authorize).toHaveBeenCalledTimes(2);
   });
 
@@ -74,11 +76,12 @@ describe('caller-authorized Aiko agent directory', () => {
     );
     const authorize = vi.fn(() => true);
     const directory = createAikoAgentDirectory({
+      resolveCaller: () => caller,
       listAgents: () => [target],
       authorize,
       getWorkspaceAlias,
     });
-    const [entry] = await directory.list(caller);
+    const [entry] = await directory.list();
     expect(entry).toMatchObject({
       id: 'stable-app-agent',
       kind: 'app',
@@ -101,11 +104,12 @@ describe('caller-authorized Aiko agent directory', () => {
       'flow-1': 'Flow alias',
     };
     const directory = createAikoAgentDirectory({
+      resolveCaller: () => caller,
       listAgents: () => [app, endpoint, flow],
       authorize: () => true,
       getWorkspaceAlias: (_workspaceId, id) => aliases[id],
     });
-    const entries = await directory.list(caller);
+    const entries = await directory.list();
     expect(entries.map(item => item.name)).toEqual(['App One', 'Endpoint One', 'Flow alias']);
     expect(entries[0]).not.toHaveProperty('alias');
     expect(entries[1]).not.toHaveProperty('alias');
@@ -117,11 +121,12 @@ describe('caller-authorized Aiko agent directory', () => {
     const getWorkspaceAlias = vi.fn(() => 'Expose me');
     const authorize = vi.fn(() => false);
     const directory = createAikoAgentDirectory({
+      resolveCaller: () => caller,
       listAgents: () => [denied],
       authorize,
       getWorkspaceAlias,
     });
-    expect(await directory.list(caller)).toEqual([]);
+    expect(await directory.list()).toEqual([]);
     expect(getWorkspaceAlias).not.toHaveBeenCalled();
     expect(authorize).toHaveBeenCalledWith(caller, denied);
   });
@@ -129,11 +134,12 @@ describe('caller-authorized Aiko agent directory', () => {
   it('uses stable fallback labels and ignores malformed aliases', async () => {
     const unnamed = agent({ id: 'unnamed-endpoint', sourceKind: 'endpoint', sourceId: 'endpoint-7', name: '' });
     const directory = createAikoAgentDirectory({
+      resolveCaller: () => caller,
       listAgents: () => [unnamed],
       authorize: () => true,
       getWorkspaceAlias: () => '  \u0000invalid  ',
     });
-    expect(await directory.list(caller)).toMatchObject([
+    expect(await directory.list()).toMatchObject([
       { id: 'unnamed-endpoint', name: 'Endpoint endpoint-7', canonicalName: 'Endpoint endpoint-7' },
     ]);
   });
@@ -142,6 +148,6 @@ describe('caller-authorized Aiko agent directory', () => {
     const first = agent({ id: 'duplicate', sourceKind: 'endpoint', sourceId: 'one', name: 'One' });
     const second = agent({ id: 'duplicate', sourceKind: 'fod-flow', sourceId: 'two', name: 'Two' });
     const directory = createAikoAgentDirectory({ listAgents: () => [first, second], authorize: () => true });
-    await expect(directory.list(caller)).rejects.toThrow('duplicate agent ID');
+    await expect(directory.list()).rejects.toThrow('duplicate agent ID');
   });
 });
