@@ -46,6 +46,31 @@ describe('Aiko authenticated chat integration', () => {
     expect(reply.replyTo).toEqual(user);
     expect(reply.result).toMatchObject({ status: 'completed', output: { id: 'flow', caller: 'user' } });
   });
+  it('routes App A -> App B -> endpoint -> B -> A without leaking final reply destination', async () => {
+    const entries: AuthorizedAgentAddress[] = [...agents,
+      { id: 'app-b', appId: 'b', kind: 'app', name: 'Other App', canonicalName: 'Other App' }];
+    const bridge = createAikoChatIntegration({
+      verifyCaller: s => s === 'valid' ? user : null,
+      listAuthorized: () => entries,
+      authorizeOperation: () => true,
+      executeAuthorized: async (entry, input, ctx, _signal, child) => {
+        if (entry.id === 'app') return { status: 'completed',
+          output: await child({ appId: 'b', agentId: 'app-b' }, input) };
+        if (entry.id === 'app-b') return { status: 'completed',
+          output: await child({ appId: 'b', agentId: 'endpoint' }, input) };
+        return { status: 'completed', output: { caller: ctx.caller.agentId, input } };
+      },
+    });
+    const root = await bridge.chat('valid', 'fetch quote');
+    expect(root.replyTo).toEqual(user);
+    const appB = (root.result as { status: 'completed'; output: any }).output;
+    expect(appB.replyTo).toMatchObject({ appId: 'a', agentId: 'app' });
+    const endpoint = appB.result.output;
+    expect(endpoint.replyTo).toMatchObject({ appId: 'b', agentId: 'app-b' });
+    expect(endpoint.result.output.caller).toBe('app-b');
+    expect(new Set([root.traceId, appB.traceId, endpoint.traceId]).size).toBe(1);
+  });
+
   it('raw graph invocation shares authorization and execution adapters', async () => {
     const { integration, calls } = setup();
     await integration.invoke('valid', { appId: 'b', agentId: 'endpoint' }, { ticker: 'A' });
