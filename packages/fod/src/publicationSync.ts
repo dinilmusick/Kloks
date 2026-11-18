@@ -43,7 +43,7 @@ export function validatePublicationDescriptor(d:FodPublicationDescriptor):void {
 /**
  * One parameterized statement makes withdrawal of old published revisions and
  * publication of the selected revision atomic. The operation is idempotent,
- * so an interrupted local save can be reconciled at startup/reconnect.\n * Stale events cannot unpublish newer versions or revive withdrawn versions;\n * republishing after withdrawal must create a new immutable version.
+ * so an interrupted local save can be reconciled at startup/reconnect.\n * Withdrawal creates an equal-version tombstone even when no publish landed.\n * Stale events cannot unpublish newer versions or revive withdrawn versions;\n * republishing after withdrawal must create a new immutable version.
  *
  * Caller must be a trusted server-side registry writer. Grant verification,
  * owner/workspace ACL and version checks are independently enforced at the
@@ -59,9 +59,25 @@ WITH withdrawn AS (
      SET publication_state='withdrawn', withdrawn_at=clock_timestamp()
    WHERE app_id=$1 AND owner_user_id=$2 AND workspace_id=$3 AND workflow_id=$4
      AND publication_state='published'
-     -- Delayed old events may withdraw only their own/older revisions.
-     AND (($8::text='withdrawn' AND version<=$5::integer)
-       OR ($8::text='published' AND version<$5::integer))
+     -- Only older versions are withdrawn here. The equal-version
+     -- tombstone is inserted or updated by withdrawal_marker below.
+     AND version<$5::integer
+  RETURNING id
+), withdrawal_marker AS (
+  -- A withdrawal must leave a durable marker EVEN IF a publish never reached
+  -- this registry. Otherwise a delayed publish could resurrect that version.
+  INSERT INTO skipo_ecosystem.workflow_publications
+    (app_id,owner_user_id,workspace_id,workflow_id,version,display_name,
+     description,publication_state,withdrawn_at)
+  SELECT $1,$2,$3,$4,$5,$6,$7,'withdrawn',clock_timestamp()
+   WHERE $8::text='withdrawn'
+  ON CONFLICT (app_id,owner_user_id,workspace_id,workflow_id,version)
+    DO UPDATE SET publication_state='withdrawn',
+                  withdrawn_at=COALESCE(
+                    skipo_ecosystem.workflow_publications.withdrawn_at,
+                    clock_timestamp()
+                  )
+     WHERE skipo_ecosystem.workflow_publications.publication_state='published'
   RETURNING id
 ), published AS (
   INSERT INTO skipo_ecosystem.workflow_publications
@@ -81,6 +97,7 @@ WITH withdrawn AS (
   RETURNING id
 )
 SELECT (SELECT count(*) FROM withdrawn) AS withdrawn_count,
+       (SELECT count(*) FROM withdrawal_marker) AS tombstone_count,
        (SELECT count(*) FROM published) AS published_count`;
       await query(sql,[
         d.appId,d.ownerUserId,d.workspaceId,d.workflowId,d.version,
