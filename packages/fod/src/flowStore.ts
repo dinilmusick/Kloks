@@ -2,7 +2,7 @@ import type {FodFlow} from './types.js';
 import type {FodPublicationOptions,FodPublicationDescriptor} from './publicationSync.js';
 
 const ROOT='FOD';
-type StoredFlow=FodFlow & {__versions?:FodFlow[];__publication?:{visible:boolean}};
+type StoredFlow=FodFlow & {__versions?:FodFlow[];__publication?:{visible:boolean};__deletePending?:boolean};
 const locks=new Map<string,Promise<void>>();
 
 function pathFor(flowId:string):string {
@@ -16,7 +16,7 @@ function assertWritableId(flowId:string):void {
   }
 }
 function publicFlow(stored:StoredFlow):FodFlow {
-  const {__versions: _versions,__publication: _publication,...flow}=stored;
+  const {__versions: _versions,__publication: _publication,__deletePending: _deletePending,...flow}=stored;
   return flow;
 }
 function isMissing(error:unknown):boolean {
@@ -121,6 +121,7 @@ export class FodFlowStore {
     assertWritableId(flow.id);
     return this.withLock(workspaceId,flow.id,async()=>{
       const previous=await this.read(workspaceId,flow.id);
+      if (previous?.__deletePending) throw new Error('Workflow deletion is pending; reconcile before editing.');
       const latest=previous ? publicFlow(previous) : null;
       if (latest && flow.version!==latest.version) {
         throw new Error('Stale flow revision: reload the current workspace flow before saving.');
@@ -152,6 +153,7 @@ export class FodFlowStore {
     return this.withLock(workspaceId,flowId,async()=>{
       const stored=await this.read(workspaceId,flowId);
       if (!stored) throw new Error('Cannot publish a missing workspace workflow.');
+      if (stored.__deletePending) throw new Error('Cannot publish a workflow while deletion is pending.');
       // N5 registry withdrawals are permanent. An explicit republish after
       // withdrawal must allocate the NEXT immutable workspace-owned version;
       // retrying a failed first publish keeps the same version.
@@ -176,6 +178,7 @@ export class FodFlowStore {
     return this.withLock(workspaceId,flowId,async()=>{
       const stored=await this.read(workspaceId,flowId);
       if (!stored?.__publication) return false;
+      if (stored.__deletePending) throw new Error('Workflow deletion is pending; reconciliation will finish deletion.');
       const record:StoredFlow={...stored,__publication:{visible:false}};
       await this.writeRecord(workspaceId,record);
       await this.syncPublication(workspaceId,record);
@@ -194,8 +197,13 @@ export class FodFlowStore {
       await this.withLock(workspaceId,flowId,async()=>{
         const stored=await this.read(workspaceId,flowId);
         if (stored?.__publication) {
+          // Registry withdrawal is always retried before the source-owned tombstone is removed.
           await this.syncPublication(workspaceId,stored);
           count++;
+          if (stored.__deletePending) {
+            const deletion=await this.workspaceService.deleteFile(workspaceId,pathFor(flowId));
+            if (!deletion?.success) throw new Error('Unable to finalize deleted workflow after publication withdrawal.');
+          }
         }
       });
     }
@@ -205,11 +213,11 @@ export class FodFlowStore {
   async delete(workspaceId:string,flowId:string):Promise<boolean> {
     return this.withLock(workspaceId,flowId,async()=>{
       const stored=await this.read(workspaceId,flowId);
-      if (stored?.__publication) {
-        // Fail closed. Persist the unpublish intent BEFORE deleting the only
-        // workspace-owned definition, so an interrupted withdrawal is replayable.
+      if (stored?.__publication || stored?.__deletePending) {
+        // Persist a durable delete intent BEFORE withdrawal. If the registry or
+        // workspace delete is interrupted, reconnect can finish the operation.
         if (!this.publication) throw new Error('Cannot delete indexed workflow without a trusted publication sink.');
-        const tombstone:StoredFlow={...stored,__publication:{visible:false}};
+        const tombstone:StoredFlow={...stored,__publication:{visible:false},__deletePending:true};
         await this.writeRecord(workspaceId,tombstone);
         await this.syncPublication(workspaceId,tombstone);
       }
