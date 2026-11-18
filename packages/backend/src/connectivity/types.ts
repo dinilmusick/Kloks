@@ -16,6 +16,7 @@ export type MessageType =
   | 'ERROR'
   | 'ACK';
 
+/** Request-scoped transport metadata. User/role/permission fields are hints only; the bearer is verified by Luth. */
 export interface AuthContext {
   userId?: string;
   role?: string;
