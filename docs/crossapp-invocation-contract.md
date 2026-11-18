@@ -11,7 +11,7 @@ Import `createFacadeInvocationBoundary` from `@ultrst-armada/kloks/backend`
 
 | Callback | Owner and required invariant |
 | --- | --- |
-| `verifyLuthCredential(rawBearer, targetAppId)` | Luth: validate signature, **audience**, expiry, live session, revocation, delegated chain, principal and verified immediate invoker on every request and again before output |
+| `verifyLuthCredential(rawBearer, targetAppId)` | Luth: perform a **single, consuming invocation admission** on the audience-bound proof, including session and grant validity; do not call again with this bearer |\n| `revalidateLuthCaller(admitted, targetAppId)` | Luth: independently and **non-consumingly** recheck live session, grant/delegation revocation, verified caller identity, audience and expiry from trusted authority before returning output; return null when unavailable |
 | `listCurrentOperations(workspaceId)` | Skipo + owner-app adapter: currently eligible immutable static capability revisions and explicitly published workflow references **only** |
 | `authorize(decision, phase, value?)` | Owning app: current owner, user, source/target workspace, grant, scope, operation and input/output policy. Called for discover, invoke and output |
 | `deploymentEligible(decision)` | Skipo: verified application/deployment identity, environment, live lease and eligibility on every call and before output |
@@ -23,7 +23,7 @@ For `static` operations, the existing `facade.services[serviceId].execute(servic
 runs on the target. Registration/authorization **must** ensure this executor is server-owned;
 untrusted callers cannot choose arbitrary service implementations.
 
-The target will reject a request with unknown/retired `operationId + version`,
+**One-use admission safety:** Luth #21 consumes the invocation bearer at admission. The target MUST NOT introspect it again at output. The mandatory `revalidateLuthCaller` must consult a distinct, authenticated, non-consuming Luth session/delegation state API or authoritative store; a no-op callback, local cache, bearer replay or caller-supplied identity is forbidden. If no trusted revalidation service is available, fail closed rather than return output. This contract cannot be considered live-integrated until that authority is actually wired and tested.\n\nThe target will reject a request with unknown/retired `operationId + version`,
 revoked grant, unavailable deployment, missing signed proof, replay, invalid handle,
 deadline expiry or a cross-app cycle. Its output is discarded if any fresh authorization,
 caller or deployment check fails.
