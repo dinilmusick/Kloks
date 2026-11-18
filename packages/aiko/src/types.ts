@@ -24,6 +24,8 @@ export interface AikoTool {
   execute:(input:unknown)=>Promise<unknown>;
   sourceKind:AikoSourceKind;
   sourceId:string;
+  /** Immutable server-side target binding for a cross-app capability. */
+  targetApp?:AikoCrossAppTarget;
 }
 
 export interface AikoAgentDefinition {
