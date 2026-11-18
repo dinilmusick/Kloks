@@ -22,7 +22,7 @@ export interface FodPublicationReconcilerOptions {
   /** Fresh Luth and workspace ACL verification immediately before replay. */
   verifyStillAuthorized:(scope:FodVerifiedReconciliationWorkspace)=>Promise<void>;
   /** Must bind a new owning-workspace FodRuntime with a server-side sink. */
-  createRuntime:(scope:FodVerifiedReconciliationWorkspace)=>Promise<Pick<FodRuntime,'reconcilePublications'>>|Pick<FodRuntime,'reconcilePublications'>;
+  createRuntime:(scope:FodVerifiedReconciliationWorkspace)=>Promise<Pick<FodRuntime,'reconcilePublications'|'getPublicationReconciliationScope'>>|Pick<FodRuntime,'reconcilePublications'>;
 }
 
 function validAppId(value:unknown):value is string {
@@ -86,8 +86,14 @@ export class FodPublicationReconciler {
       // Authentication may have changed while an earlier workspace replayed.
       await this.options.verifyStillAuthorized(scope);
       const runtime=await this.options.createRuntime(scope);
-      if (!runtime || typeof runtime.reconcilePublications!=='function') {
+      if (!runtime || typeof runtime.reconcilePublications!=='function' ||
+          typeof runtime.getPublicationReconciliationScope!=='function') {
         throw new Error('FOD reconciliation requires an owning-workspace runtime.');
+      }
+      const bound=runtime.getPublicationReconciliationScope();
+      if (!bound || bound.appId!==scope.appId || bound.ownerUserId!==scope.userId ||
+          bound.workspaceId!==scope.workspaceId) {
+        throw new Error('FOD owning runtime does not match verified Luth workspace scope.');
       }
       // Runtime also re-verifies per workflow before sending any metadata.
       const replayed=await runtime.reconcilePublications();
