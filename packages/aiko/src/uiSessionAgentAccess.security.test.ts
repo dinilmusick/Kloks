@@ -198,6 +198,29 @@ describe('live-session frontend consent security regression', () => {
       .rejects.toThrow('unavailable');
   });
 
+  it('queues only the immutable action that received approval, despite mutable callbacks', async () => {
+    const f = fixture();
+    const requested = validAction();
+    const access = createConsentedUiAgentAccess({
+      ...f.opts, approveAction: async (_caller, _grant, displayed) => {
+        (displayed as { componentId: string }).componentId = 'different';
+        (displayed.payload as { item: number }).item = 999;
+        (requested.payload as { item: number }).item = 500;
+        return true;
+      },
+    });
+    await access.action('s1', 'window-1', requested);
+    expect(await f.requests[1].json()).toEqual(validAction());
+  });
+
+  it('rejects oversized action data before consent or dispatch', async () => {
+    const f = fixture();
+    const big = { ...validAction(), payload: 'x'.repeat(300_000) };
+    await expect(f.access.action('s1', 'window-1', big)).rejects.toThrow('limit');
+    expect(f.approvals).toHaveLength(0);
+    expect(f.requests).toHaveLength(0);
+  });
+
   it('blocks a grant expired during approval, even when the token is still live', async () => {
     const f = fixture();
     const access = createConsentedUiAgentAccess({
