@@ -52,7 +52,7 @@ export class HTTPTransport implements ITransport {
     // Reject separators, encoded escapes, control characters and empty segments
     // before URL normalization could route a scoped call outside its API endpoint.
     if (typeof operation !== 'string' || !operation || operation.trim() !== operation ||
-      /[/\\?#%\x00-\x1f\x7f]/.test(operation) ||
+      /[\/\\?#%\x00-\x1f\x7f]/.test(operation) ||
       operation.split('.').some(segment => !segment || segment.trim() !== segment)) {
       throw new Error('[HTTPTransport] Invalid remote operation identifier.');
     }
