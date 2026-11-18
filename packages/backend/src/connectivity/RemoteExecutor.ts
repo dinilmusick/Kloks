@@ -120,8 +120,16 @@ export class RemoteExecutor implements BackendExecutor {
   }
 
   async delegate<T = unknown, R = unknown>(delegation: Delegation<T>): Promise<R> {
-    const msg = this.prepareMessage('COMMAND', `${delegation.target}.${delegation.operation}`, delegation, delegation);
-    const res = await this.transport.request<Delegation<T>, R>(msg);
+    // Keep transport credentials and routing metadata outside the delegation
+    // payload. HTTPTransport maps only the bearer to Authorization.
+    const { authContext, capabilityContext, ...delegationPayload } = delegation;
+    const msg = this.prepareMessage(
+      'COMMAND',
+      `${delegation.target}.${delegation.operation}`,
+      delegationPayload,
+      { authContext, capabilityContext },
+    );
+    const res = await this.transport.request<typeof delegationPayload, R>(msg);
     return res.payload as R;
   }
 
