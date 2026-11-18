@@ -138,7 +138,17 @@ export class AikoRuntime {
   private guardCapability(capability: AikoCapability): AikoTool {
     return {
       ...capability,
-      execute: async input => (await this.requireCurrentCapability(capability)).execute(input),
+      execute: async input => {
+        const current=await this.requireCurrentCapability(capability);
+        const target=current.targetApp;
+        if (target && target.appId!==this.options.appId) {
+          if (!this.options.appId || !this.options.invokeCrossApp) {
+            throw new Error('Cross-app capability execution requires an active trusted call-chain context.');
+          }
+          return this.options.invokeCrossApp(target,input);
+        }
+        return current.execute(input);
+      },
     };
   }
 
