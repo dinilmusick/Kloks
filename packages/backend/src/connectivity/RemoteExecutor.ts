@@ -107,12 +107,18 @@ export class RemoteExecutor implements BackendExecutor {
   async delegate<T = unknown, R = unknown>(delegation: Delegation<T>): Promise<R> {
     const msg = this.prepareMessage('COMMAND', `${delegation.target}.${delegation.operation}`, delegation);
     const res = await this.transport.request<Delegation<T>, R>(msg);
+    if (res.type === 'ERROR') {
+      throw new Error(res.error?.message || `Delegation "${delegation.target}.${delegation.operation}" failed.`);
+    }
     return res.payload as R;
   }
 
   async submitJob<T = unknown, R = unknown>(job: Partial<Job<T, R>>): Promise<Job<T, R>> {
     const msg = this.prepareMessage('JOB_SUBMIT', `jobs.submit`, job);
     const res = await this.transport.request<Partial<Job<T, R>>, Job<T, R>>(msg);
+    if (res.type === 'ERROR') {
+      throw new Error(res.error?.message || 'Remote job submission failed.');
+    }
     return res.payload as Job<T, R>;
   }
 
