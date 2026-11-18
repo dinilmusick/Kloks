@@ -21,7 +21,7 @@ import {
  * replay-enabling the original bearer or omitting the final grant check.
  */
 describe('Luth #21 one-use admission / Kloks #115 output authorization contract', () => {
-  function setup(options: { revokeDuringOperation?: boolean } = {}) {
+  function setup(options: { revokeDuringOperation?: boolean; revokeSessionDuringOperation?: boolean } = {}) {
     const now = Date.now();
     const caller: VerifiedFacadeCaller = {
       principalId: 'user-A', sourceAppId: 'app-A',
@@ -35,7 +35,7 @@ describe('Luth #21 one-use admission / Kloks #115 output authorization contract'
       kind: 'static', targetWorkspaceId: 'workspace-B',
       serviceId: 'math', serviceOperation: 'add',
     };
-    const state = { admitted: false, grant: true, checks: 0, outputs: 0 };
+    const state = { admitted: false, grant: true, sessionLive: true, checks: 0, outputChecks: 0, outputs: 0 };
     const boundary = createFacadeInvocationBoundary({
       targetAppId: 'app-B',
       facade: {
@@ -43,6 +43,7 @@ describe('Luth #21 one-use admission / Kloks #115 output authorization contract'
           math: {
             execute: async (_name: string, input: unknown) => {
               if (options.revokeDuringOperation) state.grant = false;
+              if (options.revokeSessionDuringOperation) state.sessionLive = false;
               const p = input as { a: number; b: number };
               state.outputs += 1;
               return { result: p.a + p.b };
@@ -57,6 +58,12 @@ describe('Luth #21 one-use admission / Kloks #115 output authorization contract'
         if (credential !== 'single-use-luth-proof' || audience !== 'app-B' || state.admitted) return null;
         state.admitted = true;
         return { ...caller, invoker: { ...caller.invoker }, chain: [...caller.chain] };
+      },
+      // Non-consuming session/grant freshness check; never replays the bearer.
+      revalidateLuthCaller: async (admitted, audience) => {
+        state.outputChecks += 1;
+        return state.sessionLive && audience === 'app-B'
+          ? { ...admitted, invoker: { ...admitted.invoker }, chain: [...admitted.chain] } : null;
       },
       listCurrentOperations: async () => [op],
       deploymentEligible: async () => true,
@@ -79,9 +86,37 @@ describe('Luth #21 one-use admission / Kloks #115 output authorization contract'
     await expect(boundary.invoke('single-use-luth-proof', request, 'http'))
       .resolves.toMatchObject({ output: { result: 5 }, invocationId: 'luth-once-1' });
     expect(state.outputs).toBe(1);
+    expect(state.checks).toBe(1);
+    expect(state.outputChecks).toBe(1);
     // A second invocation using the same one-use bearer must be rejected.
     await expect(boundary.invoke('single-use-luth-proof', { ...request, invocationId: 'luth-once-2' }, 'http'))
       .rejects.toMatchObject({ code: 'AUTH_INVALID' });
+  });
+
+  it('accepts one-use admission for standard MCP tools/call without double consumption', async () => {
+    const { boundary, state } = setup();
+    const response = await boundary.mcp(new Request('https://app-b.example/mcp', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer single-use-luth-proof', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: {
+        name: 'math.add', arguments: {
+          version: 'v1', targetWorkspaceId: 'workspace-B',
+          invocationId: 'mcp-one-use-1', input: { a: 2, b: 3 },
+        },
+      } }),
+    }));
+    expect(response.status).toBe(200);
+    expect((await response.json() as any).result.structuredContent).toEqual({ result: 5 });
+    expect(state.checks).toBe(1);
+    expect(state.outputChecks).toBe(1);
+  });
+
+  it('rejects in-flight output when the trusted Luth session is revoked', async () => {
+    const { boundary, request, state } = setup({ revokeSessionDuringOperation: true });
+    await expect(boundary.invoke('single-use-luth-proof', request, 'http'))
+      .rejects.toMatchObject({ code: 'AUTH_INVALID' });
+    expect(state.outputs).toBe(1);
+    expect(state.outputChecks).toBe(1);
   });
 
   it('rejects in-flight output after a grant is revoked despite consumed admission proof', async () => {
