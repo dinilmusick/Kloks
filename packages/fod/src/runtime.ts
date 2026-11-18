@@ -96,9 +96,13 @@ export class FodRuntime {
     const scope=await this.authorizeWorkflowGrant('revoke',flowId,callerAppId,sourceWorkspaceId);
     return this.options.workflowGrantStore!.revoke(scope);
   }
-  /** Host calls after authenticated startup and reconnect to replay pending metadata. */
+  /** Host calls only after authenticated startup/reconnect. Recheck Luth
+   * workspace ownership before each publication record is synchronized. */
   async reconcilePublications():Promise<number> {
-    return this.flowStore.reconcilePublications(this.options.workspaceId);
+    const authorize=this.options.authorizePublicationReconciliation;
+    if (!authorize) throw new Error('Publication reconciliation authorization not configured.');
+    await authorize(this.options.workspaceId);
+    return this.flowStore.reconcilePublications(this.options.workspaceId,()=>authorize(this.options.workspaceId));
   }
   async executeFlow(flowId:string,input?:unknown,options:{signal?:AbortSignal;version?:number}={}):Promise<FodExecutionResult> {
     const flow=await this.getFlow(flowId,options.version);
