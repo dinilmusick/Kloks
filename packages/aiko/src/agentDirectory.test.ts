@@ -147,7 +147,7 @@ describe('caller-authorized Aiko agent directory', () => {
   it('rejects duplicate stable IDs from the canonical registry', async () => {
     const first = agent({ id: 'duplicate', sourceKind: 'endpoint', sourceId: 'one', name: 'One' });
     const second = agent({ id: 'duplicate', sourceKind: 'fod-flow', sourceId: 'two', name: 'Two' });
-    const directory = createAikoAgentDirectory({ listAgents: () => [first, second], authorize: () => true });
+    const directory = createAikoAgentDirectory({ resolveCaller: () => caller, listAgents: () => [first, second], authorize: () => true });
     await expect(directory.list()).rejects.toThrow('duplicate agent ID');
   });
 });
