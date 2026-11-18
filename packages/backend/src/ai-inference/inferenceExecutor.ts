@@ -23,7 +23,7 @@ async function executeGoogleInference(
   options?: InferenceOptions
 ): Promise<InferenceResult> {
   const normModel = modelId.startsWith('models/') ? modelId.replace('models/', '') : modelId;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${normModel}:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(normModel)}:generateContent`;
 
   const reqBody: Record<string, unknown> = {
     contents: [{ parts: [{ text: prompt }] }],
@@ -41,7 +41,7 @@ async function executeGoogleInference(
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey.trim() },
     body: JSON.stringify(reqBody),
     signal: options?.signal,
   });
@@ -78,6 +78,9 @@ export async function performInference(
 ): Promise<InferenceResult> {
   const start = Date.now();
   const normModel = modelId.startsWith('models/') ? modelId.replace('models/', '') : modelId;
+  if (!apiKey || !apiKey.trim()) {
+    throw new Error(`[${providerId.toUpperCase()} AUTH]: Missing API key for ${providerId}`);
+  }
 
   if (providerId === 'google') {
     const res = await executeGoogleInference(normModel, apiKey, prompt, options);
@@ -85,11 +88,12 @@ export async function performInference(
     return res;
   }
 
-  if (!apiKey || apiKey.trim().length === 0) {
-    throw new Error(`[${providerId.toUpperCase()} AUTH]: Missing API key for ${providerId}`);
-  }
-
-  const baseUrl = PROVIDER_BASE_URLS[providerId] || 'https://api.groq.com/openai/v1';
+  // Never send a credential for an unknown provider to another provider's endpoint.
+  // An explicit provider adapter is required before its credentials may be used.
+  const baseUrl = Object.hasOwn(PROVIDER_BASE_URLS, providerId)
+    ? PROVIDER_BASE_URLS[providerId]
+    : undefined;
+  if (!baseUrl) throw new Error(`Unsupported AI inference provider: ${providerId}`);
   const reqBody: any = {
     model: normModel,
     messages: options?.messages || [{ role: 'user', content: prompt }],
