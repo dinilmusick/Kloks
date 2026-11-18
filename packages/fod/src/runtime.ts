@@ -21,12 +21,12 @@ export class FodRuntime {
   getEndpoints():FodEndpointDescriptor[]{return [...this.endpoints.values()];}
 
   async listFlows():Promise<FodFlow[]> { return this.flowStore.list(this.options.workspaceId); }
-  async getFlow(flowId:string):Promise<FodFlow|null> { return this.flowStore.get(this.options.workspaceId,flowId); }
+  async getFlow(flowId:string,version?:number):Promise<FodFlow|null> { return this.flowStore.get(this.options.workspaceId,flowId,version); }
   async saveFlow(flow:FodFlow):Promise<FodFlow> { return this.flowStore.save(this.options.workspaceId,flow); }
   async deleteFlow(flowId:string):Promise<boolean> { return this.flowStore.delete(this.options.workspaceId,flowId); }
-  async executeFlow(flowId:string,input?:unknown,options:{signal?:AbortSignal}={}):Promise<FodExecutionResult> {
-    const flow=await this.getFlow(flowId);
-    if(!flow) throw new Error(`FOD flow '${flowId}' not found.`);
+  async executeFlow(flowId:string,input?:unknown,options:{signal?:AbortSignal;version?:number}={}):Promise<FodExecutionResult> {
+    const flow=await this.getFlow(flowId,options.version);
+    if(!flow) throw new Error(`FOD flow '${flowId}'${options.version===undefined?'':` version ${options.version}`} not found.`);
     return executeFodFlow(flow,this.endpoints,this.options.onEvent,input,{scriptExecutor:this.options.scriptExecutor,signal:options.signal});
   }
 }
