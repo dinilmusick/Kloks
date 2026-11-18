@@ -22,7 +22,7 @@ export interface FodPublicationReconcilerOptions {
   /** Fresh Luth and workspace ACL verification immediately before replay. */
   verifyStillAuthorized:(scope:FodVerifiedReconciliationWorkspace)=>Promise<void>;
   /** Must bind a new owning-workspace FodRuntime with a server-side sink. */
-  createRuntime:(scope:FodVerifiedReconciliationWorkspace)=>Promise<Pick<FodRuntime,'reconcilePublications'|'getPublicationReconciliationScope'>>|Pick<FodRuntime,'reconcilePublications'>;
+  createRuntime:(scope:FodVerifiedReconciliationWorkspace)=>Promise<Pick<FodRuntime,'reconcilePublications'|'getPublicationReconciliationScope'>>|Pick<FodRuntime,'reconcilePublications'|'getPublicationReconciliationScope'>;
 }
 
 function validAppId(value:unknown):value is string {
