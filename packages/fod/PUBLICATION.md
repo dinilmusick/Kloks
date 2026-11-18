@@ -35,6 +35,16 @@ authorization grants for invoking workflows.
   or reconnect. Sink upserts and withdrawals are idempotent. It is the host's
   responsibility to invoke reconciliation and retry failed operations.
 
+- Deleting an indexed workflow first persists a private `deletePending`
+  tombstone with withdrawn publication intent. Reconciliation withdraws the
+  registry entry before removing the workspace document; if either operation
+  fails, the tombstone remains and the next reconnect retries it. A pending
+  delete cannot be edited, republished or separately unpublished, so a retry
+  cannot accidentally cancel deletion.
+- Reconciliation finalizes pending deletes after the idempotent withdrawal,
+  making a process restart safe even when the original delete call was
+  interrupted between registry synchronization and workspace removal.
+
 The only synchronized fields are canonical app ID, Luth owner user ID, owning
 workspace ID, stable workflow ID, immutable version, display name, description,
 and published/withdrawn state. Never index full graph definitions, edges,
