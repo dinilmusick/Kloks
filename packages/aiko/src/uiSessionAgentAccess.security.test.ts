@@ -30,7 +30,7 @@ function fixture() {
     if (session === 's2') return { ...caller, sessionId: 'luth-session-2' };
     return null;
   });
-  const authorize = vi.fn((_, window: string): UiAgentConsentGrant | null => {
+  const authorize = vi.fn((_: VerifiedUiAgentCaller, window: string): UiAgentConsentGrant | null => {
     if (!live || revoked || window !== 'window-1') return null;
     return {
       grantId: generation, windowId: 'window-1', tabId: tab, origin: grantOrigin,
