@@ -130,7 +130,7 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
     appId: string, workspaceId: string, operation: RemoteFacadeOperation | undefined,
     method: 'GET' | 'POST', payload: FacadeInvocation | undefined,
     signal?: AbortSignal, deadlineAt?: number,
-    expectedDeploymentId?: string,
+    expectedDeploymentId?: string, pinnedCatalog = false,
   ): Promise<{ body: unknown; deployment: VerifiedFacadeDeployment }> {
     if (!validId(appId) || !validId(workspaceId) ||
         (expectedDeploymentId !== undefined && !deploymentUuid.test(expectedDeploymentId)) ||
@@ -257,6 +257,26 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
         denied('DEPLOYMENT_REVOKED', 503);
       }
       if (controller.signal.aborted) throw abortError();
+      if (pinnedCatalog) {
+        // Discovery is only authoritative for operations approved by BOTH
+        // current Skipo registry and target owner ACL. A verified host alone
+        // is not permission to advertise every operation it can execute.
+        const entries = decodeOperations(body, workspaceId)
+          .filter(entry => entry.kind === 'static');
+        if (entries.length > 64) denied('CATALOG_TOO_LARGE', 503);
+        const visible: RemoteFacadeDescriptor[] = [];
+        for (const entry of entries) {
+          if (controller.signal.aborted) throw abortError();
+          const found = await resolver(appId, workspaceId, {
+            id: entry.id, version: entry.version, kind: 'static',
+          }, controller.signal, deployment.deploymentId);
+          if (!matchDeployment(deployment, found, now())) continue;
+          if (!await options.approveOrigin(found!.origin, found!)) continue;
+          if (controller.signal.aborted) throw abortError();
+          visible.push(entry);
+        }
+        return { body: { operations: visible }, deployment };
+      }
       return { body, deployment };
     };
     try { return await Promise.race([perform(), stopped]); }
@@ -294,8 +314,10 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
   async function discoverPinned(targetAppId: string, targetWorkspaceId: string,
     signal?: AbortSignal, deadlineAt?: number): Promise<PinnedRemoteFacadeDescriptor[]> {
     const { body, deployment } = await exchange(
-      targetAppId, targetWorkspaceId, undefined, 'GET', undefined, signal, deadlineAt,
+      targetAppId, targetWorkspaceId, undefined, 'GET', undefined, signal,
+      deadlineAt, undefined, true,
     );
+    if (!deploymentUuid.test(deployment.deploymentId)) denied('DEPLOYMENT_UNAVAILABLE', 503);
     return decodeOperations(body, targetWorkspaceId)
       .filter((operation): operation is RemoteFacadeDescriptor & { kind: 'static' } => operation.kind === 'static')
       .map(operation => ({ ...operation, appId: deployment.appId,
