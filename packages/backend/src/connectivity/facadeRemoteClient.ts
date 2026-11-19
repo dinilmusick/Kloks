@@ -28,6 +28,8 @@ export interface FacadeRemoteClientOptions {
   readonly resolveDeployment: (
     appId: string, workspaceId: string, operation: RemoteFacadeOperation | undefined,
     signal: AbortSignal,
+    /** Pin to the exact deployment UUID already attested for this request. */
+    expectedDeploymentId?: string,
   ) => Promise<VerifiedFacadeDeployment | null>;
   /** Host allowlist/registry proof. DNS/egress policy must also restrict reachable hosts. */
   readonly approveOrigin: (origin: string, deployment: VerifiedFacadeDeployment) => Promise<boolean>;
@@ -142,7 +144,9 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
       if (controller.signal.aborted) throw abortError();
       // Credential issuance may block. Do not send a minted one-use bearer to
       // a deployment whose ownership, origin or lease changed during minting.
-      const beforeSend = await options.resolveDeployment(appId, workspaceId, operation, controller.signal);
+      const beforeSend = await options.resolveDeployment(
+        appId, workspaceId, operation, controller.signal, deployment.deploymentId,
+      );
       if (!matchDeployment(deployment, beforeSend, now()) ||
           !await options.approveOrigin(beforeSend!.origin, beforeSend!)) {
         denied('DEPLOYMENT_REVOKED', 503);
@@ -215,7 +219,9 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
         denied(code, response.status >= 400 && response.status < 600 ? response.status : 502);
       }
       // A Skipo lease or deployment mapping can be revoked during a long call.
-      const latest = await options.resolveDeployment(appId, workspaceId, operation, controller.signal);
+      const latest = await options.resolveDeployment(
+        appId, workspaceId, operation, controller.signal, deployment.deploymentId,
+      );
       if (!matchDeployment(deployment, latest, now()) || !await options.approveOrigin(latest!.origin, latest!)) {
         denied('DEPLOYMENT_REVOKED', 503);
       }
