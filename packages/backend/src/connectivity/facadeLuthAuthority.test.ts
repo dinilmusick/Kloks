@@ -258,4 +258,50 @@ describe('Luth source-side audience-bound delegation', () => {
       .rejects.toMatchObject({ code: 'DELEGATION_DENIED' });
     expect(fetcher).not.toHaveBeenCalled();
   });
+
+  it('mints a workflow.invoke proof only for an explicit FOD workflow selection', async () => {
+    const fetcher = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      expect(JSON.parse(String(init?.body))).toEqual({
+        audience: 'app-B', caller_workspace_id: 'workspace-A',
+        target_workspace_id: 'workspace-B',
+        scope: 'workflow.invoke', resource_key: 'flow-secret-123:v4',
+      });
+      return Response.json({
+        access_token: 'workflow.one.use', token_type: 'Bearer',
+        scope: 'workflow.invoke', audience: 'app-B', expires_in: 60,
+      });
+    });
+    const issue = createLuthFacadeBearerIssuer({
+      luthOrigin: 'https://luth.example.com',
+      getSourceSessionAssertion: async () => 'source-session-assertion',
+      resolveIntent: async () => ({
+        caller_workspace_id: 'workspace-A', target_workspace_id: 'workspace-B',
+        scope: 'workflow.invoke', resource_key: 'flow-secret-123:v4',
+      }),
+      fetch: fetcher as typeof fetch,
+    });
+    await expect(issue(deployment, { id: 'workflow.report', version: 'v4', kind: 'workflow' },
+      new AbortController().signal)).resolves.toBe('workflow.one.use');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not mint backend.invoke authority for a workflow or workflow.invoke authority for a static method', async () => {
+    const fetcher = vi.fn(async () => Response.json({ access_token: 'should-not-issue' }));
+    for (const [kind, scope] of [
+      ['workflow', 'backend.invoke'], ['static', 'workflow.invoke'],
+    ] as const) {
+      const issue = createLuthFacadeBearerIssuer({
+        luthOrigin: 'https://luth.example.com',
+        getSourceSessionAssertion: async () => 'source-session-assertion',
+        resolveIntent: async () => ({
+          caller_workspace_id: 'workspace-A', target_workspace_id: 'workspace-B',
+          scope, resource_key: 'flow-secret-123:v4',
+        }),
+        fetch: fetcher as typeof fetch,
+      });
+      await expect(issue(deployment, { id: 'workflow.report', version: 'v4', kind },
+        new AbortController().signal)).rejects.toMatchObject({ code: 'DELEGATION_DENIED' });
+    }
+    expect(fetcher).not.toHaveBeenCalled();
+  });
 });
