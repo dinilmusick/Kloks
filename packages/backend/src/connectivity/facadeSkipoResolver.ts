@@ -14,6 +14,8 @@ export interface SkipoCapabilitySelector {
   capabilityId: string;
   environment: SkipoEnvironment;
   revision?: number;
+  /** Skipo #208 target-specific revalidation must match this deployment UUID. */
+  deploymentId?: string;
 }
 export interface SkipoResolvedCapability {
   deploymentId: string;
@@ -94,9 +96,11 @@ export function createSkipoFacadeDeploymentResolver(options: SkipoFacadeResolver
   }
   const now = options.now ?? Date.now;
   return async function resolveDeployment(
-    appId: string, workspaceId: string, operation: RemoteFacadeOperation | undefined, signal: AbortSignal,
+    appId: string, workspaceId: string, operation: RemoteFacadeOperation | undefined,
+    signal: AbortSignal, expectedDeploymentId?: string,
   ): Promise<VerifiedFacadeDeployment | null> {
     if (signal.aborted || !validApp(appId) || !validHandle(workspaceId) ||
+        (expectedDeploymentId !== undefined && !validUUID(expectedDeploymentId)) ||
         (operation && (!validHandle(operation.id) || !parseRevision(operation.version)))) return null;
     try {
       const request = await options.getAuthenticatedRequest(appId, workspaceId, signal);
@@ -104,6 +108,7 @@ export function createSkipoFacadeDeploymentResolver(options: SkipoFacadeResolver
       const selector = operation && {
         appId, capabilityId: operation.id, environment: options.environment,
         revision: parseRevision(operation.version)!,
+        ...(expectedDeploymentId ? { deploymentId: expectedDeploymentId } : {}),
       };
       // list() is already Luth-bound, grant-filtered and exact-current in Skipo.
       // Invocation MUST use revalidate(), never an earlier discovery cache.
@@ -112,7 +117,9 @@ export function createSkipoFacadeDeploymentResolver(options: SkipoFacadeResolver
         : await options.discovery.list(request, appId, options.environment);
       if (signal.aborted || !Array.isArray(rows) || rows.length === 0 || rows.length > 256) return null;
       for (const found of rows) {
-        if (!found || !validUUID(found.deploymentId) || !isRevision(found.revision) ||
+        if (!found || !validUUID(found.deploymentId) ||
+            (expectedDeploymentId !== undefined && found.deploymentId !== expectedDeploymentId) ||
+            !isRevision(found.revision) ||
             !found.descriptor || !validHandle(found.descriptor.id) ||
             !found.descriptor.invocation || !validHandle(found.descriptor.invocation.serviceId) ||
             !validHandle(found.descriptor.invocation.operationId) ||
