@@ -3,7 +3,7 @@
  * Skipo decides the deployment and Luth mints audience-bound credentials.
  * This adapter does not create a second operation authority or retry side effects.
  */
-import { FacadeInvocationDenied, type FacadeInvocation, type FacadeHandleKind } from './facadeInvocation.js';
+import { FacadeInvocationDenied, assertFacadeJsonInput, type FacadeInvocation, type FacadeHandleKind } from './facadeInvocation.js';
 
 export interface VerifiedFacadeDeployment {
   readonly appId: string;
@@ -256,6 +256,7 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
     let input: unknown;
     try { input = structuredClone(request.input); }
     catch { denied('MALFORMED_INPUT', 400); }
+    assertFacadeJsonInput(input);
     const captured = {
       operationId: request.operationId, version: request.version,
       targetWorkspaceId: request.targetWorkspaceId, invocationId: request.invocationId, input,
