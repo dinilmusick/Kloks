@@ -209,6 +209,8 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
     const decision = { caller, operation, transport, invocationId: admittedRequest.invocationId };
     if (!await options.deploymentEligible(decision)) fail('DEPLOYMENT_UNAVAILABLE', 503);
     if (!await options.authorize(decision, 'invoke', admittedRequest.input)) fail('ACCESS_DENIED');
+    // Do not debit an already-cancelled call or dispatch side effects after cancellation.
+    if (parentSignal?.aborted) fail('CANCELLED', 408);
     // This must be backed by durable atomic state, not a per-process Set.
     if (!await options.consumeInvocation(caller, admittedRequest.invocationId, proofContext)) fail('REPLAY_OR_BUDGET_EXHAUSTED', 409);
 
@@ -229,6 +231,7 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
         if (controller.signal.aborted) reject(abortError());
       });
       const work = async () => {
+        if (controller.signal.aborted) throw abortError();
         if (operation.kind === 'workflow') {
           return options.invokePublishedWorkflow({ workspaceId: operation.targetWorkspaceId, workflowId: operation.workflowId!, version: operation.version }, admittedRequest.input, controller.signal);
         }
@@ -238,8 +241,13 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
         if (typeof service?.execute !== 'function') fail('OPERATION_UNAVAILABLE', 404);
         return service.execute(operation.serviceOperation!, admittedRequest.input, { signal: controller.signal, transport });
       };
-      const output = await Promise.race([work(), stopped]);
-      // Do not release an output based solely on the authorization made before execution.
+      // Deadline and cancellation must also bound *all output-time checks*;
+      // racing only the service execution would allow a stalled Luth/Skipo
+      // authority to exceed the deadline and hang the caller indefinitely.
+      const guardedWork = async () => {
+        const output = await work();
+        if (controller.signal.aborted) throw abortError();
+        // Do not release an output based solely on the authorization made before execution.
       // Session revocation, deployment expiry, workflow unpublication and operation
       // version/dispatch-reference replacement must all take effect while work is running.
       // Luth invocation bearers are single-use: a second consuming introspection
@@ -259,7 +267,9 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
       if (!await options.deploymentEligible(currentDecision)) fail('DEPLOYMENT_UNAVAILABLE', 503);
       if (!await options.authorize(currentDecision, 'output', output)) fail('ACCESS_REVOKED');
       if (controller.signal.aborted) throw abortError();
-      return { output, replyTo: { ...currentCaller.invoker }, invocationId: admittedRequest.invocationId };
+        return { output, replyTo: { ...currentCaller.invoker }, invocationId: admittedRequest.invocationId };
+      };
+      return await Promise.race([guardedWork(), stopped]);
     } finally {
       if (timer) clearTimeout(timer);
       parentSignal?.removeEventListener('abort', abort);
