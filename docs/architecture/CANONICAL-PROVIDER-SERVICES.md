@@ -27,11 +27,17 @@
   case, capacity remains **unknown** instead of synthesizing fake metrics.
 - Google: OAuth identity profile; Gemini models API (API key); existing Kloks
   Google Drive service remains authoritative for Drive operations.
-- Additional entries: Groq, Cerebras, Hugging Face, OpenRouter, Render, Railway,
-  Oracle Cloud, Replit and Google Cloud Run are catalogue-only until tested
+- Additional entries: Groq, Cerebras, Hugging Face, OpenRouter, Oracle Cloud,
+  Koyeb, Replit and Google Compute Engine are catalogue-only until tested
   client operations, real quota telemetry and per-account authorization exist.
-- Fly.io free trial is excluded (one-time only). OpenAI and xAI are excluded
-  from the renewable-free allocation pool pending verified recurring plans.
+- Railway account-token identity, Fly.io app listing, Render service listing and
+  Google Cloud Run service listing have read-only API adapters with mock tests.
+  They have **no** provider-confirmed quota telemetry and are ineligible for
+  automatic capacity rotation. No machine provisioning is implemented.
+- Fly.io's API can be used for account-owned apps, but its one-time trial is
+  excluded from the renewable-free allocation pool. Railway/Render/Cloud Run
+  cannot be auto-allocated without complete verified billing and quota usage.
+  OpenAI and xAI remain excluded from renewable-free allocation.
 
 ## Provider API workflow
 

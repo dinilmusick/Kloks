@@ -9,3 +9,5 @@ export * from './gemini.js';
 export * from './operations.js';
 export * from './storage-providers.js';
 export * from './storage/index.js';
+
+export * from './compute-operations.js';

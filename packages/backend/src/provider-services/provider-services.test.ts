@@ -18,9 +18,11 @@ const base: ProviderUsageSnapshot = {
 describe('canonical provider services', () => {
   it('recognizes implemented services but never treats catalog-only adapters as available', () => {
     expect(listRecognizedAccountServices().some(p => p.id === 'cloudflare')).toBe(true);
-    expect(listRecognizedAccountServices().some(p => p.id === 'railway')).toBe(false);
+    expect(listRecognizedAccountServices().some(p => p.id === 'railway')).toBe(true);
     expect(getProviderService('CLOUDFLARE_WORKERS')?.id).toBe('cloudflare');
-    expect(getProviderService('fly')?.status).toBe('excluded');
+    expect(getProviderService('fly')?.renewal).toBe('trial')
+    expect(getProviderService('fly')?.usageImplemented).toBe(false)
+    expect(getProviderService('koyeb')?.status).toBe('catalogued');
   });
   it('scores only confirmed renewable quota windows and fails closed', () => {
     expect(calculateProviderCapacity(base, now).weight).toBe(0.75);

@@ -5,6 +5,10 @@ import type { ProviderConnection } from './types.js';
 const origins: Record<string, string> = {
   cloudflare: 'https://api.cloudflare.com',
   vercel: 'https://api.vercel.com',
+  railway: 'https://backboard.railway.com',
+  fly: 'https://api.machines.dev',
+  render: 'https://api.render.com',
+  'google-cloud-run': 'https://run.googleapis.com',
   google: 'https://www.googleapis.com',
   'google-gemini': 'https://generativelanguage.googleapis.com',
   'google-drive': 'https://www.googleapis.com',
