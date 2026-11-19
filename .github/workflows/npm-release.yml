@@ -8,12 +8,10 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: "Publish the current package to npm"
+        description: "Explicitly approve publishing an unused package version (false = audit only)"
         required: true
         type: boolean
         default: false
-  release:
-    types: [published]
 
 permissions:
   contents: read
@@ -25,10 +23,11 @@ concurrency:
 
 jobs:
   publish:
-    if: >
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
-      (github.event_name == 'workflow_dispatch' && inputs.publish) ||
-      github.event_name == 'release'
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     steps:
       - name: Check out the exact verified release commit
@@ -123,11 +122,17 @@ jobs:
         if: steps.registry.outputs.exists == 'true'
         run: echo "::warning::Existing npm version is being verified, but was not built or published from this workflow SHA."
 
-      - name: Publish with npm Trusted Publishing / OIDC
-        if: steps.registry.outputs.exists == 'false'
+      - name: Publish only on explicit approved main-branch dispatch
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          inputs.publish &&
+          steps.registry.outputs.exists == 'false'
         run: npm publish --provenance --access public
 
       - name: Independently verify downloadable npm tarball
+        if: >-
+          steps.registry.outputs.exists == 'true' ||
+          (github.event_name == 'workflow_dispatch' && inputs.publish)
         env:
           PACKAGE_NAME: ${{ steps.package.outputs.name }}
           PACKAGE_VERSION: ${{ steps.package.outputs.version }}
@@ -178,7 +183,11 @@ jobs:
           echo 'FATAL: npm metadata is visible, but package download/canonical exports remain unverified' >&2
           exit 1
       - name: Notify downstream consumers after successful upstream publication
-        if: success() && steps.registry.outputs.exists == 'false'
+        if: >-
+          success() &&
+          github.event_name == 'workflow_dispatch' &&
+          inputs.publish &&
+          steps.registry.outputs.exists == 'false'
         env:
           SYNC_TOKEN: ${{ secrets.ECOSYSTEM_SYNC_TOKEN }}
         shell: bash
