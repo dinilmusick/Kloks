@@ -29,3 +29,68 @@ All HTTP, MCP, graph and agent target calls MUST enter through the same existing
 The remote adapter test uses real `Request`/`Response` and the Kloks target boundary with injected Luth and Skipo-shaped authorities. It is a contract fixture, **not a live Luth+Skipo two-deployment test**. As of this branch, Luth `src/backend/auth/crossAppDelegation.ts` provides consuming `/api/oauth/introspect`; a non-consuming live output authority is an upstream dependency. Skipo's current production deployment-resolution/lease contract and authorization must be wired and tested by the owning integration host. Until these are provided and independently run with distinct users/workspaces, no production certification, app deployment or database cutover is justified.
 
 Required independent E2E: successful two-app operation and workflow invocation, unauthorized user/workspace denial, rotated lease/origin, revoked Luth session or grant while work is in flight, stale revision, replay, deadline/cancel, graph/agent/MCP routing, and evidence at exact repository SHAs.
+
+
+## Concrete staged Luth #23 + Skipo #208 adapters
+
+The Kloks connectivity surface now exports:
+
+- createLuthFacadeBearerIssuer — invokes Luth /api/oauth/delegate with a protected source LUTH-SESSION-V1 assertion, owner-approved scope and exact versioned resource key, and validates audience, token type, scope and expiry.
+- createLuthFacadeTargetAuthorities — consumes the one-use proof using /api/oauth/introspect, then independently checks the separately signed receipt using /api/oauth/revalidate. The admission receipt remains in a server-only WeakMap keyed by the original trusted admission object. It never enters a response or published workflow metadata.
+- createSkipoFacadeDeploymentResolver — calls Skipo createVerifiedCapabilityDiscovery.list/revalidate, enforces exact numeric revisions, and requires a *separate trusted registrar* lease/endpoint/workspace proof. The Skipo discovery record does not contain lease expiry, so no caller-provided or fabricated lease may substitute.
+
+Example host-only composition (import these exports from @kloks/backend/connectivity):
+
+    const resolveDeployment = createSkipoFacadeDeploymentResolver({
+      environment: 'production',
+      discovery: skipo.createVerifiedCapabilityDiscovery(trustedQuery, verifiedPolicy),
+      getAuthenticatedRequest: host.getProtectedLuthDiscoveryRequest,
+      inspectAttestedLease: registrar.readVerifiedLeaseAndWorkspace,
+    });
+
+    const getAudienceBearer = createLuthFacadeBearerIssuer({
+      luthOrigin: host.approvedLuthOrigin,
+      getSourceSessionAssertion: host.getSourceLuthAssertion,
+      resolveIntent: ownerGrants.resolveExactInvocationIntent,
+    });
+
+    const remote = createFacadeRemoteClient({
+      environment: 'production',
+      resolveDeployment,
+      approveOrigin: host.authorizeRegistryOriginAndEgress,
+      getAudienceBearer,
+    });
+
+    const luthTarget = createLuthFacadeTargetAuthorities({
+      luthOrigin: host.approvedLuthOrigin,
+      targetAppId: host.canonicalAppId,
+      getTargetSessionAssertion: host.getTargetLuthAssertion,
+      resolveResource: ownerGrants.resolveExactResourceKey,
+      resolveTrustedCaller: host.resolveServerVerifiedInvoker,
+      recheckTrustedCaller: host.revalidateInvokerSessionAndBudget,
+    });
+    const target = createFacadeInvocationBoundary({
+      targetAppId: host.canonicalAppId,
+      facade: host.existingBackendFacade,
+      ...luthTarget,
+      listCurrentOperations: ownerServices.listExactPublishedDescriptors,
+      authorize: ownerServices.authorizeCurrentGrantAndACL,
+      deploymentEligible: ownerServices.checkCurrentVerifiedLease,
+      consumeInvocation: ownerBudgets.atomicConsumeInvocation,
+      invokePublishedWorkflow: fodPublishedInterface.invokeExactOwnedWorkflow,
+      delegateCredential: host.delegateNestedInvocation,
+    });
+
+All these callback owners are **mandatory**; there is no permissive production default.
+
+**Security requirements:** The target assertion must be Luth-verified for the SAME live principal/session as the delegated source. An app-only static secret is insufficient. resolveTrustedCaller must obtain immediate invoker, chain, depth, deadlines and remaining-call budget from protected server state; no identity claim in the caller JSON is trusted. resolveResource must match the exact Skipo capability revision or FOD owner-published workflow version and current owner grant. For static capabilities the Kloks version must be a canonical decimal positive integer, e.g. "2" for Skipo revision 2. "v2", "02" and latest-version fallback are rejected.
+
+The output receipt is consumed locally at most once; errors, timeout and revocation deny output. Target-side operation, deployment and grant authorization is rechecked independently, under the inherited deadline. Registrar proof/read access remains server-only under least-privilege database roles.
+
+### Cross-repository candidate-head contract checkpoint
+
+- Luth #23: 3ba5b687cc23b5fc4dedde5babb76a3451f0daad — delegation, one-use admission, output receipt.
+- Skipo #208: 8e92502c5538bb239be1e860da40093b194f37e4 — Luth-scoped capability discovery and trusted-registrar lease contract.
+- Kloks FOD #124: 6eb1c4a49ab2edeadb1779b2a475b0c8d48ea615 — owner workflow and output-time grant contracts.
+
+The new facadeCrossAppContracts.integration.test.ts exercises Luth→Skipo→Kloks with two in-process application endpoints, authorization, revocation, retry/replay and concurrency. Its Luth and Skipo services use accurate staged response shapes but simulated endpoints: this is *not* a live OAuth/Neon dual-deployment certificate. Do not merge or deploy without coordinated upstream integration, real registered grants/registrar permissions and an independently witnessed two-user/two-deployment E2E.
