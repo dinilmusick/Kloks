@@ -191,3 +191,23 @@ de509cf05bbf99a090d57fd06180c8104fd3eac3 retains single-use admission
 and distinct output receipt contracts. These candidate branches are not
 production live authorities until coordinated merge, hosting configuration,
 isolated database grant tests and independent two-user/two-deployment E2E.
+
+
+### Multiple verified deployments for the same application
+
+An authenticated Skipo consumer may already have an authorized deployment UUID
+from its current registry listing. It can select that exact instance when
+discovering its backend methods:
+
+    const choices = await remote.discoverPinned(
+      targetAppId, targetWorkspaceId,
+      signal, absoluteDeadlineAt, authorizedDeploymentId,
+    );
+
+The last argument is an *authority selector*, not an approval or endpoint URL.
+It is checked by the Skipo registrar and the remote client before any Luth
+bearer is minted. Wrong, expired, rotated or malformed deployment IDs fail
+closed. Consumers should call discoverPinned once for each independently
+authorized Skipo deployment they intend to display, rather than merge
+operations from unrelated deployments into one anonymous application entry.
+The returned pinned handle is passed unchanged to invokePinned.
