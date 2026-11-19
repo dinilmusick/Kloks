@@ -1,6 +1,7 @@
 import {describe,expect,it,vi} from 'vitest';
 import {BackendRegistry,InProcessExecutor} from '@ultrst-armada/kloks/backend';
 import {FodRuntime} from './runtime.js';
+import {FodFlowStore} from './flowStore.js';
 import type {FodExecutionResult} from './types.js';
 import {
   publishedWorkflowChainKey,registerFodPublishedWorkflowBackendCommand,
@@ -44,7 +45,8 @@ function createHarness() {
       appOwnerUserId:owner,workspaceOwnerUserId:owner,
     },
     targetAppId:'kone',targetWorkspaceId:'target-workspace-1',
-    targetAppOwnerUserId:owner,targetWorkspaceOwnerUserId:owner,chain:[],
+    targetAppOwnerUserId:owner,targetWorkspaceOwnerUserId:owner,
+    invocationId:'admitted-request-one',luthSessionId:'trusted-luth-session',chain:[],
   };
   const grantChecks=vi.fn(async(d:{callerUserId:string;version:number})=>
     granted && d.callerUserId===owner && d.version===grantedVersion);
@@ -58,9 +60,13 @@ function createHarness() {
   });
   const registry=new BackendRegistry();
   const scopeChains:string[][]=[];
+  let afterExecution:(()=>Promise<void>)|undefined;
+  let verifiedAtOutput:FodVerifiedPublishedInvocation|undefined;
   const withScope=async<T>(_verified:FodVerifiedPublishedInvocation,chain:readonly string[],_signal:AbortSignal,run:()=>Promise<T>):Promise<T>=>{
     scopeChains.push([...chain]);
-    return run();
+    const output=await run();
+    await afterExecution?.();
+    return output;
   };
   const buildRuntime=vi.fn(async(workspaceId:string,current:FodVerifiedPublishedInvocation)=>new FodRuntime({
     workspaceId,workspaceService:files,publication,
@@ -70,8 +76,13 @@ function createHarness() {
     }),
   }));
   const verifyInvocation=vi.fn(async()=>verified);
+  const revalidateResult=vi.fn(async()=>verifiedAtOutput??verified);
+  const isCurrentPublishedVersion=vi.fn(async(request:FodPublishedWorkflowCall)=>
+    Boolean(await new FodFlowStore(files,publication).getCurrentPublishedRevision(
+      request.targetWorkspaceId,request.workflowId,request.version)));
   registerFodPublishedWorkflowBackendCommand(registry,{
-    targetAppId:'kone',grantStore,verifyInvocation,buildRuntime,
+    targetAppId:'kone',grantStore,verifyInvocation,revalidateResult,
+    isCurrentPublishedVersion,buildRuntime,
     withExecutionScope:withScope,maxDepth:4,timeoutMs:2000,
   });
   const executor=new InProcessExecutor(registry);
@@ -88,7 +99,10 @@ function createHarness() {
     return {runtime,result};
   };
   return {
-    files,publisher,save,execute,grantChecks,buildRuntime,scopeChains,verifyInvocation,
+    files,publisher,save,execute,grantChecks,buildRuntime,scopeChains,
+    verifyInvocation,revalidateResult,isCurrentPublishedVersion,
+    setAfterExecution:(fn:(()=>Promise<void>)|undefined)=>{afterExecution=fn;},
+    setAtOutput:(next:FodVerifiedPublishedInvocation|undefined)=>{verifiedAtOutput=next;},
     setGranted:(value:boolean)=>{granted=value;},
     setGrantedVersion:(value:number)=>{grantedVersion=value;},
     setVerified:(next:FodVerifiedPublishedInvocation)=>{verified=next;},
@@ -106,7 +120,9 @@ describe('Kloks BackendRegistry -> owning FOD published workflow command',()=>{
     expect(h.verifyInvocation).toHaveBeenCalledOnce();
     // First check belongs to the BackendRegistry boundary; second is the
     // mandatory target-side Luth and publication/grant reauthorization.
-    expect(h.grantChecks).toHaveBeenCalledTimes(2);
+    expect(h.grantChecks).toHaveBeenCalledTimes(3);
+    expect(h.revalidateResult).toHaveBeenCalledOnce();
+    expect(h.isCurrentPublishedVersion).toHaveBeenCalledOnce();
     expect(h.buildRuntime).toHaveBeenCalledWith(call.targetWorkspaceId,h.getVerified());
     expect(h.scopeChains[0]).toEqual([publishedWorkflowChainKey(call)]);
   });
@@ -210,6 +226,8 @@ describe('Kloks BackendRegistry -> owning FOD published workflow command',()=>{
       targetAppId:'kone',
       grantStore:{grant:async()=>{},revoke:async()=>false,isGranted:async()=>true},
       verifyInvocation:async()=>createHarness().getVerified(),
+      revalidateResult:async()=>createHarness().getVerified(),
+      isCurrentPublishedVersion:async()=>true,
       buildRuntime:async()=>ownerRuntime,
       withExecutionScope:async(_v,_chain,_signal,run)=>run(),
     });
@@ -220,11 +238,40 @@ describe('Kloks BackendRegistry -> owning FOD published workflow command',()=>{
     })).rejects.toThrow(/authorization not configured/);
   });
 
+  it('blocks a grant revoked after the owning engine executed but before returning the output',async()=>{
+    const h=createHarness();
+    const {runtime}=await h.save();
+    await runtime.publishFlow(call.workflowId);
+    h.setAfterExecution(async()=>{h.setGranted(false);});
+    await expect(h.execute()).rejects.toThrow(/result denied: grant revoked/);
+    expect(h.grantChecks).toHaveBeenCalledTimes(3);
+  });
+
+  it('blocks an owning-workspace withdrawal during execution even if registry metadata remains stale',async()=>{
+    const h=createHarness();
+    const {runtime}=await h.save();
+    await runtime.publishFlow(call.workflowId);
+    h.setAfterExecution(async()=>{await runtime.unpublishFlow(call.workflowId);});
+    await expect(h.execute()).rejects.toThrow(/owning revision withdrawn/);
+  });
+
+  it('blocks output on session replacement and cross-workspace session switching',async()=>{
+    const h=createHarness();
+    const {runtime}=await h.save();
+    await runtime.publishFlow(call.workflowId);
+    h.setAtOutput({...h.getVerified(),luthSessionId:'replaced-luth-session'});
+    await expect(h.execute()).rejects.toThrow(/session or invocation scope changed/);
+    h.setAtOutput({...h.getVerified(),caller:{...h.getVerified().caller,workspaceId:'wrong-source'}});
+    await expect(h.execute()).rejects.toThrow(/session or invocation scope changed/);
+  });
+
   it('requires all trusted host callbacks and never registers an unsafe command',()=>{
     const registry=new BackendRegistry();
     expect(()=>registerFodPublishedWorkflowBackendCommand(registry,{
       targetAppId:'kone',grantStore:null as unknown as FodWorkflowGrantStore,
       verifyInvocation:async()=>createHarness().getVerified(),
+      revalidateResult:async()=>createHarness().getVerified(),
+      isCurrentPublishedVersion:async()=>true,
       buildRuntime:async()=>createHarness().publisher(call.targetWorkspaceId),
       withExecutionScope:async(_v,_chain,_signal,run)=>run(),
     })).toThrow(/mandatory/);
