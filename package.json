@@ -356,7 +356,7 @@
     "verify:package-exports": "node scripts/verify-package-exports.mjs"
   },
   "dependencies": {
-    "@dinilmusick/gutts": "2.2.2",
+    "@dinilmusick/gutts": "2.2.3",
     "@jitl/quickjs-wasmfile-release-sync": "0.32.0",
     "@webcontainer/api": "^1.6.4",
     "quickjs-emscripten-core": "0.32.0",
