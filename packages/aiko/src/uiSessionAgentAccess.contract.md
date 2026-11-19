@@ -1,0 +1,22 @@
+# Consent adapter integration contract (Agent 11)
+This file documents the scoped implementation; it does not grant access or certify real browser E2E.
+
+Public API implementation: `createConsentedUiAgentAccess` in `uiSessionAgentAccess.ts`. 
+**Package index export requires AppShell/consumer owner coordination.** Do not add a permissive fallback if unresolved.
+
+## Trusted host dependencies (all required)
+- `verifyCaller(session)`: revalidate the **live** non-revoked Luth session and workspace membership for each operation, returning verified `userId`, `sessionId`, `sessionExpiresAt`, immutable `appId`, `workspaceId`, and registered HTTPS `appOrigin`. No claims from models, URL parameters or browser-supplied JWT metadata.
+- `authorizeWindow(caller,windowId)`: read a currently open, explicitly consented browser window and UUID tab with permissions separately for `inspect` and `action`. Bind the exact user, Luth session, app, workspace, registered origin, window, tab, expiry, and new `grantId` on every issue. Close/revoke/switch disposes that generation immediately.
+- `approveAction(caller,grant,action)`: actual user prompt for **every** action and its exact immutable JSON payload, advertised component/control, and revision. Listing a capability is never consent.
+- `sanitizeSnapshot`: mandatory redaction of all sensitive data before sending to any model. Deny any unrecognized data; adapter revalidates after redaction to prevent disclosure during revocation races.
+- `uiSession(request,context)`: authenticated host-only bridge into `handleUiSessionRequest`, not a raw model-provided fetch. The second argument now includes `appId`, `principalId`, `sessionId`, `workspaceId`, `windowId`, `tabId`, `grantId`, and read/action `permission`. The host MUST independently recheck them against the live session and currently approved window before it forwards a read or action; current backend API accepts only app/principal and does not perform all these checks itself. Do not expose raw `/api/ui-session/:tab` to agents.
+- For action POST, window consumer MUST revalidate live session, active workspace, current advertised control, revision, grant/window liveness, and cancellation. HTTP 202 is a **queued receipt**, not execution success or rollback guarantee.
+
+## AppShell / Agent Chat lifecycle
+- Bind one `FrontendSession` to the exact active Luth session and workspace scope. On sign-out, workspace switch, window closure, deployment withdrawal, or grant revoke, cancel in-flight requests using `trackAbortController`, dispose its subscriptions and clear local session-scope state.
+- Never infer target from model output; choose the approved host-resolved window and grant generation. Rehydrate grants only from authenticated host authority, never an old serialized graph.
+- No cross-user, cross-session, cross-workspace or cross-window fallback. Propagate abort, refusal, backend denial and unavailable window; never return a fabricated successful click.
+- The graph/chat owner needs an `@kloks/aiko` package entry export, and the Kloks backend owner must enforce a target-side consent gate and propagate terminal action/cancellation semantics.
+
+## Verification
+`pnpm --dir packages/aiko typecheck && pnpm --dir packages/aiko test`, backend disposal Vitest tests, architecture CI. Unit/target-simulation suites cover 2 users x 2 workspaces x 2 windows; they are **not real browser E2E**. External gate: run two authenticated real browser windows with production-matching Luth/AppShell and verify grant/revoke, expiry, closure, session switching and denied raw HTTP/MCP calls. Do not merge/certify until that gate is recorded.
