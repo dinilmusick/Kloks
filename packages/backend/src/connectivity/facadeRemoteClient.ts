@@ -68,11 +68,20 @@ export interface RemoteFacadeDescriptor {
   targetWorkspaceId: string;
 }
 
+/** Persistable static operation identity, pinned to its verified Skipo instance. */
+export interface PinnedRemoteFacadeDescriptor extends RemoteFacadeDescriptor {
+  readonly kind: 'static';
+  readonly appId: string;
+  readonly deploymentId: string;
+  readonly environment: string;
+}
+
 const idPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const validId = (value: unknown): value is string =>
   typeof value === 'string' && idPattern.test(value) &&
   !value.includes('..') && !['__proto__', 'constructor', 'prototype'].some(v => value.includes(v));
 const tokenPattern = /^[A-Za-z0-9._~+/-]+=*$/;
+const deploymentUuid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 const own = (value: object, key: string) => Object.prototype.hasOwnProperty.call(value, key);
 const denied = (code: string, status: number): never => { throw new FacadeInvocationDenied(code, status); };
 
@@ -121,8 +130,10 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
     appId: string, workspaceId: string, operation: RemoteFacadeOperation | undefined,
     method: 'GET' | 'POST', payload: FacadeInvocation | undefined,
     signal?: AbortSignal, deadlineAt?: number,
-  ): Promise<unknown> {
+    expectedDeploymentId?: string,
+  ): Promise<{ body: unknown; deployment: VerifiedFacadeDeployment }> {
     if (!validId(appId) || !validId(workspaceId) ||
+        (expectedDeploymentId !== undefined && !deploymentUuid.test(expectedDeploymentId)) ||
         (operation && (!validId(operation.id) || !validId(operation.version)))) {
       denied('MALFORMED_HANDLE', 400);
     }
@@ -149,8 +160,10 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
     });
     const perform = async () => {
       if (controller.signal.aborted) throw abortError();
-      const deployment = await resolver(appId, workspaceId, operation, controller.signal);
+      const resolved = await resolver(appId, workspaceId, operation, controller.signal, expectedDeploymentId);
+      const deployment = resolved && Object.freeze({ ...resolved });
       if (!deployment || deployment.verified !== true || deployment.appId !== appId ||
+          (expectedDeploymentId !== undefined && deployment.deploymentId !== expectedDeploymentId) ||
           deployment.workspaceId !== workspaceId || deployment.environment !== options.environment ||
           !validId(deployment.deploymentId) || !Number.isFinite(deployment.leaseExpiresAt) ||
           deployment.leaseExpiresAt <= now() || !approvedHttpsOrigin(deployment.origin) ||
@@ -244,7 +257,7 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
         denied('DEPLOYMENT_REVOKED', 503);
       }
       if (controller.signal.aborted) throw abortError();
-      return body;
+      return { body, deployment };
     };
     try { return await Promise.race([perform(), stopped]); }
     finally {
@@ -254,8 +267,7 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
     }
   }
 
-  async function discover(targetAppId: string, targetWorkspaceId: string, signal?: AbortSignal, deadlineAt?: number): Promise<RemoteFacadeDescriptor[]> {
-    const result = await exchange(targetAppId, targetWorkspaceId, undefined, 'GET', undefined, signal, deadlineAt);
+  function decodeOperations(result: unknown, targetWorkspaceId: string): RemoteFacadeDescriptor[] {
     if (!result || typeof result !== 'object' || Array.isArray(result) ||
         !Array.isArray((result as { operations?: unknown }).operations)) denied('INVALID_REMOTE_RESPONSE', 502);
     const operations = (result as { operations: unknown[] }).operations;
@@ -273,7 +285,25 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
     });
   }
 
-  async function invoke(targetAppId: string, request: FacadeInvocation, signal?: AbortSignal, deadlineAt?: number): Promise<RemoteFacadeResult> {
+  async function discover(targetAppId: string, targetWorkspaceId: string, signal?: AbortSignal, deadlineAt?: number): Promise<RemoteFacadeDescriptor[]> {
+    const { body } = await exchange(targetAppId, targetWorkspaceId, undefined, 'GET', undefined, signal, deadlineAt);
+    return decodeOperations(body, targetWorkspaceId);
+  }
+
+  /** Authorized catalog entries with a durable, exact deployment identity. */
+  async function discoverPinned(targetAppId: string, targetWorkspaceId: string,
+    signal?: AbortSignal, deadlineAt?: number): Promise<PinnedRemoteFacadeDescriptor[]> {
+    const { body, deployment } = await exchange(
+      targetAppId, targetWorkspaceId, undefined, 'GET', undefined, signal, deadlineAt,
+    );
+    return decodeOperations(body, targetWorkspaceId)
+      .filter((operation): operation is RemoteFacadeDescriptor & { kind: 'static' } => operation.kind === 'static')
+      .map(operation => ({ ...operation, appId: deployment.appId,
+        deploymentId: deployment.deploymentId, environment: deployment.environment }));
+  }
+
+  async function invoke(targetAppId: string, request: FacadeInvocation,
+    signal?: AbortSignal, deadlineAt?: number, expectedDeploymentId?: string): Promise<RemoteFacadeResult> {
     requireInvocation(request);
     // Deep snapshot before any async Skipo/Luth lookup, so a graph caller cannot
     // change the authorized operation, workspace or input while a proof is minted.
@@ -288,7 +318,8 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
     // The wire envelope itself counts toward the target's one-MiB body cap.
     assertFacadeJsonInput(captured);
     const operation = { id: captured.operationId, version: captured.version };
-    const body = await exchange(targetAppId, captured.targetWorkspaceId, operation, 'POST', captured, signal, deadlineAt);
+    const { body } = await exchange(targetAppId, captured.targetWorkspaceId, operation,
+      'POST', captured, signal, deadlineAt, expectedDeploymentId);
     if (!body || typeof body !== 'object' || Array.isArray(body) ||
         !own(body, 'output') || (body as Record<string, unknown>).invocationId !== captured.invocationId) {
       denied('CORRELATION_MISMATCH', 502);
@@ -320,7 +351,8 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
     const operation: RemoteFacadeOperation = {
       id: captured.operationId, version: captured.version, kind: 'workflow',
     };
-    const body = await exchange(targetAppId, captured.targetWorkspaceId, operation, 'POST', captured, signal, deadlineAt);
+    const { body } = await exchange(targetAppId, captured.targetWorkspaceId, operation,
+      'POST', captured, signal, deadlineAt);
     if (!body || typeof body !== 'object' || Array.isArray(body) ||
         !own(body, 'output') || (body as Record<string, unknown>).invocationId !== captured.invocationId) {
       denied('CORRELATION_MISMATCH', 502);
@@ -328,5 +360,25 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
     return { output: (body as { output: unknown }).output, invocationId: captured.invocationId };
   }
 
-  return { discover, invoke, invokeWorkflow };
+  /** Execute a persisted static handle only on its exact registered deployment. */
+  async function invokePinned(handle: PinnedRemoteFacadeDescriptor, input: unknown,
+    invocationId: string, signal?: AbortSignal, deadlineAt?: number): Promise<RemoteFacadeResult> {
+    if (!handle || typeof handle !== 'object' || handle.kind !== 'static' ||
+        !validId(handle.appId) || !validId(handle.id) || !validId(handle.version) ||
+        !validId(handle.targetWorkspaceId) || !validId(invocationId) ||
+        handle.environment !== options.environment ||
+        typeof handle.deploymentId !== 'string' || !deploymentUuid.test(handle.deploymentId)) {
+      denied('MALFORMED_HANDLE', 400);
+    }
+    const captured = {
+      appId: handle.appId, deploymentId: handle.deploymentId,
+      operationId: handle.id, version: handle.version, targetWorkspaceId: handle.targetWorkspaceId,
+    };
+    return invoke(captured.appId, {
+      operationId: captured.operationId, version: captured.version,
+      targetWorkspaceId: captured.targetWorkspaceId, invocationId, input,
+    }, signal, deadlineAt, captured.deploymentId);
+  }
+
+  return { discover, discoverPinned, invoke, invokePinned, invokeWorkflow };
 }
