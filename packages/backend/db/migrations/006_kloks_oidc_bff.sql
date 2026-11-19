@@ -55,7 +55,22 @@ CREATE INDEX IF NOT EXISTS kloks_oidc_sessions_active
 ALTER TABLE public.kloks_oidc_flows ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.kloks_oidc_sessions ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.kloks_oidc_flows, public.kloks_oidc_sessions FROM PUBLIC;
-REVOKE ALL ON public.kloks_oidc_flows, public.kloks_oidc_sessions FROM anon, authenticated;
+-- Neon does not necessarily define Supabase API roles. Only revoke grants
+-- for roles that actually exist. The unconditional PUBLIC revoke above is
+-- authoritative; this extra defense applies when optional roles are present.
+DO $kloks_optional_data_api_roles$
+DECLARE role_name text;
+BEGIN
+  FOR role_name IN
+    SELECT rolname FROM pg_roles WHERE rolname IN ('anon', 'authenticated')
+  LOOP
+    EXECUTE format(
+      'REVOKE ALL ON TABLE public.kloks_oidc_flows, public.kloks_oidc_sessions FROM %I',
+      role_name
+    );
+  END LOOP;
+END;
+$kloks_optional_data_api_roles$;
 
 -- A callback state is single-use and cannot be un-consumed or rebound.
 CREATE OR REPLACE FUNCTION public.kloks_oidc_enforce_flow_immutable()
