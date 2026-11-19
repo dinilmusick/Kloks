@@ -199,18 +199,60 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
     return caller;
   }
 
-  async function discover(credential: string, workspaceId: string, transport: FacadeTransport) {
-    const caller = await callerFor(credential);
+  async function discover(
+    credential: string, workspaceId: string, transport: FacadeTransport, signal?: AbortSignal,
+  ) {
     if (!validId(workspaceId)) fail('INVALID_WORKSPACE', 400);
-    const rows = await options.listCurrentOperations(workspaceId);
-    const visible: Array<Pick<FacadeOperationDescriptor, 'id' | 'version' | 'name' | 'kind' | 'targetWorkspaceId'>> = [];
-    for (const op of rows) {
-      if (!assertDescriptor(op) || op.targetWorkspaceId !== workspaceId) continue;
-      const decision = { caller, operation: op, transport };
-      if (!await options.deploymentEligible(decision) || !await options.authorize(decision, 'discover')) continue;
-      visible.push({ id: op.id, version: op.version, name: op.name, kind: op.kind, targetWorkspaceId: op.targetWorkspaceId });
+    // Discovery is scoped to an explicit catalog authority rather than an
+    // arbitrary operation. Hosts must validate this identity with Luth.
+    const proofContext: FacadeInvocationAuthorityContext = Object.freeze({
+      operationId: 'catalog.discover', version: 'current',
+      targetWorkspaceId: workspaceId, invocationId: crypto.randomUUID(), transport,
+    });
+    const initialDeadline = Date.now() + 30_000;
+    const verified = await boundedAuthority(
+      () => callerFor(credential, proofContext), initialDeadline, signal,
+    );
+    const caller: VerifiedFacadeCaller = {
+      ...verified, invoker: { ...verified.invoker }, chain: [...verified.chain],
+    };
+    const deadline = Math.min(initialDeadline, caller.deadlineAt, caller.expiresAt);
+    const rows = await boundedAuthority(() => options.listCurrentOperations(workspaceId), deadline, signal);
+    if (!Array.isArray(rows) || rows.length > 1000) fail('CATALOG_UNAVAILABLE', 503);
+    const visible: FacadeOperationDescriptor[] = [];
+    for (const listed of rows) {
+      if (!assertDescriptor(listed) || listed.targetWorkspaceId !== workspaceId) continue;
+      const operation = Object.freeze({ ...listed });
+      const decision: FacadeDecision = { caller, operation, transport };
+      if (!await boundedAuthority(() => options.deploymentEligible(decision), deadline, signal) ||
+          !await boundedAuthority(() => options.authorize(decision, 'discover'), deadline, signal)) continue;
+      visible.push(operation);
     }
-    return visible;
+    // A grant or deployment may disappear while a large capability list is
+    // being projected. Never return metadata based on only the initial admission.
+    const currentCaller = await boundedAuthority(
+      () => options.revalidateLuthCaller(caller, options.targetAppId, proofContext), deadline, signal,
+    );
+    if (!currentCaller || !currentCaller.invoker || !Array.isArray(currentCaller.chain) ||
+        !Number.isFinite(currentCaller.expiresAt) || currentCaller.expiresAt <= Date.now() ||
+        !Number.isFinite(currentCaller.deadlineAt) || currentCaller.deadlineAt <= Date.now() ||
+        currentCaller.audience !== options.targetAppId) fail('AUTH_INVALID', 401);
+    if (!sameCallerIdentity(caller, currentCaller)) fail('CALLER_CHANGED', 401);
+    const latest = await boundedAuthority(() => options.listCurrentOperations(workspaceId), deadline, signal);
+    if (!Array.isArray(latest) || latest.length > 1000) fail('CATALOG_UNAVAILABLE', 503);
+    const allowed: Array<Pick<FacadeOperationDescriptor, 'id' | 'version' | 'name' | 'kind' | 'targetWorkspaceId'>> = [];
+    for (const previous of visible) {
+      const current = latest.find(op => assertDescriptor(op) && sameDispatchReference(previous, op));
+      if (!current) continue;
+      const decision: FacadeDecision = { caller: currentCaller, operation: current, transport };
+      if (!await boundedAuthority(() => options.deploymentEligible(decision), deadline, signal) ||
+          !await boundedAuthority(() => options.authorize(decision, 'discover'), deadline, signal)) continue;
+      allowed.push({
+        id: current.id, version: current.version, name: current.name,
+        kind: current.kind, targetWorkspaceId: current.targetWorkspaceId,
+      });
+    }
+    return allowed;
   }
 
   async function invoke(credential: string, request: FacadeInvocation, transport: FacadeTransport, parentSignal?: AbortSignal) {
@@ -380,7 +422,7 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
       const path = new URL(request.url).pathname;
       const credential = bearer(request);
       if (path === '/api/crossapp/operations' && request.method === 'GET') {
-        return Response.json({ operations: await discover(credential, new URL(request.url).searchParams.get('workspace') ?? '', 'http') }, { headers: { 'Cache-Control': 'no-store' } });
+        return Response.json({ operations: await discover(credential, new URL(request.url).searchParams.get('workspace') ?? '', 'http', request.signal) }, { headers: { 'Cache-Control': 'no-store' } });
       }
       if (path === '/api/crossapp/invoke' && request.method === 'POST') {
         return Response.json(await invoke(credential, await parseJson(request) as FacadeInvocation, 'http', request.signal), { headers: { 'Cache-Control': 'no-store' } });
@@ -417,7 +459,7 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
       if (body.method === 'tools/list') {
         const workspace = body.params?.workspaceId;
         if (typeof workspace !== 'string') throw new FacadeInvocationDenied('INVALID_WORKSPACE', 400);
-        const operations = await discover(credential, workspace, 'mcp');
+        const operations = await discover(credential, workspace, 'mcp', request.signal);
         return Response.json({ jsonrpc: '2.0', id, result: { tools: operations.map(op => ({
           name: op.id, description: op.name,
           inputSchema: {
