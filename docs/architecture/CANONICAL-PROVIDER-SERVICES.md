@@ -84,3 +84,15 @@ References:
 - https://render.com/docs/free
 - https://huggingface.co/docs/inference-providers/pricing
 - https://fly.io/docs/about/free-trial/
+
+## Separate container / sandbox products
+
+- Vercel Sandbox has a distinct monthly Active CPU allowance on Hobby; the
+  existing Vercel projects/deployments API is **not** a Sandbox lifecycle API.
+  Keep `vercel-sandbox` catalogued until a verified Sandbox adapter exists.
+- Cloudflare Workers is not Cloudflare Containers. Cloudflare Containers
+  requires Workers Paid and is not part of the free Workers request quota.
+  Keep `cloudflare-containers` catalogued and disallow free rotation.
+- Koyeb offers a bounded free instance; Render offers monthly free instance
+  hours and Railway has a small recurring monthly free credit. None of these
+  claims supplies per-account live quota telemetry or allocation authority.

@@ -22,7 +22,9 @@ describe('canonical provider services', () => {
     expect(getProviderService('CLOUDFLARE_WORKERS')?.id).toBe('cloudflare');
     expect(getProviderService('fly')?.renewal).toBe('trial')
     expect(getProviderService('fly')?.usageImplemented).toBe(false)
-    expect(getProviderService('koyeb')?.status).toBe('catalogued');
+    expect(getProviderService('koyeb')?.status).toBe('catalogued')
+    expect(getProviderService('vercel-sandbox')?.apiImplemented).toBe(false)
+    expect(getProviderService('cloudflare-containers')?.apiImplemented).toBe(false);
   });
   it('scores only confirmed renewable quota windows and fails closed', () => {
     expect(calculateProviderCapacity(base, now).weight).toBe(0.75);
