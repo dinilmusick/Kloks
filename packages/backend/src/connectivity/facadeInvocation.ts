@@ -135,8 +135,74 @@ function sameDispatchReference(before: FacadeOperationDescriptor, after: FacadeO
       : before.serviceId === after.serviceId && before.serviceOperation === after.serviceOperation);
 }
 
-function parseJson(body: Request): Promise<unknown> {
-  return body.json().catch(() => fail('MALFORMED_JSON', 400));
+/**
+ * Cross-app operations are JSON-only. Reject non-finite numbers, class/Map
+ * instances, accessors and cycles before authority evaluation or dispatch.
+ * Cap nesting and serialized bytes to stop unbounded work on graph inputs.
+ */
+export function assertFacadeJsonInput(value: unknown): void {
+  const seen = new WeakSet<object>();
+  let nodes = 0;
+  const visit = (item: unknown, depth: number): void => {
+    if (++nodes > 10_000 || depth > 32) fail('MALFORMED_INPUT', 400);
+    if (item === null || typeof item === 'boolean' || typeof item === 'string') return;
+    if (typeof item === 'number' && Number.isFinite(item)) return;
+    if (typeof item !== 'object') fail('MALFORMED_INPUT', 400);
+    if (seen.has(item)) fail('MALFORMED_INPUT', 400);
+    seen.add(item);
+    if (Array.isArray(item)) {
+      for (const child of item) visit(child, depth + 1);
+    } else {
+      const proto = Object.getPrototypeOf(item);
+      if (proto !== Object.prototype && proto !== null) fail('MALFORMED_INPUT', 400);
+      for (const [key, child] of Object.entries(item)) {
+        if (['__proto__', 'prototype', 'constructor'].includes(key)) fail('MALFORMED_INPUT', 400);
+        const descriptor = Object.getOwnPropertyDescriptor(item, key);
+        if (!descriptor || !Object.hasOwn(descriptor, 'value')) fail('MALFORMED_INPUT', 400);
+        visit(child, depth + 1);
+      }
+      if (Reflect.ownKeys(item).length !== Object.keys(item).length) fail('MALFORMED_INPUT', 400);
+    }
+    seen.delete(item);
+  };
+  visit(value, 0);
+  let encoded: string | undefined;
+  try { encoded = JSON.stringify(value); }
+  catch { fail('MALFORMED_INPUT', 400); }
+  if (typeof encoded !== 'string') fail('MALFORMED_INPUT', 400);
+  if (new TextEncoder().encode(encoded).byteLength > 1_048_576) fail('PAYLOAD_TOO_LARGE', 413);
+}
+
+/** Read and bound actual request bytes, not an untrusted Content-Length. */
+async function parseJson(body: Request): Promise<unknown> {
+  const declared = body.headers.get('content-length');
+  if (declared !== null && Number(declared) > 1_048_576) fail('PAYLOAD_TOO_LARGE', 413);
+  if (!body.body) fail('MALFORMED_JSON', 400);
+  const reader = body.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  let finished = false;
+  try {
+    while (true) {
+      if (body.signal.aborted) fail('CANCELLED', 408);
+      const { done, value } = await reader.read();
+      if (done) { finished = true; break; }
+      total += value.byteLength;
+      if (total > 1_048_576) fail('PAYLOAD_TOO_LARGE', 413);
+      chunks.push(value);
+    }
+  } catch (error) {
+    if (error instanceof FacadeInvocationDenied) throw error;
+    fail('MALFORMED_JSON', 400);
+  } finally {
+    if (!finished) void reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  try { return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
+  catch { fail('MALFORMED_JSON', 400); }
 }
 
 /**
@@ -272,6 +338,7 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
         catch { return fail('MALFORMED_INPUT', 400); }
       })(),
     };
+    assertFacadeJsonInput(admittedRequest.input);
     const proofContext: FacadeInvocationAuthorityContext = Object.freeze({
       operationId: admittedRequest.operationId, version: admittedRequest.version,
       targetWorkspaceId: admittedRequest.targetWorkspaceId,
@@ -430,7 +497,7 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
         return Response.json({ operations: await discover(credential, new URL(request.url).searchParams.get('workspace') ?? '', 'http', request.signal) }, { headers: { 'Cache-Control': 'no-store' } });
       }
       if (path === '/api/crossapp/invoke' && request.method === 'POST') {
-        return Response.json(await invoke(credential, await parseJson(request) as FacadeInvocation, 'http', request.signal), { headers: { 'Cache-Control': 'no-store' } });
+        return Response.json(await invoke(credential, await boundedAuthority(() => parseJson(request), Date.now() + 5_000, request.signal) as FacadeInvocation, 'http', request.signal), { headers: { 'Cache-Control': 'no-store' } });
       }
       return errorResponse(new FacadeInvocationDenied('NOT_FOUND', 404));
     } catch (error) { return errorResponse(error); }
@@ -442,7 +509,7 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
       const credential = bearer(request);
       // tools/list and tools/call perform their own admission verification
       // inside discover/invoke. Do not consume a one-use Luth bearer twice.
-      const body = await parseJson(request) as { jsonrpc?: unknown; id?: unknown; method?: unknown; params?: Record<string, unknown> };
+      const body = await boundedAuthority(() => parseJson(request), Date.now() + 5_000, request.signal) as { jsonrpc?: unknown; id?: unknown; method?: unknown; params?: Record<string, unknown> };
       if (!body || typeof body !== 'object' || Array.isArray(body) || body.jsonrpc !== '2.0' ||
         typeof body.method !== 'string') fail('INVALID_MCP_REQUEST', 400);
       id = body.id ?? null;
