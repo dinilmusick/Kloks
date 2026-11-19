@@ -21,7 +21,9 @@ export async function getRailwayAccount(
   }>({
     path: '/graphql/v2', method: 'POST', body: { query: 'query FrnesIdentity { me { name email } }' },
   });
-  if (data.errors?.length || !data.data?.me || typeof data.data.me !== 'object')
+  if (data.errors?.length || !data.data?.me || typeof data.data.me !== 'object'
+      || !(typeof data.data.me.email === 'string' && data.data.me.email.trim()
+        || typeof data.data.me.name === 'string' && data.data.me.name.trim()))
     throw new Error('Railway account token could not be authorized');
   return data.data.me;
 }
@@ -33,7 +35,8 @@ export async function listFlyApps(
   const { data } = await client.request<{
     apps?: Array<{ name: string; machine_count?: number }>;
   }>({ path: '/v1/apps' });
-  if (!Array.isArray(data?.apps)) throw new Error('Invalid Fly Machines app listing');
+  if (!Array.isArray(data?.apps) || data.apps.some(item => typeof item.name !== 'string' || !item.name))
+    throw new Error('Invalid Fly Machines app listing');
   return data.apps;
 }
 /** Render services API, first page only (not a complete account inventory). */
@@ -44,7 +47,10 @@ export async function listRenderServices(
   const { data } = await client.request<Array<{
     service?: { id: string; name: string }; cursor?: string;
   }>>({ path: '/v1/services', query: { limit: 20 } });
-  if (!Array.isArray(data)) throw new Error('Invalid Render services response');
+  if (!Array.isArray(data) || data.some(item =>
+    typeof item.service?.id !== 'string' || !item.service.id
+      || typeof item.service.name !== 'string' || !item.service.name))
+    throw new Error('Invalid Render services response');
   return data;
 }
 /** IAM-scoped Cloud Run v2 service discovery for an exact project and region. */
@@ -58,7 +64,8 @@ export async function listGoogleCloudRunServices(
   const { data } = await createProviderClient(connection, transport).request<{
     services?: Array<{ name: string; uri?: string }>;
   }>({ path: `/v2/projects/${projectId}/locations/${location}/services` });
-  if (!data || (data.services !== undefined && !Array.isArray(data.services)))
+  if (!data || (data.services !== undefined && (!Array.isArray(data.services)
+      || data.services.some(item => typeof item.name !== 'string' || !item.name))))
     throw new Error('Invalid Cloud Run service listing');
   return data.services || [];
 }
