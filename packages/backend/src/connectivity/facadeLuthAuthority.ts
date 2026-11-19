@@ -299,7 +299,9 @@ export function createLuthFacadeBearerIssuer(options: LuthFacadeSourceOptions) {
     if (!intent || !validHandle(intent.caller_workspace_id) ||
         intent.target_workspace_id !== deployment.workspaceId ||
         !validHandle(intent.resource_key) ||
-        !['backend.invoke', 'workflow.invoke'].includes(intent.scope)) {
+        !['backend.invoke', 'workflow.invoke'].includes(intent.scope) ||
+        (operation?.kind === 'workflow' && intent.scope !== 'workflow.invoke') ||
+        (operation?.kind !== 'workflow' && intent.scope !== 'backend.invoke')) {
       denied('DELEGATION_DENIED');
     }
     if (signal.aborted) denied('CANCELLED', 408);
