@@ -89,6 +89,35 @@ describe('independent consent boundary across users, workspaces and windows', ()
     await expect(access.inspect('token', 'window-alice')).rejects.toThrow('stale');
   });
 
+  it('drops a snapshot if a reused login identifier changes user and workspace mid-flight', async () => {
+    let user = 'alice';
+    let workspace = 'workspace-one';
+    const login = (): VerifiedUiAgentCaller => ({
+      ...identity(user, workspace), sessionId: 'reused-session-id',
+    });
+    const liveGrant = (): UiAgentConsentGrant => ({
+      ...login(), grantId: 'same-buggy-generation', windowId: 'window-alice',
+      tabId: tabs.alice, origin: 'https://aiko.example', expiresAt: 7000,
+      consented: true, permissions: ['inspect'],
+    });
+    const access = createConsentedUiAgentAccess({
+      now: () => 1000,
+      verifyCaller: login,
+      authorizeWindow: liveGrant,
+      sanitizeSnapshot: () => {
+        user = 'bob';
+        workspace = 'workspace-two';
+        return { safe: true };
+      },
+      approveAction: () => false,
+      uiSession: async () => Response.json({
+        session: { revision, snapshot: { safe: true, secret: 'do-not-leak' } },
+      }),
+    });
+    await expect(access.inspect('same-client-handle', 'window-alice'))
+      .rejects.toThrow('stale');
+  });
+
   it('rejects immediately when cancellation occurs during stalled user approval', async () => {
     const caller = identity('alice', 'workspace-one');
     const grant: UiAgentConsentGrant = {
