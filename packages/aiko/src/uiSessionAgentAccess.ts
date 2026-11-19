@@ -169,7 +169,8 @@ export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
   }
 
   async function callUi(current: Awaited<ReturnType<typeof checked>>,
-    method: 'GET' | 'POST', body?: UiAgentActionRequest, signal?: AbortSignal) {
+    method: 'GET' | 'POST', body?: UiAgentActionRequest, signal?: AbortSignal,
+    purpose: 'inspect' | 'action' = method === 'GET' ? 'inspect' : 'action') {
     assertNotCancelled(signal);
     const { grant, url } = current;
     const request = new Request(new URL('/api/ui-session/' + grant.tabId +
@@ -185,7 +186,7 @@ export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
       sessionId: current.caller.sessionId, workspaceId: current.caller.workspaceId,
       windowId: current.grant.windowId, tabId: current.grant.tabId,
       grantId: current.grant.grantId,
-      permission: method === 'GET' ? 'inspect' : 'action',
+      permission: purpose,
     }), signal);
     assertNotCancelled(signal);
     if (!response || response.status !== (method === 'GET' ? 200 : 202)) {
@@ -233,7 +234,8 @@ export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
       const capturedAction = canonicalAction(input);
       let current = await checked(session, windowId, 'action', signal);
       // The tab must still be open and the revision current BEFORE prompting.
-      const before = await readRevision(await callUi(current, 'GET', undefined, signal), signal);
+      // An action-only grant can read the revision solely to verify that action.
+      const before = await readRevision(await callUi(current, 'GET', undefined, signal, 'action'), signal);
       if (before.revision !== input.revision) {
         throw new Error('UI action revision is stale.');
       }
