@@ -1,7 +1,7 @@
 # Consent adapter integration contract (Agent 11)
 This file documents the scoped implementation; it does not grant access or certify real browser E2E.
 
-Public API implementation: `createConsentedUiAgentAccess` in `uiSessionAgentAccess.ts`. 
+Public API implementation: `createConsentedUiAgentAccess` in `uiSessionAgentAccess.ts`.
 **Package index export requires AppShell/consumer owner coordination.** Do not add a permissive fallback if unresolved.
 
 ## Trusted host dependencies (all required)
