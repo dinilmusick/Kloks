@@ -121,3 +121,20 @@ The dedicated Skipo tests verify selectors `[undefined, originalDeploymentId,
 originalDeploymentId]`, wrong-instance substitution before network dispatch,
 wrong-instance substitution after execution, malformed UUID denial and
 cross-instance catalog-list substitution.
+
+
+## Published FOD workflow invocation — distinct from static Skipo capability revisions
+
+The existing target-side createFacadeInvocationBoundary handles current kind=workflow descriptors by calling the owning app's invokePublishedWorkflow. The caller-side remote client now provides an explicit invokeWorkflow operation for this path, without misusing the Skipo static capability registry or falling back from denied static operations.
+
+The host must construct createFodWorkflowDeploymentResolver with THREE mandatory trusted callbacks:
+
+1. authorizeCurrentWorkflow(appId,targetWorkspaceId,operation,signal): current owner-published exact workflow version, active owner grant, live Luth principal, source/target workspace authorization and scope. Return only opaque IDs, not private workflow graphs.
+2. locateVerifiedWorkflowHost(reference,environment,signal,expectedDeploymentId?): trusted Skipo owning application deployment locator independent of a static capability descriptor. Never trust a user-supplied URL, APP_URL or legacy unverified ticket.
+3. inspectAttestedLease(reference,candidate,environment,signal): independent registrar check of immutable app/deployment identity, workspace, environment, origin, proof validity, lease freshness and terminal revocation.
+
+Pass the created callback to createFacadeRemoteClient as resolveWorkflowDeployment. Call remote.invokeWorkflow(targetAppId,{operationId,version,targetWorkspaceId,invocationId,input}). The remote obtains a fresh Luth workflow.invoke credential bound to the current exact resource and checks the SAME verified deployment UUID before sending and again after execution. The target independently verifies Luth, owning-app FOD publication/current revision, grant, replay budget, deadline and output authority through its original BackendFacade. No clone of the private workflow graph or second workflow engine is involved.
+
+The Luth source issuer now rejects backend.invoke for an explicit workflow, and workflow.invoke for a static API. Do not infer a workflow route from a failed static lookup or trust the caller's selector as a grant.
+
+Workflow callback wiring remains owner-host responsibility and can only be live-certified after staged FOD Kloks PR #124, Luth #23, Skipo #208 and isolated Neon schema are integrated. New FOD fixture tests exercise real Kloks target guard with versioned grant, revoked publication, revoked output, missing independent workflow authority, verified host expiry and changed deployment instance. They are fixtures, not live two-user deployed Neon acceptance evidence.
