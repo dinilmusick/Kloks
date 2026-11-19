@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createFacadeInvocationBoundary, type VerifiedFacadeCaller,
 } from './facadeInvocation.js';
-import { createFacadeRemoteClient } from './facadeRemoteClient.js';
+import { createFacadeRemoteClient, type RemoteFacadeOperation, type VerifiedFacadeDeployment } from './facadeRemoteClient.js';
 import {
   createFodWorkflowDeploymentResolver,
   type FodCurrentPublishedReference,
@@ -84,8 +84,8 @@ function fixture() {
     } : null,
   };
   const resolveWorkflowDeployment = createFodWorkflowDeploymentResolver(options);
-  const getAudienceBearer = vi.fn(async (_deployment, selector) => {
-    expect(selector.kind).toBe('workflow');
+  const getAudienceBearer = vi.fn(async (_deployment: VerifiedFacadeDeployment, selector: RemoteFacadeOperation | undefined) => {
+    expect(selector?.kind).toBe('workflow');
     state.minted++;
     return 'luth.one.use';
   });
@@ -164,7 +164,7 @@ describe('FOD owner-granted workflow dispatch over verified Skipo host', () => {
     const running = remote.invokeWorkflow(appId, invoke('fod-midflight-revoke'));
     await new Promise(resolve => setTimeout(resolve, 25));
     state.ownerApproved = false;
-    await expect(running).rejects.toMatchObject({ code: 'AUTH_INVALID' });
+    await expect(running).rejects.toMatchObject({ code: 'ACCESS_REVOKED' });
     expect(state.dispatches).toBe(1);
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
