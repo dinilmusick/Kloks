@@ -272,4 +272,21 @@ describe('Skipo #208 verified capability resolution into Kloks remote HTTP bound
       .rejects.toMatchObject({ code: 'DEPLOYMENT_UNAVAILABLE' });
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
+
+  it('allows explicit Skipo-verified deployment selection for a multi-instance catalog', async () => {
+    const { client, fetcher, discovery } = fixture();
+    const [selected] = await client.discoverPinned(
+      'app-b', 'workspace-B', undefined, undefined, deploymentId,
+    );
+    expect(selected.deploymentId).toBe(deploymentId);
+    const wrongInstance = '77777777-7777-4777-8777-777777777777';
+    await expect(client.discoverPinned(
+      'app-b', 'workspace-B', undefined, undefined, wrongInstance,
+    )).rejects.toMatchObject({ code: 'DEPLOYMENT_UNAVAILABLE' });
+    await expect(client.discoverPinned(
+      'app-b', 'workspace-B', undefined, undefined, 'malformed',
+    )).rejects.toMatchObject({ code: 'MALFORMED_HANDLE' });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(discovery).toBeTruthy();
+  });
 });
