@@ -143,9 +143,15 @@ function sameDispatchReference(before: FacadeOperationDescriptor, after: FacadeO
 export function assertFacadeJsonInput(value: unknown): void {
   const seen = new WeakSet<object>();
   let nodes = 0;
+  let approximateStringUnits = 0;
   const visit = (item: unknown, depth: number): void => {
     if (++nodes > 10_000 || depth > 32) fail('MALFORMED_INPUT', 400);
-    if (item === null || typeof item === 'boolean' || typeof item === 'string') return;
+    if (typeof item === 'string') {
+      approximateStringUnits += item.length;
+      if (approximateStringUnits > 1_048_576) fail('PAYLOAD_TOO_LARGE', 413);
+      return;
+    }
+    if (item === null || typeof item === 'boolean') return;
     if (typeof item === 'number' && Number.isFinite(item)) return;
     if (typeof item !== 'object') fail('MALFORMED_INPUT', 400);
     if (seen.has(item)) fail('MALFORMED_INPUT', 400);
@@ -156,6 +162,8 @@ export function assertFacadeJsonInput(value: unknown): void {
       const proto = Object.getPrototypeOf(item);
       if (proto !== Object.prototype && proto !== null) fail('MALFORMED_INPUT', 400);
       for (const [key, child] of Object.entries(item)) {
+        approximateStringUnits += key.length;
+        if (approximateStringUnits > 1_048_576) fail('PAYLOAD_TOO_LARGE', 413);
         if (['__proto__', 'prototype', 'constructor'].includes(key)) fail('MALFORMED_INPUT', 400);
         const descriptor = Object.getOwnPropertyDescriptor(item, key);
         if (!descriptor || !Object.hasOwn(descriptor, 'value')) fail('MALFORMED_INPUT', 400);
