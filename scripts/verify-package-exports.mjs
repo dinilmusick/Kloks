@@ -5,6 +5,13 @@ import { execFileSync } from "node:child_process";
 
 const root = process.cwd();
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+const authEntry = manifest.exports?.["./backend/auth"];
+if (!authEntry ||
+    authEntry.types !== "./packages/backend/dist/auth/index.d.ts" ||
+    authEntry.import !== "./packages/backend/dist/auth/index.js" ||
+    authEntry.default !== authEntry.import) {
+  throw new Error("Canonical Kloks OAuth BFF public backend/auth entrypoint is not correctly exported");
+}
 const exportTargets = new Set();
 
 function collectTargets(value, exportName) {

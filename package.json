@@ -340,6 +340,11 @@
       "types": "./packages/fod/dist/quickjs-node.d.ts",
       "import": "./packages/fod/dist/quickjs-node.js",
       "default": "./packages/fod/dist/quickjs-node.js"
+    },
+    "./backend/auth": {
+      "types": "./packages/backend/dist/auth/index.d.ts",
+      "import": "./packages/backend/dist/auth/index.js",
+      "default": "./packages/backend/dist/auth/index.js"
     }
   },
   "scripts": {
