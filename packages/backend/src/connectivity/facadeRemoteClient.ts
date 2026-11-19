@@ -165,7 +165,9 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
       if (!deployment || deployment.verified !== true || deployment.appId !== appId ||
           (expectedDeploymentId !== undefined && deployment.deploymentId !== expectedDeploymentId) ||
           deployment.workspaceId !== workspaceId || deployment.environment !== options.environment ||
-          !validId(deployment.deploymentId) || !Number.isFinite(deployment.leaseExpiresAt) ||
+          !validId(deployment.deploymentId) ||
+          (pinnedCatalog && !deploymentUuid.test(deployment.deploymentId)) ||
+          !Number.isFinite(deployment.leaseExpiresAt) ||
           deployment.leaseExpiresAt <= now() || !approvedHttpsOrigin(deployment.origin) ||
           !await options.approveOrigin(deployment.origin, deployment)) denied('DEPLOYMENT_UNAVAILABLE', 503);
       if (controller.signal.aborted) throw abortError();
