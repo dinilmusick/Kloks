@@ -6,7 +6,8 @@ import type {FodVerifiedPublishedInvocation} from './publishedWorkflowBackend.js
 const verified:FodVerifiedPublishedInvocation={
   caller:{userId:'owner',appId:'aiko',workspaceId:'source',appOwnerUserId:'owner',workspaceOwnerUserId:'owner'},
   targetAppId:'kone',targetWorkspaceId:'owner-ws',
-  targetAppOwnerUserId:'owner',targetWorkspaceOwnerUserId:'owner',chain:[],
+  targetAppOwnerUserId:'owner',targetWorkspaceOwnerUserId:'owner',
+  invocationId:'invocation-1',luthSessionId:'luth-session-1',chain:[],
 };
 const request={
   targetAppId:'kone',targetWorkspaceId:'owner-ws',
@@ -31,6 +32,10 @@ describe('owning-application workflow executor compatibility',()=>{
     registerFodPublishedWorkflowBackendCommand(registry,{
       targetAppId:'kone',grantStore,
       verifyInvocation:async()=>verified,
+      revalidateResult:async()=>verified,
+      // Host reads the exact current published revision from its owning
+      // application store; a registry handle alone is never authority.
+      isCurrentPublishedVersion:async()=>true,
       // The target's existing Aiko/FOD engine can satisfy this contract
       // structurally. W5 must not force a parallel FodFlowStore.
       buildRuntime:async()=>({
@@ -53,6 +58,6 @@ describe('owning-application workflow executor compatibility',()=>{
     });
     expect(result).toMatchObject({success:true,flowId:'saved-flow',output:{question:'pin'}});
     expect(ownerExec).toHaveBeenCalledOnce();
-    expect(grant).toHaveBeenCalledTimes(2);
+    expect(grant).toHaveBeenCalledTimes(3);
   });
 });
