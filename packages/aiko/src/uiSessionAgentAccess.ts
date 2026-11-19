@@ -85,6 +85,10 @@ export class UiAgentAccessError extends Error {
 
 const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const actionName = /^[\w.:-]{1,128}$/;
+const validUuid = (id: unknown): id is string =>
+  typeof id === 'string' && uuidV4.test(id);
+const validActionName = (name: unknown): name is string =>
+  typeof name === 'string' && actionName.test(name);
 
 function assertNotCancelled(signal?: AbortSignal): void {
   if (signal?.aborted) throw new Error('UI session operation cancelled.');
@@ -169,11 +173,12 @@ export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
         permissions: Object.freeze([...resolvedGrant.permissions ?? []]) }) : null;
     if (!grant || grant.consented !== true ||
         !grant.permissions?.includes(permission) || grant.windowId !== windowId ||
-        !grant.grantId?.trim() || !uuidV4.test(grant.tabId) ||
+        !grant.grantId?.trim() || !validUuid(grant.tabId) ||
         grant.userId !== caller.userId || grant.appId !== caller.appId ||
         grant.workspaceId !== caller.workspaceId ||
         grant.sessionId !== caller.sessionId ||
-        !Number.isFinite(grant.expiresAt) || grant.expiresAt <= now()) {
+        !Number.isFinite(grant.expiresAt) || grant.expiresAt <= now() ||
+        grant.expiresAt > caller.sessionExpiresAt) {
       throw new Error('UI session consent is missing, expired, revoked or for another session.');
     }
     const url = baseUrl(grant.origin);
@@ -256,7 +261,7 @@ export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
       ? document.session : undefined;
     const revision = session !== null && typeof session === 'object' && 'revision' in session
       ? session.revision : undefined;
-    if (typeof revision !== 'string' || !uuidV4.test(revision)) {
+    if (!validUuid(revision)) {
       throw new Error('UI session revision is unavailable.');
     }
     return { revision, session };
@@ -283,8 +288,8 @@ export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
     },
     async action(session: unknown, windowId: string, input: UiAgentActionRequest,
       signal?: AbortSignal) {
-      if (!input || !uuidV4.test(input.revision) || !actionName.test(input.componentId) ||
-          !actionName.test(input.controlId)) {
+      if (!input || !validUuid(input.revision) || !validActionName(input.componentId) ||
+          !validActionName(input.controlId)) {
         throw new Error('Invalid approved UI action.');
       }
       const capturedAction = canonicalAction(input);
@@ -303,7 +308,7 @@ export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
       const approved = await cancellable(() => options.approveAction(
         current.caller, current.grant, JSON.parse(capturedAction) as UiAgentActionRequest, signal), signal);
       assertNotCancelled(signal);
-      if (!approved) throw new Error('User approval for the exact UI action was denied.');
+      if (approved !== true) throw new Error('User approval for the exact UI action was denied.');
       current = await rechecked(session, current, 'action', signal);
       // Backend rejects closed tabs, non-advertised controls and stale revisions.
       // Cancellation before dispatch prevents queueing. An already queued command
