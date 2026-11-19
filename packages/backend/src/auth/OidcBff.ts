@@ -298,10 +298,37 @@ export function createOAuthBff(config: OAuthBffConfig) {
     if (request.headers.get('origin') !== configOrigin(config).origin ||
         request.headers.get('sec-fetch-site') === 'cross-site') return reply({ error: 'ORIGIN_DENIED' }, 403);
     const opaque = exactCookie(request, cookieName(config, 'session'));
-    if (opaque) await db.query(
-      'UPDATE public.kloks_oidc_sessions SET revoked_at=clock_timestamp() ' +
-      'WHERE session_hash=$1 AND app_id=$2 AND revoked_at IS NULL', [await sha256(opaque), config.appId],
-    );
+    if (opaque) {
+      const hash = await sha256(opaque);
+      const active = await db.query(
+        'SELECT refresh_encrypted FROM public.kloks_oidc_sessions WHERE session_hash=$1 ' +
+        'AND app_id=$2 AND revoked_at IS NULL AND expires_at>clock_timestamp() LIMIT 1',
+        [hash, config.appId],
+      );
+      // Local revocation is authoritative even if Luth's network is down.
+      await db.query(
+        'UPDATE public.kloks_oidc_sessions SET revoked_at=clock_timestamp() ' +
+        'WHERE session_hash=$1 AND app_id=$2 AND revoked_at IS NULL', [hash, config.appId],
+      );
+      const token = active.rows[0]?.refresh_encrypted;
+      if (typeof token === 'string' && token) {
+        const revoke = await (config.fetcher || fetch)(config.issuer + '/oauth2/revoke', {
+          method: 'POST',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            ...Object.fromEntries(clientCredentials(config)),
+            token: await unseal(token, config),
+            token_type_hint: 'refresh_token',
+          }),
+          cache: 'no-store', redirect: 'manual',
+        }).catch(() => null);
+        if (!revoke?.ok) {
+          const failed = reply({ success: false, error: 'LUTH_REFRESH_TOKEN_REVOCATION_UNVERIFIED' }, 503);
+          failed.headers.append('set-cookie', clearCookie(config, 'session'));
+          return failed;
+        }
+      }
+    }
     const response = reply({ success: true }, 200);
     response.headers.append('set-cookie', clearCookie(config, 'session'));
     return response;
