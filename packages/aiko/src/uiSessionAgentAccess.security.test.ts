@@ -143,6 +143,31 @@ describe('live-session frontend consent security regression', () => {
     expect(x.approvals).toHaveLength(0);
   });
 
+  it('rejects unadvertised controls before any user approval or POST', async () => {
+    const f = fixture();
+    await expect(f.access.action('s1', 'window-1', {
+      ...validAction(), controlId: 'not-advertised',
+    })).rejects.toThrow('not advertised');
+    await expect(f.access.action('s1', 'window-1', {
+      ...validAction(), componentId: 'unknown-component',
+    })).rejects.toThrow('not advertised');
+    expect(f.approvals).toHaveLength(0);
+    expect(f.requests.every(req => req.method === 'GET')).toBe(true);
+  });
+
+  it('fails closed when the host omits advertised snapshot metadata', async () => {
+    const f = fixture();
+    const access = createConsentedUiAgentAccess({
+      ...f.opts,
+      uiSession: async () => Response.json({ session: {
+        revision, snapshot: { version: 1, components: [] },
+      } }),
+    });
+    await expect(access.action('s1', 'window-1', validAction()))
+      .rejects.toThrow('not advertised');
+    expect(f.approvals).toHaveLength(0);
+  });
+
   it('consent is specific to exact revision and action payload', async () => {
     const f = fixture();
     await expect(f.access.action('s1', 'window-1', validAction())).resolves.toEqual({
