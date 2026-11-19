@@ -92,3 +92,65 @@ Skipo #198 proof-qualified deployment resolver, hard transport timeouts,
 scoped consumer notifications, complete storage-provider reconnect races,
 independent N5 SQL fixtures, or integrated Kloks CI/typecheck/build.
 Do not enable production invocation or merge this stack out of order.
+
+
+## Aiko and other owning-app host adapter: output-time authorization
+
+The owning application supplies the following callbacks to
+`registerFodPublishedWorkflowBackendCommand` (no new graph engine):
+
+```ts
+{
+  targetAppId: 'aiko', // host-configured, registered immutable app ID
+  grantStore: createSqlFodWorkflowGrantStore(serverSql),
+  verifyInvocation: (transportContext, handle) => admitSingleUseLuthInvocation(
+    transportContext, handle
+  ), // MUST return trusted invocationId AND luthSessionId
+  revalidateResult: (transportContext, handle, admitted) =>
+    revalidateLuthInvocationWithoutConsumingCredential(
+      transportContext, handle, admitted
+    ), // same invocation, live session, source+target scopes, audience, grant
+  isCurrentPublishedVersion: async (handle, verified) =>
+    Boolean(await owningWorkspaceFlowStore(verified).getCurrentPublishedRevision(
+      handle.targetWorkspaceId, handle.workflowId, handle.version
+    )),
+  buildRuntime: (workspaceId, verified) =>
+    existingAikoFodHost(verified).pinnedWorkflowExecutor(workspaceId),
+  withExecutionScope: (verified, chain, signal, run) =>
+    withAuthenticatedAikoScope(verified, chain, signal, run),
+}
+```
+
+`verifyInvocation` is the **single-use admission**, not a reusable result checker.
+`revalidateResult` MUST call a trusted **non-consuming** Luth authority:
+running single-use introspection twice is an authentication failure, and
+accepting a cached principal is a security failure. Both responses MUST
+identify the same server-admitted `invocationId`, authenticated `luthSessionId`,
+user, caller app, source workspace, target app and owning target workspace.
+A different session or principal suppresses the result. An actual Luth session
+ID is required; the BackendFacade message's untrusted `sessionId` is NOT proof.
+
+The host's `isCurrentPublishedVersion` consults its live owning workspace,
+not the registry. It MUST return false on edits, withdrawal, deletion, lost
+storage, stale versions or mismatched workspace. The BackendFacade adapter
+rechecks the active version and exact-version caller grant *after* the owner's
+executor completes, before returning any output. If revocation or withdrawal
+races execution, it rejects the output. The owner executor must independently
+validate admission/grants and execute the original FOD/Aiko runtime; do not
+clone private graphs into the global registry, create a second workflow engine
+or trust a discovery descriptor as authority.
+
+The `FodVerifiedPublishedInvocation` returned by the host includes
+`invocationId` and `luthSessionId` alongside the existing canonical owner,
+workspace, caller, chain, deadline and abort fields. Output revalidation may
+not extend a previous deadline or allow a new caller/workspace. A denied
+operation is an error, never a successful result with omitted data.
+
+**Schema dependency for expiring grants:** the historical Skipo N5
+`workflow_grants` contract contains `granted_at` and revocation state, but
+does not yet contain an `expires_at`/lease column. Explicit TTL expiration
+cannot be certified or made durable by this FOD package alone. The database
+migration owner must add an immutable optional expiry and enforce it in active
+grant lookup and discovery before enabling expiring grants; the FOD host must
+fail closed for any requested expiry until the storage contract exists.
+No production schema or transport is modified by this PR.
