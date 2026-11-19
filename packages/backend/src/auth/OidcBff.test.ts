@@ -35,6 +35,12 @@ function fixture() {
         }
         return { rows: [browserSession] };
       }
+      if (sql.startsWith('SELECT refresh_encrypted FROM public.kloks_oidc_sessions')) {
+        if (browserSession && browserSession.session_hash === values[0] && !browserSession.revoked) {
+          return { rows: [{ refresh_encrypted: browserSession.refresh_encrypted }] };
+        }
+        return { rows: [] };
+      }
       if (sql.startsWith('UPDATE public.kloks_oidc_sessions SET revoked_at')) {
         if (browserSession && browserSession.session_hash === values[0]) browserSession.revoked = true;
         return { rows: [] };
@@ -74,6 +80,13 @@ function fixture() {
           refresh_token: 'rotated-refresh-token', expires_in: 3600 });
       }
       return Response.json({ error: 'invalid_grant' }, { status: 400 });
+    }
+    if (path === '/api/auth/oauth2/revoke') {
+      const params = new URLSearchParams(init?.body as string);
+      return params.get('client_id') === 'verified-srkl-client' &&
+        params.get('token') === 'luth-refresh-token'
+        ? new Response(null, { status: 200 })
+        : Response.json({ error: 'invalid_client' }, { status: 401 });
     }
     if (path === '/api/auth/oauth2/userinfo') {
       if (init?.headers && new Headers(init.headers).get('authorization')?.startsWith('Bearer ')) {
