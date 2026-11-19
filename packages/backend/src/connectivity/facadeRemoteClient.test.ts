@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  createFacadeInvocationBoundary, type FacadeInvocation, type VerifiedFacadeCaller,
+  createFacadeInvocationBoundary, FacadeInvocationDenied, type FacadeInvocation, type VerifiedFacadeCaller,
 } from './facadeInvocation.js';
 import {
   createFacadeRemoteClient, type FacadeRemoteClientOptions, type VerifiedFacadeDeployment,
@@ -381,5 +381,47 @@ describe('Skipo/Luth-authorized cross-app remote facade client', () => {
     await expect(client.discoverPinned(app, workspace))
       .rejects.toMatchObject({ code: 'DEADLINE_EXCEEDED' });
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('sanitizes confidential Skipo resolver and origin-authority failures', async () => {
+    const { options, fetcher } = harness();
+    for (const override of [
+      { resolveDeployment: async () => { throw new Error('database DSN and JWT secret'); } },
+      { approveOrigin: async () => { throw new Error('private network or credential error'); } },
+    ]) {
+      const client = createFacadeRemoteClient({ ...options, ...override });
+      await expect(client.invoke(app, request('redacted-registry-error')))
+        .rejects.toMatchObject({ code: 'DEPLOYMENT_UNAVAILABLE', status: 503 });
+      try { await client.discover(app, workspace); }
+      catch (error) {
+        expect(String(error)).not.toContain('secret');
+        expect(String(error)).not.toContain('credential error');
+      }
+    }
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('denies a failing trusted Luth issuer without exposing its session or token errors', async () => {
+    const { options, fetcher } = harness();
+    const client = createFacadeRemoteClient({
+      ...options, getAudienceBearer: async () => {
+        throw new Error('Luth source assertion: sensitive-token-value');
+      },
+    });
+    await expect(client.invoke(app, request('redact-luth-error')))
+      .rejects.toMatchObject({ code: 'AUTH_UNAVAILABLE', status: 503 });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('preserves deliberate denied Luth delegation codes without converting them to success', async () => {
+    const { options, fetcher } = harness();
+    const client = createFacadeRemoteClient({
+      ...options, getAudienceBearer: async () => {
+        throw new FacadeInvocationDenied('DELEGATION_DENIED', 403);
+      },
+    });
+    await expect(client.invoke(app, request('luth-delegation-denial')))
+      .rejects.toMatchObject({ code: 'DELEGATION_DENIED', status: 403 });
+    expect(fetcher).not.toHaveBeenCalled();
   });
 });
