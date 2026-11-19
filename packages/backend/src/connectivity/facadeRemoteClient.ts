@@ -159,8 +159,24 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
       if (controller.signal.aborted) reject(abortError());
     });
     const perform = async () => {
+      // Do not leak adapter-specific errors, SQL diagnostics or credential
+      // material from trusted host Luth/Skipo callbacks to graph consumers.
+      const resolveSafe = async (selected: RemoteFacadeOperation | undefined, pinned?: string) => {
+        try { return await resolver(appId, workspaceId, selected, controller.signal, pinned); }
+        catch {
+          if (controller.signal.aborted) throw abortError();
+          denied('DEPLOYMENT_UNAVAILABLE', 503);
+        }
+      };
+      const approveSafe = async (target: VerifiedFacadeDeployment) => {
+        try { return await options.approveOrigin(target.origin, target); }
+        catch {
+          if (controller.signal.aborted) throw abortError();
+          denied('DEPLOYMENT_UNAVAILABLE', 503);
+        }
+      };
       if (controller.signal.aborted) throw abortError();
-      const resolved = await resolver(appId, workspaceId, operation, controller.signal, expectedDeploymentId);
+      const resolved = await resolveSafe(operation, expectedDeploymentId);
       const deployment = resolved && Object.freeze({ ...resolved });
       if (!deployment || deployment.verified !== true || deployment.appId !== appId ||
           (expectedDeploymentId !== undefined && deployment.deploymentId !== expectedDeploymentId) ||
@@ -169,19 +185,23 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
           (pinnedCatalog && !deploymentUuid.test(deployment.deploymentId)) ||
           !Number.isFinite(deployment.leaseExpiresAt) ||
           deployment.leaseExpiresAt <= now() || !approvedHttpsOrigin(deployment.origin) ||
-          !await options.approveOrigin(deployment.origin, deployment)) denied('DEPLOYMENT_UNAVAILABLE', 503);
+          !await approveSafe(deployment)) denied('DEPLOYMENT_UNAVAILABLE', 503);
       if (controller.signal.aborted) throw abortError();
-      const bearer = await options.getAudienceBearer(deployment, operation, controller.signal);
+      let bearer: string;
+      try { bearer = await options.getAudienceBearer(deployment, operation, controller.signal); }
+      catch (error) {
+        if (controller.signal.aborted) throw abortError();
+        if (error instanceof FacadeInvocationDenied) throw error;
+        denied('AUTH_UNAVAILABLE', 503);
+      }
       if (typeof bearer !== 'string' || bearer.length === 0 || bearer.length > 8192 ||
           !tokenPattern.test(bearer)) denied('AUTH_INVALID', 401);
       if (controller.signal.aborted) throw abortError();
       // Credential issuance may block. Do not send a minted one-use bearer to
       // a deployment whose ownership, origin or lease changed during minting.
-      const beforeSend = await resolver(
-        appId, workspaceId, operation, controller.signal, deployment.deploymentId,
-      );
+      const beforeSend = await resolveSafe(operation, deployment.deploymentId);
       if (!matchDeployment(deployment, beforeSend, now()) ||
-          !await options.approveOrigin(beforeSend!.origin, beforeSend!)) {
+          !await approveSafe(beforeSend!)) {
         denied('DEPLOYMENT_REVOKED', 503);
       }
       if (controller.signal.aborted) throw abortError();
@@ -252,10 +272,8 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
         denied(code, response.status >= 400 && response.status < 600 ? response.status : 502);
       }
       // A Skipo lease or deployment mapping can be revoked during a long call.
-      const latest = await resolver(
-        appId, workspaceId, operation, controller.signal, deployment.deploymentId,
-      );
-      if (!matchDeployment(deployment, latest, now()) || !await options.approveOrigin(latest!.origin, latest!)) {
+      const latest = await resolveSafe(operation, deployment.deploymentId);
+      if (!matchDeployment(deployment, latest, now()) || !await approveSafe(latest!)) {
         denied('DEPLOYMENT_REVOKED', 503);
       }
       if (controller.signal.aborted) throw abortError();
@@ -269,11 +287,11 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
         const visible: RemoteFacadeDescriptor[] = [];
         for (const entry of entries) {
           if (controller.signal.aborted) throw abortError();
-          const found = await resolver(appId, workspaceId, {
+          const found = await resolveSafe({
             id: entry.id, version: entry.version, kind: 'static',
-          }, controller.signal, deployment.deploymentId);
+          }, deployment.deploymentId);
           if (!matchDeployment(deployment, found, now())) continue;
-          if (!await options.approveOrigin(found!.origin, found!)) continue;
+          if (!await approveSafe(found!)) continue;
           if (controller.signal.aborted) throw abortError();
           visible.push(entry);
         }
