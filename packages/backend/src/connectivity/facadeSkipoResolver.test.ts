@@ -177,4 +177,63 @@ describe('Skipo #208 verified capability resolution into Kloks remote HTTP bound
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(state.resolved).toBeGreaterThanOrEqual(4);
   });
+
+  it('pins the original attested deployment ID on both pre-send and output revalidation', async () => {
+    const { client, discovery, fetcher } = fixture();
+    const pinned: Array<string | undefined> = [];
+    const original = discovery.revalidate;
+    discovery.revalidate = async (req, selector) => {
+      pinned.push(selector.deploymentId);
+      return original(req, selector);
+    };
+    const output = await client.invoke('app-b', {
+      operationId: 'math.add', version: '2', targetWorkspaceId: 'workspace-B',
+      invocationId: 'instance-pinned-1', input: { a: 5, b: 3 },
+    });
+    expect(output).toEqual({ output: { result: 8 }, invocationId: 'instance-pinned-1' });
+    expect(pinned).toEqual([undefined, deploymentId, deploymentId]);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects another verified instance with the same app, operation and revision before dispatch', async () => {
+    const { client, discovery, fetcher } = fixture();
+    let calls = 0;
+    const impostor = '22222222-2222-4222-8222-222222222222';
+    discovery.revalidate = async () => ++calls === 1
+      ? registryRow : { ...registryRow, deploymentId: impostor };
+    await expect(client.invoke('app-b', {
+      operationId: 'math.add', version: '2', targetWorkspaceId: 'workspace-B',
+      invocationId: 'wrong-instance-before-send', input: { a: 1, b: 1 },
+    })).rejects.toMatchObject({ code: 'DEPLOYMENT_REVOKED' });
+    expect(calls).toBe(2);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('suppresses already-executed output when the registry switches to a different instance', async () => {
+    const { client, discovery, fetcher } = fixture();
+    let calls = 0;
+    const impostor = '33333333-3333-4333-8333-333333333333';
+    discovery.revalidate = async () => ++calls === 3
+      ? { ...registryRow, deploymentId: impostor } : registryRow;
+    await expect(client.invoke('app-b', {
+      operationId: 'math.add', version: '2', targetWorkspaceId: 'workspace-B',
+      invocationId: 'wrong-instance-after-output', input: { a: 1, b: 1 },
+    })).rejects.toMatchObject({ code: 'DEPLOYMENT_REVOKED' });
+    expect(calls).toBe(3);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects malformed pinned UUIDs and cross-instance discovery substitutions', async () => {
+    const { resolveDeployment, discovery } = fixture();
+    const signal = new AbortController().signal;
+    const operation = { id: 'math.add', version: '2' };
+    await expect(resolveDeployment('app-b', 'workspace-B', operation, signal, 'not-a-uuid'))
+      .resolves.toBeNull();
+    const wrong = '44444444-4444-4444-8444-444444444444';
+    await expect(resolveDeployment('app-b', 'workspace-B', operation, signal, wrong))
+      .resolves.toBeNull();
+    discovery.list = async () => [{ ...registryRow, deploymentId: wrong }];
+    await expect(resolveDeployment('app-b', 'workspace-B', undefined, signal, deploymentId))
+      .resolves.toBeNull();
+  });
 });
