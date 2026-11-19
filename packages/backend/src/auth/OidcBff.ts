@@ -28,7 +28,7 @@ export interface OAuthBffConfig {
 export interface OAuthBffUser {
   id: string;
   email: string;
-  name?: string;
+  name: string;
   image?: string | null;
 }
 
@@ -158,7 +158,7 @@ async function userInfo(config: OAuthBffConfig, token: string): Promise<OAuthBff
   if (typeof data.sub !== 'string' || !data.sub ||
       typeof data.email !== 'string' || !data.email) throw new Error('LUTH_OAUTH_INVALID_PRINCIPAL');
   return { id: data.sub, email: data.email,
-    ...(typeof data.name === 'string' ? { name: data.name } : {}),
+    name: typeof data.name === 'string' && data.name ? data.name : data.email,
     ...(typeof data.picture === 'string' ? { image: data.picture } : {}) };
 }
 
