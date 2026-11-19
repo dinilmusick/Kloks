@@ -30,3 +30,5 @@ export * from './facadeInvocation.js';
 export * from './facadeRemoteClient.js';
 /** Server-side Luth one-use admission and non-consuming output authority wire adapter. */
 export * from './facadeLuthAuthority.js';
+/** Server-side Skipo exact-revision, Luth-scoped deployment and lease resolver. */
+export * from './facadeSkipoResolver.js';
