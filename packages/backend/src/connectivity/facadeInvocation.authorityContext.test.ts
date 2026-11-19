@@ -14,7 +14,7 @@ const expected: FacadeInvocationAuthorityContext = {
   transport: 'graph',
 };
 
-function fixture() {
+function fixture(options: { hangRevalidation?: boolean; deadlineMs?: number } = {}) {
   const time = Date.now();
   const caller: VerifiedFacadeCaller = {
     principalId: 'user-1',
@@ -27,7 +27,7 @@ function fixture() {
     depth: 1,
     maxDepth: 4,
     remainingCalls: 4,
-    deadlineAt: time + 15_000,
+    deadlineAt: time + (options.deadlineMs ?? 15_000),
     expiresAt: time + 15_000,
   };
   const state = { grant: true, admitted: false, admissions: 0, outputs: 0, debits: 0 };
@@ -56,6 +56,7 @@ function fixture() {
     revalidateLuthCaller: async (admitted, audience, scope) => {
       state.outputs++;
       scopes.push({ ...scope });
+      if (options.hangRevalidation) return new Promise<VerifiedFacadeCaller | null>(() => undefined);
       return state.grant && audience === 'app-B'
         ? { ...admitted, invoker: { ...admitted.invoker }, chain: [...admitted.chain] } : null;
     },
@@ -119,5 +120,22 @@ describe('exact identity to Luth and atomic invocation authority', () => {
       .rejects.toMatchObject({ code: 'AUTH_INVALID' });
     expect(state.admissions).toBe(2);
     expect(state.debits).toBe(1);
+  });
+  it('bounds stalled output revalidation by the inherited execution deadline', async () => {
+    const { boundary, request, state } = fixture({ hangRevalidation: true, deadlineMs: 90 });
+    await expect(boundary.invoke('one-use-bearer', request, 'graph'))
+      .rejects.toMatchObject({ code: 'DEADLINE_EXCEEDED' });
+    expect(state.outputs).toBe(1);
+    expect(state.admissions).toBe(1);
+  });
+
+  it('does not debit budget or perform side effects for a pre-cancelled invocation', async () => {
+    const { boundary, request, state } = fixture();
+    const abort = new AbortController();
+    abort.abort();
+    await expect(boundary.invoke('one-use-bearer', request, 'graph', abort.signal))
+      .rejects.toMatchObject({ code: 'CANCELLED' });
+    expect(state.debits).toBe(0);
+    expect(state.outputs).toBe(0);
   });
 });
