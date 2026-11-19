@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  createFacadeInvocationBoundary, type VerifiedFacadeCaller,
+  createFacadeInvocationBoundary, type FacadeTrustedWorkflowContext, type VerifiedFacadeCaller,
 } from './facadeInvocation.js';
 import { createFacadeRemoteClient, type RemoteFacadeOperation, type VerifiedFacadeDeployment } from './facadeRemoteClient.js';
 import {
@@ -24,6 +24,7 @@ function fixture() {
     ownerApproved: true, published: true, sessionLive: true,
     leaseLive: true, hostId: deploymentId, currentVersion: 'v4',
     slow: false, revocations: 0, dispatches: 0, minted: 0, staticChecks: 0,
+    admissions: 0, workflowContexts: [] as FacadeTrustedWorkflowContext[],
     selections: [] as Array<string | undefined>,
   };
   const now = Date.now();
@@ -41,9 +42,11 @@ function fixture() {
   const target = createFacadeInvocationBoundary({
     targetAppId: appId,
     facade: { services: {}, orchestrations: {} },
-    verifyLuthCredential: async (bearer, audience) =>
-      bearer === 'luth.one.use' && audience === appId && state.sessionLive
-        ? { ...caller, chain: [...caller.chain], invoker: { ...caller.invoker } } : null,
+    verifyLuthCredential: async (bearer, audience) => {
+      state.admissions++;
+      return bearer === 'luth.one.use' && audience === appId && state.sessionLive
+        ? { ...caller, chain: [...caller.chain], invoker: { ...caller.invoker } } : null;
+    },
     revalidateLuthCaller: async admitted =>
       state.sessionLive ? { ...admitted, chain: [...admitted.chain], invoker: { ...admitted.invoker } } : null,
     listCurrentOperations: async () => state.published ? [{
@@ -56,7 +59,8 @@ function fixture() {
       verified.sourceWorkspaceId === 'workspace-A',
     deploymentEligible: async () => state.leaseLive,
     consumeInvocation: async () => true,
-    invokePublishedWorkflow: async (ref, input) => {
+    invokePublishedWorkflow: async (ref, input, _signal, context) => {
+      state.workflowContexts.push(context);
       state.dispatches++;
       if (state.slow) await new Promise(resolve => setTimeout(resolve, 50));
       return { flowId: ref.workflowId, version: ref.version, input };
@@ -109,7 +113,23 @@ describe('FOD owner-granted workflow dispatch over verified Skipo host', () => {
     });
     expect(resolveDeployment).not.toHaveBeenCalled();
     expect(state.selections).toEqual([undefined, deploymentId, deploymentId]);
-    expect(state).toMatchObject({ minted: 1, dispatches: 1, staticChecks: 0 });
+    expect(state).toMatchObject({ minted: 1, admissions: 1, dispatches: 1, staticChecks: 0 });
+    const [context] = state.workflowContexts;
+    expect(context).toMatchObject({
+      targetAppId: appId,
+      caller: {
+        principalId: 'owner-A', sourceAppId: 'app-a', sourceWorkspaceId: 'workspace-A',
+        audience: appId, invoker: { kind: 'workflow-agent', id: 'workflow-agent-A' },
+      },
+      authority: { operationId: 'workflow.report', version: 'v4',
+        targetWorkspaceId: workspace, invocationId: 'fod-1', transport: 'http' },
+      operation: { kind: 'workflow', workflowId: 'flow-secret-123' },
+    });
+    expect(Object.isFrozen(context)).toBe(true);
+    expect(Object.isFrozen(context.caller)).toBe(true);
+    expect(Object.isFrozen(context.caller.chain)).toBe(true);
+    expect(JSON.stringify(context)).not.toContain('luth.one.use');
+    expect(JSON.stringify(context)).not.toContain('admission_token');
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
