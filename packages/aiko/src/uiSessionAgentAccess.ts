@@ -45,17 +45,18 @@ export interface UiAgentActionRequest {
 
 export interface UiAgentAccessOptions {
   /** Verify Luth session, revocation, expiry and workspace server-side on each use. */
-  readonly verifyCaller: (session: unknown) =>
+  readonly verifyCaller: (session: unknown, signal?: AbortSignal) =>
     Promise<VerifiedUiAgentCaller | null> | VerifiedUiAgentCaller | null;
   /** Resolve only currently open, approved windows for the exact caller. */
-  readonly authorizeWindow: (caller: VerifiedUiAgentCaller, windowId: string) =>
+  readonly authorizeWindow: (caller: VerifiedUiAgentCaller, windowId: string,
+    signal?: AbortSignal) =>
     Promise<UiAgentConsentGrant | null> | UiAgentConsentGrant | null;
   /** Human/user-controlled approval for this exact revision and action payload. */
   readonly approveAction: (caller: VerifiedUiAgentCaller, grant: UiAgentConsentGrant,
-    action: UiAgentActionRequest) => Promise<boolean> | boolean;
+    action: UiAgentActionRequest, signal?: AbortSignal) => Promise<boolean> | boolean;
   /** Mandatory trusted redaction of every snapshot before agent exposure. */
   readonly sanitizeSnapshot: (caller: VerifiedUiAgentCaller, grant: UiAgentConsentGrant,
-    snapshot: unknown) => Promise<unknown> | unknown;
+    snapshot: unknown, signal?: AbortSignal) => Promise<unknown> | unknown;
   /** Existing Luth-middleware-protected backend, not model-selected URL/fetch. */
   /** Host must independently enforce these exact bindings before reading/queueing. */
   readonly uiSession: (request: Request, input: {
@@ -65,6 +66,21 @@ export interface UiAgentAccessOptions {
   }) =>
     Promise<Response | undefined>;
   readonly now?: () => number;
+}
+
+/** Codes allow AppShell to differentiate denial, closed windows and revision conflicts. */
+export type UiAgentAccessErrorCode =
+  'BACKEND_DENIED' | 'WINDOW_CLOSED' | 'REVISION_CONFLICT' | 'BACKEND_UNAVAILABLE';
+
+export class UiAgentAccessError extends Error {
+  constructor(
+    readonly code: UiAgentAccessErrorCode,
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+    this.name = 'UiAgentAccessError';
+  }
 }
 
 const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -139,14 +155,14 @@ export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
   async function checked(session: unknown, windowId: string,
     permission: 'inspect' | 'action', signal?: AbortSignal) {
     assertNotCancelled(signal);
-    const resolvedCaller = await cancellable(() => options.verifyCaller(session), signal);
+    const resolvedCaller = await cancellable(() => options.verifyCaller(session, signal), signal);
     assertNotCancelled(signal);
     assertCaller(resolvedCaller, now());
     // Host callbacks can return reused mutable objects: snapshot the authority
     // before any async redaction or approval can replace their properties.
     const caller: VerifiedUiAgentCaller = Object.freeze({ ...resolvedCaller });
     if (!windowId || windowId.length > 128) throw new Error('Invalid UI window identifier.');
-    const resolvedGrant = await cancellable(() => options.authorizeWindow(caller, windowId), signal);
+    const resolvedGrant = await cancellable(() => options.authorizeWindow(caller, windowId, signal), signal);
     assertNotCancelled(signal);
     const grant: UiAgentConsentGrant | null = resolvedGrant
       ? Object.freeze({ ...resolvedGrant,
@@ -208,7 +224,13 @@ export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
     }), signal);
     assertNotCancelled(signal);
     if (!response || response.status !== (method === 'GET' ? 200 : 202)) {
-      throw new Error('The approved UI window is unavailable or the requested action was denied.');
+      if (!response) throw new UiAgentAccessError('BACKEND_UNAVAILABLE',
+        'The approved UI window is unavailable or the requested action was denied.');
+      const code: UiAgentAccessErrorCode = response.status === 401 || response.status === 403
+        ? 'BACKEND_DENIED' : response.status === 404 ? 'WINDOW_CLOSED'
+        : response.status === 409 ? 'REVISION_CONFLICT' : 'BACKEND_UNAVAILABLE';
+      throw new UiAgentAccessError(code,
+        'The approved UI window is unavailable or the requested action was denied.', response.status);
     }
     return response;
   }
@@ -234,7 +256,7 @@ export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
       const snapshot = document !== null && typeof document === 'object' && 'snapshot' in document
         ? document.snapshot : undefined;
       const sanitized = await cancellable(
-        () => options.sanitizeSnapshot(current.caller, current.grant, snapshot), signal);
+        () => options.sanitizeSnapshot(current.caller, current.grant, snapshot, signal), signal);
       assertNotCancelled(signal);
       if (sanitized === undefined || sanitized === null) {
         throw new Error('UI snapshot redaction rejected the result.');
@@ -261,7 +283,7 @@ export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
       }
       current = await rechecked(session, current, 'action', signal);
       const approved = await cancellable(() => options.approveAction(
-        current.caller, current.grant, JSON.parse(capturedAction) as UiAgentActionRequest), signal);
+        current.caller, current.grant, JSON.parse(capturedAction) as UiAgentActionRequest, signal), signal);
       assertNotCancelled(signal);
       if (!approved) throw new Error('User approval for the exact UI action was denied.');
       current = await rechecked(session, current, 'action', signal);
@@ -316,9 +338,9 @@ export function createSessionScopedConsentedUiAgentAccess(
   });
   const access = createConsentedUiAgentAccess({
     ...options,
-    verifyCaller: async (handle) => {
+    verifyCaller: async (handle, signal) => {
       if (frontend.isDisposed()) return null;
-      const caller = await options.verifyCaller(handle);
+      const caller = await options.verifyCaller(handle, signal);
       if (!caller || frontend.isDisposed() || caller.userId !== expected.userId ||
           caller.appId !== expected.appId || caller.workspaceId !== expected.workspaceId ||
           caller.sessionId !== expected.sessionId ||
