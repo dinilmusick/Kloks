@@ -1,7 +1,7 @@
 # Consent adapter integration contract (Agent 11)
 This file documents the scoped implementation; it does not grant access or certify real browser E2E.
 
-Public API implementation: `createConsentedUiAgentAccess` in `uiSessionAgentAccess.ts`.
+Public APIs: `createConsentedUiAgentAccess` (host gateway) and `createSessionScopedConsentedUiAgentAccess` (recommended AppShell binding) in `uiSessionAgentAccess.ts`.
 **Package index export requires AppShell/consumer owner coordination.** Do not add a permissive fallback if unresolved.
 
 ## Trusted host dependencies (all required)
@@ -13,10 +13,15 @@ Public API implementation: `createConsentedUiAgentAccess` in `uiSessionAgentAcce
 - For action POST, window consumer MUST revalidate live session, active workspace, current advertised control, revision, grant/window liveness, and cancellation. HTTP 202 is a **queued receipt**, not execution success or rollback guarantee.
 
 ## AppShell / Agent Chat lifecycle
-- Bind one `FrontendSession` to the exact active Luth session and workspace scope. On sign-out, workspace switch, window closure, deployment withdrawal, or grant revoke, cancel in-flight requests using `trackAbortController`, dispose its subscriptions and clear local session-scope state.
+- Bind one `FrontendSession` to the exact active Luth session and workspace scope. Prefer `createSessionScopedConsentedUiAgentAccess(frontendSession, { userId, appId, workspaceId, appOrigin }, options)` with a **trusted** scope captured from the verified login. It rejects session/user/app/workspace/origin switches and automatically attaches abort controllers to `FrontendSession.trackAbortController`. On sign-out, workspace switch, window closure, deployment withdrawal, or grant revoke, dispose the relevant frontend scope and clear local session-scope state.
 - Never infer target from model output; choose the approved host-resolved window and grant generation. Rehydrate grants only from authenticated host authority, never an old serialized graph.
 - No cross-user, cross-session, cross-workspace or cross-window fallback. Propagate abort, refusal, backend denial and unavailable window; never return a fabricated successful click.
 - The graph/chat owner needs an `@kloks/aiko` package entry export, and the Kloks backend owner must enforce a target-side consent gate and propagate terminal action/cancellation semantics.
 
 ## Verification
 `pnpm --dir packages/aiko typecheck && pnpm --dir packages/aiko test`, backend disposal Vitest tests, architecture CI. Unit/target-simulation suites cover 2 users x 2 workspaces x 2 windows; they are **not real browser E2E**. External gate: run two authenticated real browser windows with production-matching Luth/AppShell and verify grant/revoke, expiry, closure, session switching and denied raw HTTP/MCP calls. Do not merge/certify until that gate is recorded.
+
+## Queue receipt and redacted snapshot boundaries
+- A sanitized snapshot is JSON-cloned and size-bounded before returning; callers cannot mutate the host-owned redaction object after the inspection to retroactively change its contents.
+- After a POST returns `202`, the adapter revalidates live Luth/session/window/grant authority **again** before returning a queued receipt. Revocation during POST yields a rejected promise, but a command might already be in the target queue; host/window consumer must abort it and report a terminal status. This adapter cannot roll back effects.
+- The scoped adapter uses structural `FrontendSession` methods instead of importing backend packages; it is a stable AppShell integration point and does not create a second identity/consent authority.
