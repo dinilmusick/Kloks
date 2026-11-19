@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   createConsentedUiAgentAccess, createSessionScopedConsentedUiAgentAccess,
+  UiAgentAccessError,
   type UiAgentFrontendSessionScope, type UiAgentVerifiedFrontendScope,
   type UiAgentAccessOptions, type UiAgentConsentGrant, type VerifiedUiAgentCaller,
 } from './uiSessionAgentAccess.js';
@@ -170,6 +171,47 @@ describe('session-scoped frontend agent consent lifecycle', () => {
       ...f.options, sanitizeSnapshot: () => ({ safe: 'x'.repeat(300000) }),
     });
     await expect(oversized.inspect('handle', 'window-A')).rejects.toThrow('response limit');
+  });
+
+  it('notifies a host approval prompt immediately when its frontend session is disposed', async () => {
+    const f = fixture();
+    let approvalEntered!: () => void;
+    const started = new Promise<void>(resolve => { approvalEntered = resolve; });
+    let approvalSignal: AbortSignal | undefined;
+    const access = createSessionScopedConsentedUiAgentAccess(f.frontend, pinned, {
+      ...f.options,
+      approveAction: (_caller, _grant, _action, signal) => {
+        approvalSignal = signal;
+        approvalEntered();
+        return new Promise<boolean>(() => {});
+      },
+    });
+    const pending = access.action('host-handle', 'window-A', {
+      revision, componentId: 'panel', controlId: 'click',
+    });
+    await started;
+    expect(approvalSignal?.aborted).toBe(false);
+    f.dispose();
+    expect(approvalSignal?.aborted).toBe(true);
+    await expect(pending).rejects.toThrow('cancelled');
+  });
+
+  it.each([
+    [401, 'BACKEND_DENIED'],
+    [403, 'BACKEND_DENIED'],
+    [404, 'WINDOW_CLOSED'],
+    [409, 'REVISION_CONFLICT'],
+    [503, 'BACKEND_UNAVAILABLE'],
+  ] as const)('propagates HTTP %i as a typed %s denial without backend contents', async (status, code) => {
+    const f = fixture();
+    const access = createConsentedUiAgentAccess({
+      ...f.options,
+      uiSession: async () => Response.json({ secret: 'do-not-expose', error: 'internal' }, { status }),
+    });
+    const caught = await access.inspect('handle', 'window-A').catch((error: unknown) => error);
+    expect(caught).toBeInstanceOf(UiAgentAccessError);
+    expect(caught).toMatchObject({ code, status });
+    expect((caught as Error).message).not.toContain('do-not-expose');
   });
 
   it('does not return a queued receipt if the grant is revoked during target dispatch', async () => {
