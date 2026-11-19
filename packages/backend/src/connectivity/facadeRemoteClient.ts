@@ -261,6 +261,8 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
       operationId: request.operationId, version: request.version,
       targetWorkspaceId: request.targetWorkspaceId, invocationId: request.invocationId, input,
     };
+    // The wire envelope itself counts toward the target's one-MiB body cap.
+    assertFacadeJsonInput(captured);
     const operation = { id: captured.operationId, version: captured.version };
     const body = await exchange(targetAppId, captured.targetWorkspaceId, operation, 'POST', captured, signal, deadlineAt);
     if (!body || typeof body !== 'object' || Array.isArray(body) ||
