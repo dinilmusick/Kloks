@@ -5,7 +5,7 @@ const required = [
   "id-token: write",
   "registry-url: https://registry.npmjs.org/",
   "npm install --global npm@latest",
-  "npm publish "$archive" --provenance --access public",
+  'npm publish "$archive" --provenance --access public',
   "workflow_dispatch:",
 ];
 for (const value of required) {
