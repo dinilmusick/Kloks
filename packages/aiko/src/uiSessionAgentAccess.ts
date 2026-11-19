@@ -120,6 +120,18 @@ function canonicalAction(input: UiAgentActionRequest): string {
   }
   return serialized;
 }
+/** Defensive JSON copy: return only redacted, size-bounded data, never a mutable host object. */
+function isolatedSnapshot(value: unknown): unknown {
+  let json: string | undefined;
+  try { json = JSON.stringify(value); } catch {
+    throw new Error('UI snapshot redaction must return serializable JSON.');
+  }
+  if (!json || new TextEncoder().encode(json).byteLength > 256 * 1024) {
+    throw new Error('UI snapshot redaction exceeds the session response limit.');
+  }
+  return JSON.parse(json) as unknown;
+}
+
 /** Never reuse consent across users, sessions, workspaces, apps or tabs. */
 export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
   const now = options.now ?? Date.now;
@@ -227,9 +239,11 @@ export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
       if (sanitized === undefined || sanitized === null) {
         throw new Error('UI snapshot redaction rejected the result.');
       }
+      const isolated = isolatedSnapshot(sanitized);
+      assertNotCancelled(signal);
       // Never return a snapshot captured before sign-out, switch, revoke or close.
       await rechecked(session, current, 'inspect', signal);
-      return { windowId, revision, snapshot: sanitized };
+      return { windowId, revision, snapshot: isolated };
     },
     async action(session: unknown, windowId: string, input: UiAgentActionRequest,
       signal?: AbortSignal) {
@@ -256,14 +270,86 @@ export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
       // must be cancelled by the host UI action consumer, not this overlay.
       const response = await callUi(
         current, 'POST', JSON.parse(capturedAction) as UiAgentActionRequest, signal);
-      const result: unknown = await response.json();
+      const result: unknown = await cancellable(() => response.json(), signal);
       assertNotCancelled(signal);
+      // An accepted queue receipt is not permission to disclose an action result
+      // after the host has signed out, switched scope or revoked the grant.
+      await rechecked(session, current, 'action', signal);
       const actionId = result !== null && typeof result === 'object' && 'actionId' in result
         ? result.actionId : undefined;
       if (typeof actionId !== 'string' || !uuidV4.test(actionId)) {
         throw new Error('UI action acceptance receipt is invalid.');
       }
       return { windowId, status: 'queued' as const, actionId };
+    },
+  });
+}
+
+/** The minimal FrontendSession contract; avoids a circular backend→Aiko dependency. */
+export interface UiAgentFrontendSessionScope {
+  readonly sessionId: string;
+  isDisposed(): boolean;
+  trackAbortController(controller: AbortController): () => void;
+}
+
+export type UiAgentVerifiedFrontendScope = Readonly<Pick<VerifiedUiAgentCaller,
+  'userId' | 'appId' | 'workspaceId' | 'appOrigin'>>;
+
+/**
+ * AppShell binding: scope every operation to a single trusted live frontend
+ * session and fixed workspace. Disposing FrontendSession cancels all in-flight
+ * inspections/approvals; even a reused model handle cannot change the caller.
+ * The host must still verify Luth and live windows independently at the target.
+ */
+export function createSessionScopedConsentedUiAgentAccess(
+  frontend: UiAgentFrontendSessionScope,
+  scope: UiAgentVerifiedFrontendScope,
+  options: UiAgentAccessOptions,
+) {
+  if (!frontend?.sessionId?.trim() || frontend.isDisposed() ||
+      !scope?.userId?.trim() || !scope.appId?.trim() || !scope.workspaceId?.trim()) {
+    throw new Error('A live, trusted frontend session scope is required.');
+  }
+  const expected = Object.freeze({
+    userId: scope.userId, appId: scope.appId, workspaceId: scope.workspaceId,
+    sessionId: frontend.sessionId, appOrigin: baseUrl(scope.appOrigin).origin,
+  });
+  const access = createConsentedUiAgentAccess({
+    ...options,
+    verifyCaller: async (handle) => {
+      if (frontend.isDisposed()) return null;
+      const caller = await options.verifyCaller(handle);
+      if (!caller || frontend.isDisposed() || caller.userId !== expected.userId ||
+          caller.appId !== expected.appId || caller.workspaceId !== expected.workspaceId ||
+          caller.sessionId !== expected.sessionId ||
+          baseUrl(caller.appOrigin).origin !== expected.appOrigin) return null;
+      return caller;
+    },
+  });
+
+  async function inScope<T>(run: (signal: AbortSignal) => Promise<T>,
+    outer?: AbortSignal): Promise<T> {
+    if (frontend.isDisposed()) throw new Error('UI session operation cancelled: scope disposed.');
+    const controller = new AbortController();
+    const unregister = frontend.trackAbortController(controller);
+    const forwardAbort = () => controller.abort();
+    if (outer?.aborted) controller.abort();
+    else outer?.addEventListener('abort', forwardAbort, { once: true });
+    try {
+      assertNotCancelled(controller.signal);
+      return await run(controller.signal);
+    } finally {
+      outer?.removeEventListener('abort', forwardAbort);
+      unregister();
+    }
+  }
+  return Object.freeze({
+    inspect(handle: unknown, windowId: string, signal?: AbortSignal) {
+      return inScope(current => access.inspect(handle, windowId, current), signal);
+    },
+    action(handle: unknown, windowId: string, input: UiAgentActionRequest,
+      signal?: AbortSignal) {
+      return inScope(current => access.action(handle, windowId, input, current), signal);
     },
   });
 }
