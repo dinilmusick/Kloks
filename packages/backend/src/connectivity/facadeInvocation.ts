@@ -185,7 +185,10 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
     const admittedRequest: FacadeInvocation = {
       operationId: request.operationId, version: request.version,
       targetWorkspaceId: request.targetWorkspaceId, invocationId: request.invocationId,
-      input: request.input,
+      input: (() => {
+        try { return structuredClone(request.input); }
+        catch { return fail('MALFORMED_INPUT', 400); }
+      })(),
     };
     const proofContext: FacadeInvocationAuthorityContext = Object.freeze({
       operationId: admittedRequest.operationId, version: admittedRequest.version,
