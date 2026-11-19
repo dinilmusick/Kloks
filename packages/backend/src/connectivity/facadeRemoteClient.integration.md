@@ -211,3 +211,11 @@ closed. Consumers should call discoverPinned once for each independently
 authorized Skipo deployment they intend to display, rather than merge
 operations from unrelated deployments into one anonymous application entry.
 The returned pinned handle is passed unchanged to invokePinned.
+
+**Upstream catalog enumeration limitation:** Skipo #208's list() currently
+deduplicates rows by static capability ID across deployments. When multiple
+verified instances publish the same ID, only one may appear in that list.
+Kloks does NOT bypass this by trusting raw deployment URLs or arbitrary UUIDs:
+a requested hidden instance is denied until Skipo exposes a genuinely
+authenticated per-instance catalog/resolution authority. This is a Skipo
+registry interface requirement, not a reason to relax Kloks authorization.
