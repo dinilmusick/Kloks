@@ -341,4 +341,45 @@ describe('Skipo/Luth-authorized cross-app remote facade client', () => {
       output: { result: 7 }, invocationId: 'pinned-immutable-1',
     });
   });
+
+  it('hides any static endpoint not reauthorized against the exact Skipo capability revision', async () => {
+    const { options, state, fetcher } = harness();
+    state.deployment.deploymentId = '11111111-1111-4111-8111-111111111111';
+    const original = options.resolveDeployment;
+    let operationChecks = 0;
+    const client = createFacadeRemoteClient({
+      ...options,
+      resolveDeployment: async (targetApp, targetWorkspace, selected, signal, pinned) => {
+        if (selected) { operationChecks++; return null; } // Current Skipo ACL revoked.
+        return original(targetApp, targetWorkspace, selected, signal, pinned);
+      },
+    });
+    await expect(client.discoverPinned(app, workspace)).resolves.toEqual([]);
+    expect(operationChecks).toBe(1);
+    expect(fetcher).toHaveBeenCalledTimes(1); // Only authenticated catalog fetch.
+  });
+
+  it('rejects unpinnable host identities before issuing a one-use Luth credential', async () => {
+    const { client, state, fetcher } = harness();
+    await expect(client.discoverPinned(app, workspace))
+      .rejects.toMatchObject({ code: 'DEPLOYMENT_UNAVAILABLE' });
+    expect(state.credentialCalls).toBe(0);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('keeps per-operation Skipo discovery checks within the inherited deadline', async () => {
+    const { options, state, fetcher } = harness();
+    state.deployment.deploymentId = '11111111-1111-4111-8111-111111111111';
+    const original = options.resolveDeployment;
+    const client = createFacadeRemoteClient({
+      ...options, maxRequestMs: 65,
+      resolveDeployment: async (targetApp, targetWorkspace, operation, signal, pinned) => {
+        if (operation) return new Promise(() => undefined); // Simulated stuck registry.
+        return original(targetApp, targetWorkspace, operation, signal, pinned);
+      },
+    });
+    await expect(client.discoverPinned(app, workspace))
+      .rejects.toMatchObject({ code: 'DEADLINE_EXCEEDED' });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
 });
