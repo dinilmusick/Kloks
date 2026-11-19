@@ -198,7 +198,11 @@ export function createOAuthBff(config: OAuthBffConfig) {
     const code = url.searchParams.get('code') || '';
     const expected = exactCookie(request, cookieName(config, 'flow'));
     if (!expected || !sameValue(state, expected) || !/^[A-Za-z0-9_-]{43}$/.test(state) ||
-        url.searchParams.get('iss') !== config.issuer || !/^[A-Za-z0-9._~-]{16,2048}$/.test(code) ||
+        url.searchParams.get('iss') !== config.issuer ||
+        url.searchParams.getAll('iss').length !== 1 ||
+        url.searchParams.getAll('state').length !== 1 ||
+        url.searchParams.getAll('code').length !== 1 ||
+        !/^[A-Za-z0-9._~-]{16,2048}$/.test(code) ||
         url.searchParams.has('error')) {
       const response = reply({ error: 'OAUTH_CALLBACK_REJECTED' }, 400);
       response.headers.append('set-cookie', clearCookie(config, 'flow'));
