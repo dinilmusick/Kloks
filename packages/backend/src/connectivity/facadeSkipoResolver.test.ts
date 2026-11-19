@@ -236,4 +236,13 @@ describe('Skipo #208 verified capability resolution into Kloks remote HTTP bound
     await expect(resolveDeployment('app-b', 'workspace-B', undefined, signal, deploymentId))
       .resolves.toBeNull();
   });
+
+  it('refuses a FOD workflow handle on Skipo static-capability resolution', async () => {
+    const { resolveDeployment, state } = fixture();
+    await expect(resolveDeployment('app-b', 'workspace-B', {
+      id: 'math.add', version: '2', kind: 'workflow',
+    }, new AbortController().signal)).resolves.toBeNull();
+    expect(state.resolved).toBe(0);
+    expect(state.listed).toBe(0);
+  });
 });
