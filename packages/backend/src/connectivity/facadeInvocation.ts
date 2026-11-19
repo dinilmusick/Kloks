@@ -53,6 +53,17 @@ export interface FacadeInvocationAuthorityContext {
   readonly transport: FacadeTransport;
 }
 
+/**
+ * Trusted owning-app FOD execution context. Target-side admitted, never
+ * sourced from untrusted invocation JSON; contains no bearer/receipt.
+ */
+export interface FacadeTrustedWorkflowContext {
+  readonly targetAppId: string;
+  readonly caller: Readonly<VerifiedFacadeCaller>;
+  readonly authority: Readonly<FacadeInvocationAuthorityContext>;
+  readonly operation: Readonly<FacadeOperationDescriptor>;
+}
+
 export interface FacadeDecision {
   caller: Readonly<VerifiedFacadeCaller>;
   operation: Readonly<FacadeOperationDescriptor>;
@@ -86,8 +97,14 @@ export interface FacadeInvocationOptions {
   deploymentEligible: (decision: FacadeDecision) => Promise<boolean>;
   /** Durable, atomic replay rejection and shared work-budget debit. No in-memory fallback. */
   consumeInvocation: (caller: VerifiedFacadeCaller, invocationId: string, context: Readonly<FacadeInvocationAuthorityContext>) => Promise<boolean>;
-  /** Resolve the workflow from its owning workspace, then invoke via existing FOD runtime. */
-  invokePublishedWorkflow: (reference: { workspaceId: string; workflowId: string; version: string }, input: unknown, signal: AbortSignal) => Promise<unknown>;
+  /**
+   * Execute via owning request-bound FOD runtime using this already admitted
+   * caller/context. Never consume the original Luth bearer again.
+   */
+  invokePublishedWorkflow: (
+    reference: { workspaceId: string; workflowId: string; version: string },
+    input: unknown, signal: AbortSignal, context: Readonly<FacadeTrustedWorkflowContext>,
+  ) => Promise<unknown>;
   /** Issue a new Luth-verifiable, audience-scoped delegated credential after atomic budget reservation. */
   delegateCredential: (caller: VerifiedFacadeCaller, targetAppId: string, invocationId: string, signal?: AbortSignal) => Promise<string>;
 }
@@ -293,9 +310,10 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
     const verified = await boundedAuthority(
       () => callerFor(credential, proofContext), initialDeadline, signal,
     );
-    const caller: VerifiedFacadeCaller = {
-      ...verified, invoker: { ...verified.invoker }, chain: [...verified.chain],
-    };
+    const caller: VerifiedFacadeCaller = Object.freeze({
+      ...verified, invoker: Object.freeze({ ...verified.invoker }),
+      chain: Object.freeze([...verified.chain]),
+    });
     const deadline = Math.min(initialDeadline, caller.deadlineAt, caller.expiresAt);
     const rows = await boundedAuthority(() => options.listCurrentOperations(workspaceId), deadline, signal);
     if (!Array.isArray(rows) || rows.length > 1000) fail('CATALOG_UNAVAILABLE', 503);
@@ -357,9 +375,10 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
     const verified = await boundedAuthority(() => callerFor(credential, proofContext), initialDeadline, parentSignal);
     // Snapshot the signed caller so a host adapter cannot mutate the original
     // object during a long-running operation and bypass the final identity check.
-    const caller: VerifiedFacadeCaller = {
-      ...verified, invoker: { ...verified.invoker }, chain: [...verified.chain],
-    };
+    const caller: VerifiedFacadeCaller = Object.freeze({
+      ...verified, invoker: Object.freeze({ ...verified.invoker }),
+      chain: Object.freeze([...verified.chain]),
+    });
     const preflightDeadline = Math.min(initialDeadline, caller.deadlineAt, caller.expiresAt);
     const current = await boundedAuthority(
       () => options.listCurrentOperations(admittedRequest.targetWorkspaceId), preflightDeadline, parentSignal,
@@ -401,7 +420,13 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
       const work = async () => {
         if (controller.signal.aborted) throw abortError();
         if (operation.kind === 'workflow') {
-          return options.invokePublishedWorkflow({ workspaceId: operation.targetWorkspaceId, workflowId: operation.workflowId!, version: operation.version }, admittedRequest.input, controller.signal);
+          const executionContext: FacadeTrustedWorkflowContext = Object.freeze({
+            targetAppId: options.targetAppId, caller, authority: proofContext, operation,
+          });
+          return options.invokePublishedWorkflow(
+            { workspaceId: operation.targetWorkspaceId, workflowId: operation.workflowId!, version: operation.version },
+            admittedRequest.input, controller.signal, executionContext,
+          );
         }
         const services = options.facade.services as Record<string, unknown>;
         if (!own(services, operation.serviceId!)) fail('OPERATION_UNAVAILABLE', 404);
