@@ -44,24 +44,35 @@ export interface FacadeInvocation {
   input: unknown;
 }
 
+/** Immutable operation identity passed to Luth admission, output revalidation and atomic replay/budget authority. */
+export interface FacadeInvocationAuthorityContext {
+  readonly operationId: string;
+  readonly version: string;
+  readonly targetWorkspaceId: string;
+  readonly invocationId: string;
+  readonly transport: FacadeTransport;
+}
+
 export interface FacadeDecision {
   caller: Readonly<VerifiedFacadeCaller>;
   operation: Readonly<FacadeOperationDescriptor>;
   transport: FacadeTransport;
+  /** Durable, authority-verified invocation correlation; never taken from caller claims. */
+  invocationId?: string;
 }
 
 export interface FacadeInvocationOptions {
   targetAppId: string;
   facade: BackendFacade;
   /** Must validate Luth signature, audience, session status, revocation and delegation chain at each use. */
-  verifyLuthCredential: (credential: string, targetAudience: string) => Promise<VerifiedFacadeCaller | null>;
+  verifyLuthCredential: (credential: string, targetAudience: string, context?: Readonly<FacadeInvocationAuthorityContext>) => Promise<VerifiedFacadeCaller | null>;
   /**
    * Fresh, NON-CONSUMING Luth/session authority check for an already admitted caller.
    * Must validate the live session, delegation/grant revocation, target app and
    * audience against trusted state; must NEVER introspect or replay the one-use
    * admission bearer. Return the current trusted identity or null.
    */
-  revalidateLuthCaller: (admitted: Readonly<VerifiedFacadeCaller>, targetAudience: string) => Promise<VerifiedFacadeCaller | null>;
+  revalidateLuthCaller: (admitted: Readonly<VerifiedFacadeCaller>, targetAudience: string, context: Readonly<FacadeInvocationAuthorityContext>) => Promise<VerifiedFacadeCaller | null>;
   /** Must return only current static definitions and explicitly published workflow references. */
   listCurrentOperations: (workspaceId: string) => Promise<FacadeOperationDescriptor[]>;
   /** Must re-read current owner, publication, ACL, grant, scopes, input and output rules. */
@@ -69,7 +80,7 @@ export interface FacadeInvocationOptions {
   /** Must verify registry attestation, active lease, environment and target-workspace access. */
   deploymentEligible: (decision: FacadeDecision) => Promise<boolean>;
   /** Durable, atomic replay rejection and shared work-budget debit. No in-memory fallback. */
-  consumeInvocation: (caller: VerifiedFacadeCaller, invocationId: string) => Promise<boolean>;
+  consumeInvocation: (caller: VerifiedFacadeCaller, invocationId: string, context: Readonly<FacadeInvocationAuthorityContext>) => Promise<boolean>;
   /** Resolve the workflow from its owning workspace, then invoke via existing FOD runtime. */
   invokePublishedWorkflow: (reference: { workspaceId: string; workflowId: string; version: string }, input: unknown, signal: AbortSignal) => Promise<unknown>;
   /** Issue a new Luth-verifiable, audience-scoped delegated credential after atomic budget reservation. */
@@ -134,9 +145,9 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
     if (typeof options[name] !== 'function') throw new Error(`Missing required facade authority: ${name}`);
   }
 
-  async function callerFor(credential: string): Promise<VerifiedFacadeCaller> {
+  async function callerFor(credential: string, context?: Readonly<FacadeInvocationAuthorityContext>): Promise<VerifiedFacadeCaller> {
     if (!credential || typeof credential !== 'string') fail('AUTH_REQUIRED', 401);
-    const caller = await options.verifyLuthCredential(credential, options.targetAppId);
+    const caller = await options.verifyLuthCredential(credential, options.targetAppId, context);
     if (!caller || !validId(caller.principalId) || !validId(caller.sourceAppId) ||
         !validId(caller.sourceWorkspaceId) || !validId(caller.sessionId) ||
         caller.audience !== options.targetAppId || !validId(caller.invoker?.id) ||
@@ -169,21 +180,34 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
 
   async function invoke(credential: string, request: FacadeInvocation, transport: FacadeTransport, parentSignal?: AbortSignal) {
     assertInvocation(request);
-    const verified = await callerFor(credential);
+    // Snapshot the input handle so caller-side mutation cannot change the target
+    // workspace, immutable revision or invocation correlation during execution.
+    const admittedRequest: FacadeInvocation = {
+      operationId: request.operationId, version: request.version,
+      targetWorkspaceId: request.targetWorkspaceId, invocationId: request.invocationId,
+      input: request.input,
+    };
+    const proofContext: FacadeInvocationAuthorityContext = Object.freeze({
+      operationId: admittedRequest.operationId, version: admittedRequest.version,
+      targetWorkspaceId: admittedRequest.targetWorkspaceId,
+      invocationId: admittedRequest.invocationId, transport,
+    });
+    const verified = await callerFor(credential, proofContext);
     // Snapshot the signed caller so a host adapter cannot mutate the original
     // object during a long-running operation and bypass the final identity check.
     const caller: VerifiedFacadeCaller = {
       ...verified, invoker: { ...verified.invoker }, chain: [...verified.chain],
     };
-    const current = await options.listCurrentOperations(request.targetWorkspaceId);
-    const operation = current.find(op => assertDescriptor(op) && op.id === request.operationId &&
-      op.targetWorkspaceId === request.targetWorkspaceId && op.version === request.version);
+    const current = await options.listCurrentOperations(admittedRequest.targetWorkspaceId);
+    const matching = current.find(op => assertDescriptor(op) && op.id === admittedRequest.operationId &&
+      op.targetWorkspaceId === admittedRequest.targetWorkspaceId && op.version === admittedRequest.version);
+    const operation = matching && Object.freeze({ ...matching });
     if (!operation) fail('OPERATION_UNAVAILABLE', 404);
-    const decision = { caller, operation, transport };
+    const decision = { caller, operation, transport, invocationId: admittedRequest.invocationId };
     if (!await options.deploymentEligible(decision)) fail('DEPLOYMENT_UNAVAILABLE', 503);
-    if (!await options.authorize(decision, 'invoke', request.input)) fail('ACCESS_DENIED');
+    if (!await options.authorize(decision, 'invoke', admittedRequest.input)) fail('ACCESS_DENIED');
     // This must be backed by durable atomic state, not a per-process Set.
-    if (!await options.consumeInvocation(caller, request.invocationId)) fail('REPLAY_OR_BUDGET_EXHAUSTED', 409);
+    if (!await options.consumeInvocation(caller, admittedRequest.invocationId, proofContext)) fail('REPLAY_OR_BUDGET_EXHAUSTED', 409);
 
     const controller = new AbortController();
     const deadline = Math.min(caller.deadlineAt, caller.expiresAt, Date.now() + 30_000);
@@ -203,13 +227,13 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
       });
       const work = async () => {
         if (operation.kind === 'workflow') {
-          return options.invokePublishedWorkflow({ workspaceId: operation.targetWorkspaceId, workflowId: operation.workflowId!, version: operation.version }, request.input, controller.signal);
+          return options.invokePublishedWorkflow({ workspaceId: operation.targetWorkspaceId, workflowId: operation.workflowId!, version: operation.version }, admittedRequest.input, controller.signal);
         }
         const services = options.facade.services as Record<string, unknown>;
         if (!own(services, operation.serviceId!)) fail('OPERATION_UNAVAILABLE', 404);
         const service = services[operation.serviceId!] as { execute?: (name: string, input: unknown, context?: unknown) => unknown };
         if (typeof service?.execute !== 'function') fail('OPERATION_UNAVAILABLE', 404);
-        return service.execute(operation.serviceOperation!, request.input, { signal: controller.signal, transport });
+        return service.execute(operation.serviceOperation!, admittedRequest.input, { signal: controller.signal, transport });
       };
       const output = await Promise.race([work(), stopped]);
       // Do not release an output based solely on the authorization made before execution.
@@ -218,21 +242,21 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
       // Luth invocation bearers are single-use: a second consuming introspection
       // would reject every legitimate result. Consult a distinct non-consuming
       // live Luth/session authority instead; fail closed if it is unavailable.
-      const currentCaller = await options.revalidateLuthCaller(caller, options.targetAppId);
+      const currentCaller = await options.revalidateLuthCaller(caller, options.targetAppId, proofContext);
       if (!currentCaller || !currentCaller.invoker || !Array.isArray(currentCaller.chain) ||
         !Number.isFinite(currentCaller.expiresAt) || currentCaller.expiresAt <= Date.now() ||
         !Number.isFinite(currentCaller.deadlineAt) || currentCaller.deadlineAt <= Date.now() ||
         currentCaller.audience !== options.targetAppId) fail('AUTH_INVALID', 401);
       if (!sameCallerIdentity(caller, currentCaller)) fail('CALLER_CHANGED', 401);
-      const currentOperations = await options.listCurrentOperations(request.targetWorkspaceId);
+      const currentOperations = await options.listCurrentOperations(admittedRequest.targetWorkspaceId);
       if (!currentOperations.some(op => assertDescriptor(op) && sameDispatchReference(operation, op))) {
         fail('OPERATION_REVOKED', 403);
       }
-      const currentDecision: FacadeDecision = { caller: currentCaller, operation, transport };
+      const currentDecision: FacadeDecision = { caller: currentCaller, operation, transport, invocationId: admittedRequest.invocationId };
       if (!await options.deploymentEligible(currentDecision)) fail('DEPLOYMENT_UNAVAILABLE', 503);
       if (!await options.authorize(currentDecision, 'output', output)) fail('ACCESS_REVOKED');
       if (controller.signal.aborted) throw abortError();
-      return { output, replyTo: { ...currentCaller.invoker }, invocationId: request.invocationId };
+      return { output, replyTo: { ...currentCaller.invoker }, invocationId: admittedRequest.invocationId };
     } finally {
       if (timer) clearTimeout(timer);
       parentSignal?.removeEventListener('abort', abort);
