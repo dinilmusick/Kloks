@@ -61,7 +61,7 @@ try {
   }
   // Check the first available future patch without publishing or mutating manifests.
   // A network/auth/registry failure must never be interpreted as an unused version.
-  const matched = /^(\\d+)\\.(\\d+)\\.(\\d+)$/.exec(current.version);
+  const matched = /^(\d+)\.(\d+)\.(\d+)$/.exec(current.version);
   let nextUnusedPatch = null;
   if (matched) {
     for (let attempt = 1; attempt <= 30; attempt++) {
