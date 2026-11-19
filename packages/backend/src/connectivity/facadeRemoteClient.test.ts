@@ -260,4 +260,85 @@ describe('Skipo/Luth-authorized cross-app remote facade client', () => {
       invocationId: 'immutable-remote',
     });
   });
+
+  it('returns a persistable static Skipo handle with exact verified deployment UUID and can invoke it', async () => {
+    const { client, state, fetcher } = harness();
+    const deploymentId = '11111111-1111-4111-8111-111111111111';
+    state.deployment.deploymentId = deploymentId;
+    const pinned = await client.discoverPinned(app, workspace);
+    expect(pinned).toEqual([{
+      id: 'Math.add', version: 'v1', name: 'Addition', kind: 'static',
+      appId: app, targetWorkspaceId: workspace, environment: 'production',
+      deploymentId,
+    }]);
+    const output = await client.invokePinned(pinned[0], { a: 5, b: 8 }, 'pinned-static-1');
+    expect(output).toEqual({ output: { result: 13 }, invocationId: 'pinned-static-1' });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    const body = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body)) as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual([
+      'input', 'invocationId', 'operationId', 'targetWorkspaceId', 'version',
+    ]);
+    expect(JSON.stringify(body)).not.toContain('deploymentId');
+    expect(JSON.stringify(body)).not.toContain('appId');
+  });
+
+  it('does not silently retarget a saved graph capability when Skipo selects a new same-app instance', async () => {
+    const { client, state, fetcher } = harness();
+    state.deployment.deploymentId = '11111111-1111-4111-8111-111111111111';
+    const [handle] = await client.discoverPinned(app, workspace);
+    const credentialsBefore = state.credentialCalls;
+    state.deployment.deploymentId = '22222222-2222-4222-8222-222222222222';
+    await expect(client.invokePinned(handle, { a: 1, b: 1 }, 'stale-pinned-instance'))
+      .rejects.toMatchObject({ code: 'DEPLOYMENT_UNAVAILABLE' });
+    expect(state.credentialCalls).toBe(credentialsBefore);
+    expect(fetcher).toHaveBeenCalledTimes(1); // Discovery only.
+  });
+
+  it('denies malformed, cross-environment and workflow-shaped pinned capability handles before lookup', async () => {
+    const { client, state, fetcher } = harness();
+    state.deployment.deploymentId = '11111111-1111-4111-8111-111111111111';
+    const [handle] = await client.discoverPinned(app, workspace);
+    const credentialsBefore = state.credentialCalls;
+    for (const forged of [
+      { ...handle, deploymentId: 'not-a-uuid' },
+      { ...handle, environment: 'staging' },
+      { ...handle, kind: 'workflow' as const },
+      { ...handle, targetWorkspaceId: '../workspace' },
+    ]) {
+      await expect(client.invokePinned(forged as typeof handle, { a: 1, b: 1 }, 'pinned-forged'))
+        .rejects.toMatchObject({ code: 'MALFORMED_HANDLE' });
+    }
+    expect(state.credentialCalls).toBe(credentialsBefore);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('enforces pinned version and target owner grant independently on the target', async () => {
+    const { client, state, fetcher } = harness();
+    state.deployment.deploymentId = '11111111-1111-4111-8111-111111111111';
+    const [handle] = await client.discoverPinned(app, workspace);
+    state.currentVersion = 'v2';
+    await expect(client.invokePinned(handle, { a: 2, b: 2 }, 'pinned-retired-version'))
+      .rejects.toMatchObject({ code: 'OPERATION_UNAVAILABLE' });
+    state.currentVersion = 'v1';
+    state.authorized = false;
+    await expect(client.invokePinned(handle, { a: 2, b: 2 }, 'pinned-revoked-grant'))
+      .rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+
+  it('snapshots a saved graph handle and nested input before any asynchronous source lookup', async () => {
+    const { client, state } = harness();
+    state.deployment.deploymentId = '11111111-1111-4111-8111-111111111111';
+    const [handle] = await client.discoverPinned(app, workspace);
+    const mutable = { ...handle };
+    const input = { a: 3, b: 4 };
+    const pending = client.invokePinned(mutable, input, 'pinned-immutable-1');
+    mutable.deploymentId = '22222222-2222-4222-8222-222222222222';
+    mutable.appId = 'wrong-target';
+    mutable.version = 'v2';
+    input.a = 9000;
+    await expect(pending).resolves.toEqual({
+      output: { result: 7 }, invocationId: 'pinned-immutable-1',
+    });
+  });
 });
