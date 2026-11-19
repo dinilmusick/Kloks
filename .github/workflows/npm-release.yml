@@ -1,19 +1,13 @@
 name: npm Release
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
     inputs:
       publish:
-        description: "Publish the current package to npm"
+        description: "Explicitly approve publishing an unused package version (false = audit only)"
         required: true
         type: boolean
         default: false
-  release:
-    types: [published]
 
 permissions:
   contents: read
@@ -25,16 +19,23 @@ concurrency:
 
 jobs:
   publish:
-    if: >
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
-      (github.event_name == 'workflow_dispatch' && inputs.publish) ||
-      github.event_name == 'release'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - name: Check out main
+      - name: Check out the exact verified release commit
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Assert immutable verified commit
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          sha256sum package.json pnpm-lock.yaml
 
       - name: Set up Node.js for npm Trusted Publishing
         uses: actions/setup-node@v4
@@ -68,8 +69,38 @@ jobs:
       - name: Test
         run: pnpm run test
 
-      - name: Inspect package
-        run: npm pack --dry-run
+      - name: Verify actual packed package in independent Node and Worker consumers
+        run: node scripts/clean-room-boundary.mjs
+
+      - name: Embed approved exact-source release attestation
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          inputs.publish &&
+          steps.registry.outputs.exists == 'false'
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const sourceCommit = process.env.SOURCE_SHA;
+          if (!/^[0-9a-f]{40}$/.test(sourceCommit)) throw new Error('Invalid immutable release SHA');
+          fs.writeFileSync('.krusbl-release-attestation.json', JSON.stringify({
+            schema: 1,
+            packageName: pkg.name,
+            version: pkg.version,
+            sourceCommit,
+            releaseWorkflow: process.env.GITHUB_WORKFLOW,
+            workflowRunId: process.env.GITHUB_RUN_ID
+          }, null, 2) + '\n');
+          NODE
+
+      - name: Pack exact artifact once and retain its checksum
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ultrst-release"
+          npm pack --pack-destination "$RUNNER_TEMP/ultrst-release"
+          sha256sum "$RUNNER_TEMP/ultrst-release"/*.tgz
 
       - name: Read package metadata
         id: package
@@ -87,23 +118,44 @@ jobs:
           console.log("version=" + pkg.version);
           NODE
 
-      - name: Check whether this version is already published
+      - name: Check version uniqueness without mistaking a registry outage for absence
         id: registry
+        shell: bash
         env:
           PACKAGE_NAME: ${{ steps.package.outputs.name }}
           PACKAGE_VERSION: ${{ steps.package.outputs.version }}
         run: |
-          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
+          set -euo pipefail
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version --registry=https://registry.npmjs.org/ > "$RUNNER_TEMP/npm-version.out" 2> "$RUNNER_TEMP/npm-version.err"; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
+            echo "::notice::Immutable package version already exists; no publication will be attempted."
+          elif grep -Eq 'E404|404 Not Found' "$RUNNER_TEMP/npm-version.err"; then
             echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "npm registry failed for a reason other than a missing version. Publication is blocked." >&2
+            cat "$RUNNER_TEMP/npm-version.err" >&2
+            exit 1
           fi
 
-      - name: Publish with npm Trusted Publishing / OIDC
-        if: steps.registry.outputs.exists == 'false'
-        run: npm publish --provenance --access public
+      - name: Mark previously published versions as historical artifacts, not this source release
+        if: steps.registry.outputs.exists == 'true'
+        run: echo "::warning::Existing npm version is being verified, but was not built or published from this workflow SHA."
+
+      - name: Publish only on explicit approved main-branch dispatch
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          inputs.publish &&
+          steps.registry.outputs.exists == 'false'
+        run: |
+          set -euo pipefail
+          archive="$(find "$RUNNER_TEMP/ultrst-release" -maxdepth 1 -name '*.tgz' -print -quit)"
+          test -n "$archive"
+          npm publish "$archive" --provenance --access public
 
       - name: Independently verify downloadable npm tarball
+        if: >-
+          steps.registry.outputs.exists == 'true' ||
+          (github.event_name == 'workflow_dispatch' && inputs.publish)
         env:
           PACKAGE_NAME: ${{ steps.package.outputs.name }}
           PACKAGE_VERSION: ${{ steps.package.outputs.version }}
@@ -154,7 +206,11 @@ jobs:
           echo 'FATAL: npm metadata is visible, but package download/canonical exports remain unverified' >&2
           exit 1
       - name: Notify downstream consumers after successful upstream publication
-        if: success() && steps.registry.outputs.exists == 'false'
+        if: >-
+          success() &&
+          github.event_name == 'workflow_dispatch' &&
+          inputs.publish &&
+          steps.registry.outputs.exists == 'false'
         env:
           SYNC_TOKEN: ${{ secrets.ECOSYSTEM_SYNC_TOKEN }}
         shell: bash
