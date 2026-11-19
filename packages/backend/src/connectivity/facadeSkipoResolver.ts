@@ -100,6 +100,7 @@ export function createSkipoFacadeDeploymentResolver(options: SkipoFacadeResolver
     signal: AbortSignal, expectedDeploymentId?: string,
   ): Promise<VerifiedFacadeDeployment | null> {
     if (signal.aborted || !validApp(appId) || !validHandle(workspaceId) ||
+        operation?.kind === 'workflow' ||
         (expectedDeploymentId !== undefined && !validUUID(expectedDeploymentId)) ||
         (operation && (!validHandle(operation.id) || !parseRevision(operation.version)))) return null;
     try {
