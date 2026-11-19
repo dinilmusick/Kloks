@@ -83,8 +83,10 @@ function fixture() {
 describe('exact identity to Luth and atomic invocation authority', () => {
   it('binds admission, replay debit and output revalidation to the same immutable operation', async () => {
     const { boundary, request, state, scopes } = fixture();
+    const originalInput = request.input as { value: number };
     const result = boundary.invoke('one-use-bearer', request, 'graph');
     // Caller-controlled graph inputs can mutate while an async target executes.
+    originalInput.value = 999;
     request.operationId = 'math.withdraw';
     request.version = 'v8';
     request.targetWorkspaceId = 'workspace-other';
