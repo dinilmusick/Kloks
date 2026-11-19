@@ -31,10 +31,20 @@ jobs:
       github.event_name == 'release'
     runs-on: ubuntu-latest
     steps:
-      - name: Check out main
+      - name: Check out the exact verified release commit
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+
+      - name: Assert immutable verified commit
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          sha256sum package.json pnpm-lock.yaml
 
       - name: Set up Node.js for npm Trusted Publishing
         uses: actions/setup-node@v4
@@ -68,8 +78,11 @@ jobs:
       - name: Test
         run: pnpm run test
 
-      - name: Inspect package
-        run: npm pack --dry-run
+      - name: Verify actual packed package in independent Node and Worker consumers
+        run: node scripts/clean-room-boundary.mjs
+
+      - name: Record actual npm package candidate
+        run: npm pack --pack-destination "$RUNNER_TEMP"
 
       - name: Read package metadata
         id: package
@@ -87,17 +100,28 @@ jobs:
           console.log("version=" + pkg.version);
           NODE
 
-      - name: Check whether this version is already published
+      - name: Check version uniqueness without mistaking a registry outage for absence
         id: registry
+        shell: bash
         env:
           PACKAGE_NAME: ${{ steps.package.outputs.name }}
           PACKAGE_VERSION: ${{ steps.package.outputs.version }}
         run: |
-          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
+          set -euo pipefail
+          if npm view "${PACKAGE_NAME}@${PACKAGE_VERSION}" version --registry=https://registry.npmjs.org/ > "$RUNNER_TEMP/npm-version.out" 2> "$RUNNER_TEMP/npm-version.err"; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
+            echo "::notice::Immutable package version already exists; no publication will be attempted."
+          elif grep -Eq 'E404|404 Not Found' "$RUNNER_TEMP/npm-version.err"; then
             echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "npm registry failed for a reason other than a missing version. Publication is blocked." >&2
+            cat "$RUNNER_TEMP/npm-version.err" >&2
+            exit 1
           fi
+
+      - name: Mark previously published versions as historical artifacts, not this source release
+        if: steps.registry.outputs.exists == 'true'
+        run: echo "::warning::Existing npm version is being verified, but was not built or published from this workflow SHA."
 
       - name: Publish with npm Trusted Publishing / OIDC
         if: steps.registry.outputs.exists == 'false'
