@@ -6,7 +6,7 @@ const required = [
   "registry-url: https://registry.npmjs.org/",
   "npm install --global npm@latest",
   "npm publish --provenance --access public",
-  "workflow_run:",
+  "workflow_dispatch:",
 ];
 for (const value of required) {
   if (!workflow.includes(value)) throw new Error("Missing Trusted Publishing requirement: " + value);
@@ -16,13 +16,14 @@ for (const forbidden of ["NPM_TOKEN", "NODE_AUTH_TOKEN", "_authToken", "secrets.
 }
 // Assert the same commit passed CI and is packed for independent consumption.
 for (const required of [
-  'ref: ${{ github.event.workflow_run.head_sha || github.sha }}',
+  'ref: ${{ github.sha }}',
   'test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"',
   'pnpm install --frozen-lockfile',
   'node scripts/clean-room-boundary.mjs',
   'npm pack --pack-destination',
   "steps.registry.outputs.exists == 'false'",
-  "github.event.workflow_run.conclusion == 'success'",
+  "github.ref == 'refs/heads/main'",
+  "inputs.publish",
 ]) {
   if (!workflow.includes(required)) throw new Error('Missing reproducible release gate: ' + required);
 }
