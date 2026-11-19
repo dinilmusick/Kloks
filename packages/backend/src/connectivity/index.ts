@@ -32,3 +32,5 @@ export * from './facadeRemoteClient.js';
 export * from './facadeLuthAuthority.js';
 /** Server-side Skipo exact-revision, Luth-scoped deployment and lease resolver. */
 export * from './facadeSkipoResolver.js';
+/** Owning FOD publication/grant and verified Skipo workflow host integration. */
+export * from './facadeFodResolver.js';
