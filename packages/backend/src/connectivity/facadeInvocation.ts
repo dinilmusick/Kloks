@@ -135,6 +135,41 @@ function parseJson(body: Request): Promise<unknown> {
 }
 
 /**
+ * Bound admission and preflight authority lookups by the SAME absolute deadline.
+ * Auth checks may stall while a deployment or grant is being revoked. Their
+ * returned decisions must not outlive the request, even when the host ignores
+ * an aborted fetch. This utility does not itself cancel upstream authority I/O;
+ * hosts should honor any cancellation signals they receive separately.
+ */
+async function boundedAuthority<T>(
+  run: () => Promise<T>, deadlineAt: number, signal?: AbortSignal,
+): Promise<T> {
+  if (signal?.aborted) fail('CANCELLED', 408);
+  const remaining = deadlineAt - Date.now();
+  if (remaining <= 0) fail('DEADLINE_EXCEEDED', 408);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  try {
+    const stopped = new Promise<never>((_resolve, reject) => {
+      onAbort = () => reject(new FacadeInvocationDenied('CANCELLED', 408));
+      signal?.addEventListener('abort', onAbort, { once: true });
+      timer = setTimeout(() => reject(new FacadeInvocationDenied('DEADLINE_EXCEEDED', 408)), remaining);
+      if (signal?.aborted) onAbort();
+    });
+    return await Promise.race([
+      Promise.resolve().then(() => {
+        if (signal?.aborted) fail('CANCELLED', 408);
+        return run();
+      }),
+      stopped,
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    if (onAbort) signal?.removeEventListener('abort', onAbort);
+  }
+}
+
+/**
  * All four entry points call the same guard. No client-controlled user, app,
  * source workspace, parent caller or grant claim is accepted as authority.
  */
@@ -195,27 +230,37 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
       targetWorkspaceId: admittedRequest.targetWorkspaceId,
       invocationId: admittedRequest.invocationId, transport,
     });
-    const verified = await callerFor(credential, proofContext);
+    const initialDeadline = Date.now() + 30_000;
+    const verified = await boundedAuthority(() => callerFor(credential, proofContext), initialDeadline, parentSignal);
     // Snapshot the signed caller so a host adapter cannot mutate the original
     // object during a long-running operation and bypass the final identity check.
     const caller: VerifiedFacadeCaller = {
       ...verified, invoker: { ...verified.invoker }, chain: [...verified.chain],
     };
-    const current = await options.listCurrentOperations(admittedRequest.targetWorkspaceId);
+    const preflightDeadline = Math.min(initialDeadline, caller.deadlineAt, caller.expiresAt);
+    const current = await boundedAuthority(
+      () => options.listCurrentOperations(admittedRequest.targetWorkspaceId), preflightDeadline, parentSignal,
+    );
     const matching = current.find(op => assertDescriptor(op) && op.id === admittedRequest.operationId &&
       op.targetWorkspaceId === admittedRequest.targetWorkspaceId && op.version === admittedRequest.version);
     const operation = matching && Object.freeze({ ...matching });
     if (!operation) fail('OPERATION_UNAVAILABLE', 404);
     const decision = { caller, operation, transport, invocationId: admittedRequest.invocationId };
-    if (!await options.deploymentEligible(decision)) fail('DEPLOYMENT_UNAVAILABLE', 503);
-    if (!await options.authorize(decision, 'invoke', admittedRequest.input)) fail('ACCESS_DENIED');
+    if (!await boundedAuthority(() => options.deploymentEligible(decision), preflightDeadline, parentSignal)) {
+      fail('DEPLOYMENT_UNAVAILABLE', 503);
+    }
+    if (!await boundedAuthority(
+      () => options.authorize(decision, 'invoke', admittedRequest.input), preflightDeadline, parentSignal,
+    )) fail('ACCESS_DENIED');
     // Do not debit an already-cancelled call or dispatch side effects after cancellation.
     if (parentSignal?.aborted) fail('CANCELLED', 408);
     // This must be backed by durable atomic state, not a per-process Set.
-    if (!await options.consumeInvocation(caller, admittedRequest.invocationId, proofContext)) fail('REPLAY_OR_BUDGET_EXHAUSTED', 409);
+    if (!await boundedAuthority(
+      () => options.consumeInvocation(caller, admittedRequest.invocationId, proofContext), preflightDeadline, parentSignal,
+    )) fail('REPLAY_OR_BUDGET_EXHAUSTED', 409);
 
     const controller = new AbortController();
-    const deadline = Math.min(caller.deadlineAt, caller.expiresAt, Date.now() + 30_000);
+    const deadline = preflightDeadline;
     const remaining = deadline - Date.now();
     if (remaining <= 0) fail('DEADLINE_EXCEEDED', 408);
     const abort = () => controller.abort();
