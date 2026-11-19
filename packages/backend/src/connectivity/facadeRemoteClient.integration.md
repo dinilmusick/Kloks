@@ -94,3 +94,30 @@ The output receipt is consumed locally at most once; errors, timeout and revocat
 - Kloks FOD #124: 6eb1c4a49ab2edeadb1779b2a475b0c8d48ea615 — owner workflow and output-time grant contracts.
 
 The new facadeCrossAppContracts.integration.test.ts exercises Luth→Skipo→Kloks with two in-process application endpoints, authorization, revocation, retry/replay and concurrency. Its Luth and Skipo services use accurate staged response shapes but simulated endpoints: this is *not* a live OAuth/Neon dual-deployment certificate. Do not merge or deploy without coordinated upstream integration, real registered grants/registrar permissions and an independently witnessed two-user/two-deployment E2E.
+
+
+## Skipo verified deployment-instance binding (PR #208 follow-up)
+
+Skipo PR #208 added `CapabilitySelector.deploymentId?: string` and
+`resolveVerifiedCapabilityDeployment(..., deploymentId?)` so a capability
+selector can pin its **exact attested deployment UUID**, not merely application,
+environment, capability and revision. The corresponding source head is
+`f1f4bb4cffdd3e9482c19b4790b649d19dedd3bd`.
+
+The remote client now passes the original authenticated deployment ID into
+`resolveDeployment(..., expectedDeploymentId)` immediately before sending its
+one-use Luth proof **and again after execution before returning output**.
+`createSkipoFacadeDeploymentResolver` forwards the ID into Skipo
+`revalidate` as `selector.deploymentId` and independently rejects any
+mismatched ID returned by a registry adapter. For catalog discovery, the
+resolver filters the Skipo `list` result against the original deployment ID.
+The new argument is optional so host resolvers predating #208 still typecheck,
+but trusted deployments MUST be compared against the original handle at both
+post-admission checks. Missing, expired, switched or revoked exact instances
+fail closed; a newer instance with an identical app/capability/revision is
+**not** a permitted substitute. This does not add cross-deployment retries.
+
+The dedicated Skipo tests verify selectors `[undefined, originalDeploymentId,
+originalDeploymentId]`, wrong-instance substitution before network dispatch,
+wrong-instance substitution after execution, malformed UUID denial and
+cross-instance catalog-list substitution.
