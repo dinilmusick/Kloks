@@ -28,3 +28,5 @@ export * from './BackendClient.js';
 export * from './facadeInvocation.js';
 /** Attested Skipo deployment resolution and one-use Luth remote wire client. */
 export * from './facadeRemoteClient.js';
+/** Server-side Luth one-use admission and non-consuming output authority wire adapter. */
+export * from './facadeLuthAuthority.js';
