@@ -165,6 +165,13 @@ describe('FOD owner grant controls',()=>{
     });
     await runtime.saveFlow(flow('report'));
     await runtime.publishFlow('report');
+    // An expiry requested by the owner may not silently fall back to an
+    // indefinitely active grant until the N5 schema has an expiry authority.
+    await expect(runtime.grantFlow(
+      'report','aiko','aiko-workspace','2026-12-01T00:00:00Z',
+    )).rejects.toThrow(/verified durable expiry schema/);
+    expect(grants).toHaveLength(0);
+    expect(approvals).toHaveLength(0);
     const created=await runtime.grantFlow('report','aiko','aiko-workspace');
     expect(created).toEqual({
       workflowId:'report',version:1,callerAppId:'aiko',sourceWorkspaceId:'aiko-workspace',
