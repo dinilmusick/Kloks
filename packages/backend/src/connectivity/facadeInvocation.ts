@@ -154,24 +154,25 @@ export function assertFacadeJsonInput(value: unknown): void {
     if (item === null || typeof item === 'boolean') return;
     if (typeof item === 'number' && Number.isFinite(item)) return;
     if (typeof item !== 'object') fail('MALFORMED_INPUT', 400);
-    if (seen.has(item)) fail('MALFORMED_INPUT', 400);
-    seen.add(item);
+    const object = item as object;
+    if (seen.has(object)) fail('MALFORMED_INPUT', 400);
+    seen.add(object);
     if (Array.isArray(item)) {
       for (const child of item) visit(child, depth + 1);
     } else {
-      const proto = Object.getPrototypeOf(item);
+      const proto = Object.getPrototypeOf(object);
       if (proto !== Object.prototype && proto !== null) fail('MALFORMED_INPUT', 400);
-      for (const [key, child] of Object.entries(item)) {
+      for (const [key, child] of Object.entries(object)) {
         approximateStringUnits += key.length;
         if (approximateStringUnits > 1_048_576) fail('PAYLOAD_TOO_LARGE', 413);
         if (['__proto__', 'prototype', 'constructor'].includes(key)) fail('MALFORMED_INPUT', 400);
-        const descriptor = Object.getOwnPropertyDescriptor(item, key);
+        const descriptor = Object.getOwnPropertyDescriptor(object, key);
         if (!descriptor || !Object.hasOwn(descriptor, 'value')) fail('MALFORMED_INPUT', 400);
         visit(child, depth + 1);
       }
-      if (Reflect.ownKeys(item).length !== Object.keys(item).length) fail('MALFORMED_INPUT', 400);
+      if (Reflect.ownKeys(object).length !== Object.keys(object).length) fail('MALFORMED_INPUT', 400);
     }
-    seen.delete(item);
+    seen.delete(object);
   };
   visit(value, 0);
   let encoded: string | undefined;
