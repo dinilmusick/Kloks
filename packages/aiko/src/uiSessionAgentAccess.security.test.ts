@@ -48,7 +48,8 @@ function fixture() {
     if (!live) return Response.json({ error: 'closed' }, { status: 404 });
     if (req.method === 'GET') {
       return Response.json({ session: { revision: activeRevision,
-        snapshot: { safe: 'allowed', secret: 'credential' } } });
+        snapshot: { version: 1, components: [{ id: 'tiles', actions: ['select'] }],
+          safe: 'allowed', secret: 'credential' } } });
     }
     return Response.json({ actionId: receipt }, { status: 202 });
   });

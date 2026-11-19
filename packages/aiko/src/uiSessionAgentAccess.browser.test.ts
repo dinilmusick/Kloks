@@ -98,7 +98,8 @@ run('real browser windows with host-simulated Luth/target authority', () => {
               const control = await page.locator('#approved').textContent();
               return Response.json({
                 session: { revision: rev, snapshot: {
-                  control, secret: 'browser-secret-' + expected.userId,
+                  control, version: 1, components: [{ id: 'approved', actions: ['click'] }],
+                  secret: 'browser-secret-' + expected.userId,
                 } },
               });
             }

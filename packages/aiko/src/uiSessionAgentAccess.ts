@@ -235,6 +235,20 @@ export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
     return response;
   }
 
+  /** Verify a live advertised control before showing the human approval prompt. */
+  function advertisedControl(document: unknown, action: UiAgentActionRequest): boolean {
+    if (!document || typeof document !== 'object' || !('snapshot' in document)) return false;
+    const snapshot = document.snapshot;
+    if (!snapshot || typeof snapshot !== 'object' || !('version' in snapshot) ||
+        snapshot.version !== 1 || !('components' in snapshot) ||
+        !Array.isArray(snapshot.components)) return false;
+    return snapshot.components.some((component: unknown) =>
+      component !== null && typeof component === 'object' &&
+      'id' in component && component.id === action.componentId &&
+      'actions' in component && Array.isArray(component.actions) &&
+      component.actions.includes(action.controlId));
+  }
+
   async function readRevision(response: Response, signal?: AbortSignal) {
     const document: unknown = await cancellable(() => response.json(), signal);
     assertNotCancelled(signal);
@@ -280,6 +294,10 @@ export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
       const before = await readRevision(await callUi(current, 'GET', undefined, signal, 'action'), signal);
       if (before.revision !== input.revision) {
         throw new Error('UI action revision is stale.');
+      }
+      if (!advertisedControl(before.session, input)) {
+        throw new UiAgentAccessError('BACKEND_DENIED',
+          'The requested control is not advertised in this live UI snapshot.');
       }
       current = await rechecked(session, current, 'action', signal);
       const approved = await cancellable(() => options.approveAction(

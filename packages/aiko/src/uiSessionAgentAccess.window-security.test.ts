@@ -127,7 +127,9 @@ describe('independent consent boundary across users, workspaces and windows', ()
     };
     const controller = new AbortController();
     const backend = vi.fn(async (request: Request) => request.method === 'GET'
-      ? Response.json({ session: { revision, snapshot: {} } })
+      ? Response.json({ session: { revision, snapshot: {
+          version: 1, components: [{ id: 'card', actions: ['click'] }],
+        } } })
       : Response.json({ actionId: tabs.alice }, { status: 202 }));
     const access = createConsentedUiAgentAccess({
       now: () => 1000, verifyCaller: () => caller,

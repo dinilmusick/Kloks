@@ -28,7 +28,7 @@ function fixture() {
       const tab = new URL(request.url).pathname.split('/')[3];
       if (!grants.size || ![tabA,tabB].includes(tab)) return Response.json({}, {status:404});
       if (request.method === 'GET') return Response.json({session:{
-        revision:rev,snapshot:{visible:tab,secret:'must-not-leak'} }});
+        revision:rev,snapshot:{version:1,components:[{id:'tiles',actions:['select']}],visible:tab,secret:'must-not-leak'} }});
       return Response.json({actionId: 'd50e46e9-1c4b-4dfa-88fa-dc6a0f03297e'}, {status:202});
     },
   });
@@ -76,7 +76,7 @@ describe('consented UI agent access over existing Kloks UI session authority',()
       approveAction:()=>{ if(active) mutable.grants.delete('window-A');active=false;return true;},
       sanitizeSnapshot:()=>({}),
       uiSession:async(request)=> request.method === 'GET'
-        ? Response.json({session:{revision:rev,snapshot:{visible:'x'}}})
+        ? Response.json({session:{revision:rev,snapshot:{version:1,components:[{id:'tiles',actions:['select']}],visible:'x'}}})
         : Response.json({actionId:'d50e46e9-1c4b-4dfa-88fa-dc6a0f03297e'},{status:202}),
     });
     await expect(wrapped.action('alice-session','window-A',{

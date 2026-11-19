@@ -31,7 +31,8 @@ function fixture() {
   const uiSession = vi.fn(async (request: Request) => {
     calls.push(request);
     return request.method === 'GET'
-      ? Response.json({ session: { revision, snapshot: { safe: true, secret: 'must-redact' } } })
+      ? Response.json({ session: { revision, snapshot: { version: 1, components: [{ id: 'panel', actions: ['click'] }],
+        safe: true, secret: 'must-redact' } } })
       : Response.json({ actionId }, { status: 202 });
   });
   const options: UiAgentAccessOptions = {
@@ -220,7 +221,9 @@ describe('session-scoped frontend agent consent lifecycle', () => {
       ...f.options,
       uiSession: async request => {
         if (request.method === 'GET') {
-          return Response.json({ session: { revision, snapshot: { safe: true } } });
+          return Response.json({ session: { revision, snapshot: {
+            version: 1, components: [{ id: 'panel', actions: ['click'] }], safe: true,
+          } } });
         }
         f.grant(null);
         return Response.json({ actionId }, { status: 202 });

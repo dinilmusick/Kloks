@@ -30,3 +30,6 @@ Public APIs: `createConsentedUiAgentAccess` (host gateway) and `createSessionSco
 - `verifyCaller`, `authorizeWindow`, `sanitizeSnapshot`, and `approveAction` callbacks accept an optional `AbortSignal`. Hosts should propagate cancellation to network verification, live-window checks, redaction work and visible consent dialogs instead of only waiting for the adapter to reject.
 - Invalid/denied backend responses throw `UiAgentAccessError` with a stable `code`: `BACKEND_DENIED` (HTTP 401/403), `WINDOW_CLOSED` (404), `REVISION_CONFLICT` (409), or `BACKEND_UNAVAILABLE` (no response/other status). `status` holds the HTTP code when present. The exception message deliberately excludes untrusted backend response bodies.
 - Cancellation and stale-grant errors remain ordinary rejections. Frontends must display failure rather than converting rejection into a successful action.
+
+## Advertised-control preflight
+Before requesting user approval for an action, the adapter checks the current live tab's revision **and** confirms the exact component and control appear in `snapshot.components[*].actions` with snapshot `version: 1`. A missing, stale, or unadvertised control fails closed without prompting. The backend/target must independently repeat the same check at dispatch; this preflight does not authorize raw API access.
