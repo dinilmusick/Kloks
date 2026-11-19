@@ -28,6 +28,10 @@ export interface FodVerifiedPublishedInvocation {
   targetWorkspaceId:string;
   targetAppOwnerUserId:string;
   targetWorkspaceOwnerUserId:string;
+  /** Server-generated invocation identity from the one-use Luth admission. */
+  invocationId:string;
+  /** Authenticated Luth session identity, never the transport Message.sessionId. */
+  luthSessionId:string;
   /** Trusted lineage supplied by the target host; includes prior invocations. */
   chain:readonly string[];
   /** Absolute deadline inherited from the authenticated caller or host policy. */
@@ -51,6 +55,14 @@ export interface FodPublishedWorkflowBackendOptions {
   grantStore:FodWorkflowGrantStore;
   /** Must validate the current Luth session and all canonical ownership records. */
   verifyInvocation:(transportContext:unknown,call:FodPublishedWorkflowCall)=>Promise<FodVerifiedPublishedInvocation>;
+  /**
+   * Trusted NON-CONSUMING output-time authority. Must revalidate the same
+   * admitted invocation, live Luth session and exact caller/target workspace
+   * and grant scope without replaying the single-use admission credential.
+   */
+  revalidateResult:(transportContext:unknown,call:FodPublishedWorkflowCall,admission:FodVerifiedPublishedInvocation)=>Promise<FodVerifiedPublishedInvocation>;
+  /** Fresh read from the owning application's actual workflow store, not catalog rows. */
+  isCurrentPublishedVersion:(call:FodPublishedWorkflowCall,verified:FodVerifiedPublishedInvocation)=>Promise<boolean>;
   /** Must construct a target-owned runtime bound to the same verified request. */
   /** Bind the ALREADY owning application workflow engine. Aiko hosts can
    * supply a structural exact-version executor, not a duplicate FOD store. */
@@ -71,6 +83,19 @@ function validAppId(value:unknown):value is string {
 }
 function nonEmpty(value:unknown):value is string {
   return typeof value==='string' && value.length>0 && value.trim()===value;
+}
+function sameAuthenticatedScope(a:FodVerifiedPublishedInvocation,b:FodVerifiedPublishedInvocation):boolean {
+  return Boolean(b && nonEmpty(b.invocationId) && nonEmpty(b.luthSessionId) &&
+    a.invocationId===b.invocationId && a.luthSessionId===b.luthSessionId &&
+    a.caller.userId===b.caller?.userId &&
+    a.caller.appId===b.caller?.appId &&
+    a.caller.workspaceId===b.caller?.workspaceId &&
+    a.caller.appOwnerUserId===b.caller?.appOwnerUserId &&
+    a.caller.workspaceOwnerUserId===b.caller?.workspaceOwnerUserId &&
+    a.targetAppId===b.targetAppId &&
+    a.targetWorkspaceId===b.targetWorkspaceId &&
+    a.targetAppOwnerUserId===b.targetAppOwnerUserId &&
+    a.targetWorkspaceOwnerUserId===b.targetWorkspaceOwnerUserId);
 }
 function parseCall(value:unknown):FodPublishedWorkflowCall {
   if (!value || typeof value!=='object' || Array.isArray(value)) {
@@ -105,6 +130,8 @@ export function registerFodPublishedWorkflowBackendCommand(
 ):void {
   if (!validAppId(options.targetAppId) || !options.grantStore ||
       typeof options.verifyInvocation!=='function' ||
+      typeof options.revalidateResult!=='function' ||
+      typeof options.isCurrentPublishedVersion!=='function' ||
       typeof options.buildRuntime!=='function' ||
       typeof options.withExecutionScope!=='function') {
     throw new Error('Published workflow host verification, runtime and scoped transport are mandatory.');
@@ -123,7 +150,8 @@ export function registerFodPublishedWorkflowBackendCommand(
     }
     const verified=await options.verifyInvocation(transportContext,call);
     const caller=verified?.caller;
-    if (!caller || !nonEmpty(caller.userId) || !validAppId(caller.appId) ||
+    if (!caller || !nonEmpty(verified.invocationId) || !nonEmpty(verified.luthSessionId) ||
+        !nonEmpty(caller.userId) || !validAppId(caller.appId) ||
         !nonEmpty(caller.workspaceId) || !nonEmpty(verified.targetWorkspaceId) ||
         verified.targetAppId!==options.targetAppId ||
         verified.targetWorkspaceId!==call.targetWorkspaceId ||
@@ -172,6 +200,27 @@ export function registerFodPublishedWorkflowBackendCommand(
         verified,nextChain,controller.signal,
         ()=>runtime.executePublishedFlow(call.workflowId,call.version,call.input,{signal:controller.signal}),
       );
+      if (controller.signal.aborted) throw new Error('Published workflow cancelled or deadline exceeded.');
+      // A single-use admission cannot be consumed twice. The owning host
+      // must use Luth's independent non-consuming revalidation authority at
+      // output time and bind it to this exact admitted invocation/session.
+      const atOutput=await options.revalidateResult(transportContext,call,verified);
+      if (!sameAuthenticatedScope(verified,atOutput)) {
+        throw new Error('Published workflow result denied: Luth session or invocation scope changed.');
+      }
+      if (controller.signal.aborted) throw new Error('Published workflow cancelled or deadline exceeded.');
+      // A revocation or withdrawal that raced the engine MUST suppress its
+      // output, even when execution itself already completed successfully.
+      const stillGranted=await options.grantStore.isGranted({
+        appId:options.targetAppId,ownerUserId:atOutput.caller.userId,
+        targetWorkspaceId:call.targetWorkspaceId,workflowId:call.workflowId,
+        version:call.version,callerAppId:atOutput.caller.appId,
+        sourceWorkspaceId:atOutput.caller.workspaceId,callerUserId:atOutput.caller.userId,
+      });
+      if (!stillGranted) throw new Error('Published workflow result denied: grant revoked or publication withdrawn.');
+      if (!await options.isCurrentPublishedVersion(call,atOutput)) {
+        throw new Error('Published workflow result denied: owning revision withdrawn or replaced.');
+      }
       if (controller.signal.aborted) throw new Error('Published workflow cancelled or deadline exceeded.');
       return result;
     } finally {
