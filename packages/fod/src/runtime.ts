@@ -75,9 +75,14 @@ export class FodRuntime {
   }
 
   /** Grant one currently published version to an app/workspace owned by the same Luth principal. */
-  async grantFlow(flowId:string,callerAppId:string,sourceWorkspaceId:string):Promise<{
+  async grantFlow(flowId:string,callerAppId:string,sourceWorkspaceId:string,expiresAt?:string):Promise<{
     workflowId:string;version:number;callerAppId:string;sourceWorkspaceId:string;targetWorkspaceId:string;state:'active'
   }> {
+    // The current N5 grant relation has no durable expiry field. Never
+    // silently issue an indefinite grant in response to an expiry request.
+    if (expiresAt!==undefined) {
+      throw new Error('Expiring FOD workflow grants require a verified durable expiry schema.');
+    }
     const scope=await this.authorizeWorkflowGrant('grant',flowId,callerAppId,sourceWorkspaceId);
     // Read the workspace's current published version without trusting an index row.
     const latest=await this.flowStore.get(scope.targetWorkspaceId,flowId);
