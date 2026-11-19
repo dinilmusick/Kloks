@@ -168,6 +168,32 @@ describe('live-session frontend consent security regression', () => {
     expect(f.approvals).toHaveLength(0);
   });
 
+  it('requires an exact boolean true from the human approval callback', async () => {
+    const f = fixture();
+    const access = createConsentedUiAgentAccess({
+      ...f.opts,
+      approveAction: async () => 'yes' as unknown as boolean,
+    });
+    await expect(access.action('s1', 'window-1', validAction()))
+      .rejects.toThrow('approval');
+    expect(f.requests.filter(req => req.method === 'POST')).toHaveLength(0);
+  });
+
+  it('rejects malformed action field runtime types before verifying consent', async () => {
+    const f = fixture();
+    const invalidControls = {
+      ...validAction(), componentId: 12 as unknown as string,
+    };
+    await expect(f.access.action('s1', 'window-1', invalidControls))
+      .rejects.toThrow('Invalid approved UI action');
+    const invalidRevision = {
+      ...validAction(), revision: { toString: () => revision } as unknown as string,
+    };
+    await expect(f.access.action('s1', 'window-1', invalidRevision))
+      .rejects.toThrow('Invalid approved UI action');
+    expect(f.requests).toHaveLength(0);
+  });
+
   it('consent is specific to exact revision and action payload', async () => {
     const f = fixture();
     await expect(f.access.action('s1', 'window-1', validAction())).resolves.toEqual({
