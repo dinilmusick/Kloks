@@ -107,10 +107,29 @@ try {
   }
   console.log('GUTTS NPM ARTIFACT CHECK PASSED: published ' + guttsPackageJson.version + ' S3 JavaScript, declarations, and runtime exports.');
 
+  // Pin the published Supabase auth peer in this disposable consumer fixture:
+  // npm's floating resolution selected @supabase/auth-js@2.119.2 on
+  // 2026-11-19, whose registry tarball returned E404 before tests could run.
+  // This only constrains the throwaway verification fixture, not Kloks or
+  // downstream package manifests/lockfiles. The actual npm package is still
+  // installed from its packed tarball, and runtime/typing probes still execute.
+  const fixtureManifestFile = path.join(consumer, "package.json");
+  const fixtureManifest = JSON.parse(fs.readFileSync(fixtureManifestFile, "utf8"));
+  fixtureManifest.overrides = {
+    ...(fixtureManifest.overrides || {}),
+    "@supabase/auth-js": "2.119.1",
+  };
+  fs.writeFileSync(fixtureManifestFile, JSON.stringify(fixtureManifest, null, 2) + "\n");
   const optionalPeers = Object.entries(pkg.peerDependenciesMeta || {})
     .filter(([name, meta]) => meta?.optional && pkg.peerDependencies?.[name])
     .map(([name]) => `${name}@${pkg.peerDependencies[name]}`);
-  if (optionalPeers.length) execFileSync("npm", ["install", ...optionalPeers], {cwd: consumer, stdio: "pipe"});
+  if (optionalPeers.length) {
+    execFileSync("npm", ["install", "--no-audit", "--no-fund", ...optionalPeers], {cwd: consumer, stdio: "pipe"});
+    const authManifest = path.join(consumer, "node_modules", "@supabase", "auth-js", "package.json");
+    if (!fs.existsSync(authManifest) || JSON.parse(fs.readFileSync(authManifest, "utf8")).version !== "2.119.1") {
+      throw new Error("Clean-room Supabase auth fixture did not install pinned public version 2.119.1");
+    }
+  }
 
   const fodProbe = path.join(consumer, "fod-probe.mjs");
   fs.writeFileSync(fodProbe, [
