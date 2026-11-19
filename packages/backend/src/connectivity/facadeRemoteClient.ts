@@ -128,9 +128,11 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
     }
     // Workflow authority is intentionally separate from verified static APIs.
     // A missing FOD authority is a denial, not a fallback to a static method.
-    const resolver = operation?.kind === 'workflow'
-      ? options.resolveWorkflowDeployment : options.resolveDeployment;
-    if (!resolver) denied('WORKFLOW_AUTHORITY_REQUIRED', 503);
+    const workflow = operation?.kind === 'workflow' ? operation : undefined;
+    if (workflow && !options.resolveWorkflowDeployment) denied('WORKFLOW_AUTHORITY_REQUIRED', 503);
+    const resolver: FacadeRemoteClientOptions['resolveDeployment'] = workflow
+      ? (a, w, _operation, s, pinned) => options.resolveWorkflowDeployment!(a, w, workflow, s, pinned)
+      : options.resolveDeployment;
     const end = Math.min(now() + maxRequestMs, deadlineAt ?? Infinity);
     if (!Number.isFinite(end) || end <= now()) denied('DEADLINE_EXCEEDED', 408);
     const controller = new AbortController();
