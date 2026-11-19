@@ -1,3 +1,7 @@
+import type {FodPublicationOptions} from './publicationSync.js';
+import type {FodWorkflowGrantAuthorizer,FodWorkflowGrantStore} from './workflowGrants.js';
+import type {SmallScriptExecutor} from './smallScript.js';
+
 export type FodPortDirection = 'input' | 'output';
 export type FodNodeCategory = 'host-app' | 'gutts' | 'flow' | 'system';
 
@@ -88,4 +92,16 @@ export interface FodRuntimeOptions {
   endpoints?:FodEndpointDescriptor[];
   nodes?:FodNodeDefinition[];
   onEvent?:(event:FodExecutionEvent)=>void;
+  scriptExecutor?:SmallScriptExecutor;
+  publication?:FodPublicationOptions;
+  /** Must check the verified Luth principal and owning workspace; defaults to DENY. */
+  authorizePublication?:(action:'publish'|'unpublish',workspaceId:string,flowId:string)=>Promise<void>;
+  /** Fresh trusted Luth principal and workspace ownership check for replay;
+   * mandatory for runtime reconciliation, repeated before every metadata write. */
+  authorizePublicationReconciliation?:(workspaceId:string)=>Promise<void>;
+  /** Host-bound Luth principal, workspace ACL and active caller grant check. */
+  authorizePublishedExecution?:(workspaceId:string,flowId:string,version:number)=>Promise<void>;
+  workflowGrantStore?:FodWorkflowGrantStore;
+  /** Must resolve exact app/workspace owners from Luth and deny cross-user delegation. */
+  authorizeWorkflowGrant?:FodWorkflowGrantAuthorizer;
 }
