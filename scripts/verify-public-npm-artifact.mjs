@@ -59,10 +59,30 @@ try {
       checkedExports++;
     }
   }
+  // Check the first available future patch without publishing or mutating manifests.
+  // A network/auth/registry failure must never be interpreted as an unused version.
+  const matched = /^(\\d+)\\.(\\d+)\\.(\\d+)$/.exec(current.version);
+  let nextUnusedPatch = null;
+  if (matched) {
+    for (let attempt = 1; attempt <= 30; attempt++) {
+      const candidate = matched[1] + "." + matched[2] + "." + (Number(matched[3]) + attempt);
+      try {
+        exec("npm", ["view", current.name + "@" + candidate, "version", "--json"]);
+      } catch (error) {
+        const details = String(error.stderr || "") + String(error.message || "");
+        if (!/E404|404 Not Found/.test(details)) {
+          throw new Error("Unable to verify candidate uniqueness; no release recommendation: " + details.slice(0, 250));
+        }
+        nextUnusedPatch = candidate;
+        break;
+      }
+    }
+    if (!nextUnusedPatch) throw new Error("No unused patch version found within 30 checks");
+  }
   const result = {
     schema: 1, kind: "historical-registry-artifact",
     packageName, packageVersion, sha256, sha512Integrity: integrity,
-    checkedExports, archiveBytes: bytes.length,
+    checkedExports, archiveBytes: bytes.length, nextUnusedPatch,
     sourceVerificationCommit: process.env.EXPECTED_SHA || null,
     note: "Current checkout and registry artifact are distinct unless published provenance establishes the same commit."
   };
