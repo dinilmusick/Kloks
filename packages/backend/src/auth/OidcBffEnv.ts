@@ -48,7 +48,9 @@ export function createCanonicalApplicationOAuthBff(
     encryptionSecret: secret,
     database: {
       async query(statement, values) {
-        const rows = await sql.query(statement, [...values]);
+        // Kloks pins Neon HTTP driver 0.10.x: parameterized statements use
+        // the callable query API; sql.query was introduced in Neon 1.x.
+        const rows = await sql(statement, [...values]);
         return { rows: [...rows] };
       },
     },
