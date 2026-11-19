@@ -72,7 +72,12 @@ export interface FacadeInvocationOptions {
    * audience against trusted state; must NEVER introspect or replay the one-use
    * admission bearer. Return the current trusted identity or null.
    */
-  revalidateLuthCaller: (admitted: Readonly<VerifiedFacadeCaller>, targetAudience: string, context: Readonly<FacadeInvocationAuthorityContext>) => Promise<VerifiedFacadeCaller | null>;
+  revalidateLuthCaller: (
+    admitted: Readonly<VerifiedFacadeCaller>, targetAudience: string,
+    context: Readonly<FacadeInvocationAuthorityContext>,
+    /** Exact original trusted admission object; only the Luth adapter can dereference its server-only receipt. */
+    admissionEvidence: Readonly<VerifiedFacadeCaller>,
+  ) => Promise<VerifiedFacadeCaller | null>;
   /** Must return only current static definitions and explicitly published workflow references. */
   listCurrentOperations: (workspaceId: string) => Promise<FacadeOperationDescriptor[]>;
   /** Must re-read current owner, publication, ACL, grant, scopes, input and output rules. */
@@ -231,7 +236,7 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
     // A grant or deployment may disappear while a large capability list is
     // being projected. Never return metadata based on only the initial admission.
     const currentCaller = await boundedAuthority(
-      () => options.revalidateLuthCaller(caller, options.targetAppId, proofContext), deadline, signal,
+      () => options.revalidateLuthCaller(caller, options.targetAppId, proofContext, verified), deadline, signal,
     );
     if (!currentCaller || !currentCaller.invoker || !Array.isArray(currentCaller.chain) ||
         !Number.isFinite(currentCaller.expiresAt) || currentCaller.expiresAt <= Date.now() ||
@@ -340,7 +345,7 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
       // Luth invocation bearers are single-use: a second consuming introspection
       // would reject every legitimate result. Consult a distinct non-consuming
       // live Luth/session authority instead; fail closed if it is unavailable.
-      const currentCaller = await options.revalidateLuthCaller(caller, options.targetAppId, proofContext);
+      const currentCaller = await options.revalidateLuthCaller(caller, options.targetAppId, proofContext, verified);
       if (!currentCaller || !currentCaller.invoker || !Array.isArray(currentCaller.chain) ||
         !Number.isFinite(currentCaller.expiresAt) || currentCaller.expiresAt <= Date.now() ||
         !Number.isFinite(currentCaller.deadlineAt) || currentCaller.deadlineAt <= Date.now() ||
