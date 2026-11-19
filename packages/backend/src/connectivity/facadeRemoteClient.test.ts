@@ -245,4 +245,19 @@ describe('Skipo/Luth-authorized cross-app remote facade client', () => {
       .rejects.toMatchObject({ code: 'REMOTE_TRANSPORT_FAILED' });
     expect(attempts).toBe(1);
   });
+
+  it('snapshots caller-controlled graph inputs and correlation before async issuer lookup', async () => {
+    const { client } = harness();
+    const input = { a: 2, b: 3 };
+    const call = request('immutable-remote', { input });
+    const pending = client.invoke(app, call);
+    input.a = 1000;
+    call.operationId = 'other.operation';
+    call.targetWorkspaceId = 'workspace-other';
+    call.invocationId = 'spoofed-id';
+    await expect(pending).resolves.toEqual({
+      output: { result: 5 },
+      invocationId: 'immutable-remote',
+    });
+  });
 });
