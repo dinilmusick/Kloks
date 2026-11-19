@@ -314,10 +314,11 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
 
   /** Authorized catalog entries with a durable, exact deployment identity. */
   async function discoverPinned(targetAppId: string, targetWorkspaceId: string,
-    signal?: AbortSignal, deadlineAt?: number): Promise<PinnedRemoteFacadeDescriptor[]> {
+    signal?: AbortSignal, deadlineAt?: number,
+    expectedDeploymentId?: string): Promise<PinnedRemoteFacadeDescriptor[]> {
     const { body, deployment } = await exchange(
       targetAppId, targetWorkspaceId, undefined, 'GET', undefined, signal,
-      deadlineAt, undefined, true,
+      deadlineAt, expectedDeploymentId, true,
     );
     if (!deploymentUuid.test(deployment.deploymentId)) denied('DEPLOYMENT_UNAVAILABLE', 503);
     return decodeOperations(body, targetWorkspaceId)
