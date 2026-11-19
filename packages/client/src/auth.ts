@@ -8,6 +8,8 @@ export {
   resolveClientEnvironment,
   LuthAuthError,
   DEFAULT_LUTH_URL,
+  ApplicationAuthClient,
+  createApplicationAuthClient,
 } from '@dinilmusick/gutts/auth';
 
 export type {
@@ -21,6 +23,7 @@ export type {
   LuthUser,
   LuthSessionResult,
   RegisterApplicationResult,
+  ApplicationAuthClientConfig,
 } from '@dinilmusick/gutts/auth';
 
 export interface LuthDeploymentRecord {
