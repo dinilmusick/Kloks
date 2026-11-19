@@ -20,6 +20,8 @@ export interface VerifiedFacadeDeployment {
 export interface RemoteFacadeOperation {
   readonly id: string;
   readonly version: string;
+  /** Trusted caller-side selector: FOD grants are not Skipo static capabilities. */
+  readonly kind?: 'static' | 'workflow';
 }
 
 export interface FacadeRemoteClientOptions {
@@ -30,6 +32,15 @@ export interface FacadeRemoteClientOptions {
     signal: AbortSignal,
     /** Pin to the exact deployment UUID already attested for this request. */
     expectedDeploymentId?: string,
+  ) => Promise<VerifiedFacadeDeployment | null>;
+  /**
+   * Separate FOD owning-workspace publication/grant + Skipo host-lease path.
+   * MUST reauthorize the exact published revision and target before every call.
+   * Never fall back from a failed static selector or from a missing workflow grant.
+   */
+  readonly resolveWorkflowDeployment?: (
+    appId: string, workspaceId: string, operation: RemoteFacadeOperation,
+    signal: AbortSignal, expectedDeploymentId?: string,
   ) => Promise<VerifiedFacadeDeployment | null>;
   /** Host allowlist/registry proof. DNS/egress policy must also restrict reachable hosts. */
   readonly approveOrigin: (origin: string, deployment: VerifiedFacadeDeployment) => Promise<boolean>;
@@ -115,6 +126,11 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
         (operation && (!validId(operation.id) || !validId(operation.version)))) {
       denied('MALFORMED_HANDLE', 400);
     }
+    // Workflow authority is intentionally separate from verified static APIs.
+    // A missing FOD authority is a denial, not a fallback to a static method.
+    const resolver = operation?.kind === 'workflow'
+      ? options.resolveWorkflowDeployment : options.resolveDeployment;
+    if (!resolver) denied('WORKFLOW_AUTHORITY_REQUIRED', 503);
     const end = Math.min(now() + maxRequestMs, deadlineAt ?? Infinity);
     if (!Number.isFinite(end) || end <= now()) denied('DEADLINE_EXCEEDED', 408);
     const controller = new AbortController();
@@ -131,7 +147,7 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
     });
     const perform = async () => {
       if (controller.signal.aborted) throw abortError();
-      const deployment = await options.resolveDeployment(appId, workspaceId, operation, controller.signal);
+      const deployment = await resolver(appId, workspaceId, operation, controller.signal);
       if (!deployment || deployment.verified !== true || deployment.appId !== appId ||
           deployment.workspaceId !== workspaceId || deployment.environment !== options.environment ||
           !validId(deployment.deploymentId) || !Number.isFinite(deployment.leaseExpiresAt) ||
@@ -144,7 +160,7 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
       if (controller.signal.aborted) throw abortError();
       // Credential issuance may block. Do not send a minted one-use bearer to
       // a deployment whose ownership, origin or lease changed during minting.
-      const beforeSend = await options.resolveDeployment(
+      const beforeSend = await resolver(
         appId, workspaceId, operation, controller.signal, deployment.deploymentId,
       );
       if (!matchDeployment(deployment, beforeSend, now()) ||
@@ -219,7 +235,7 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
         denied(code, response.status >= 400 && response.status < 600 ? response.status : 502);
       }
       // A Skipo lease or deployment mapping can be revoked during a long call.
-      const latest = await options.resolveDeployment(
+      const latest = await resolver(
         appId, workspaceId, operation, controller.signal, deployment.deploymentId,
       );
       if (!matchDeployment(deployment, latest, now()) || !await options.approveOrigin(latest!.origin, latest!)) {
@@ -280,5 +296,35 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
     return { output: (body as { output: unknown }).output, invocationId: captured.invocationId };
   }
 
-  return { discover, invoke };
+  /**
+   * Explicit workflow call. The FOD owning workspace and grants select a
+   * verified host independent of Skipo static capability enumeration.
+   * The actual target still verifies Luth + exact current workflow revision.
+   */
+  async function invokeWorkflow(
+    targetAppId: string, request: FacadeInvocation,
+    signal?: AbortSignal, deadlineAt?: number,
+  ): Promise<RemoteFacadeResult> {
+    requireInvocation(request);
+    let input: unknown;
+    try { input = structuredClone(request.input); }
+    catch { denied('MALFORMED_INPUT', 400); }
+    assertFacadeJsonInput(input);
+    const captured = {
+      operationId: request.operationId, version: request.version,
+      targetWorkspaceId: request.targetWorkspaceId, invocationId: request.invocationId, input,
+    };
+    assertFacadeJsonInput(captured);
+    const operation: RemoteFacadeOperation = {
+      id: captured.operationId, version: captured.version, kind: 'workflow',
+    };
+    const body = await exchange(targetAppId, captured.targetWorkspaceId, operation, 'POST', captured, signal, deadlineAt);
+    if (!body || typeof body !== 'object' || Array.isArray(body) ||
+        !own(body, 'output') || (body as Record<string, unknown>).invocationId !== captured.invocationId) {
+      denied('CORRELATION_MISMATCH', 502);
+    }
+    return { output: (body as { output: unknown }).output, invocationId: captured.invocationId };
+  }
+
+  return { discover, invoke, invokeWorkflow };
 }
