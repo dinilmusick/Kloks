@@ -20,6 +20,8 @@ Compose `createFacadeInvocationBoundary` with mandatory real authorities:
 4. `consumeInvocation`: shared atomic replay/budget debit. No per-process in-memory fallback.
 5. `invokePublishedWorkflow`: existing FOD owner-workspace execution interface. No workflow logic is duplicated in connectivity.
 
+The guard passes the same immutable `FacadeInvocationAuthorityContext` — `operationId`, `version`, `targetWorkspaceId`, `invocationId`, and `transport` — as the third parameter to `verifyLuthCredential`, `revalidateLuthCaller`, and `consumeInvocation`. The host MUST bind the authenticated Luth proof/grant and atomic replay debit to these exact values. Never accept caller-side request mutation or a Luth verifier that ignores the bound scope. The output-time revalidation, publication, deployment and ACL checks are subject to the inherited deadline and cancellation, just like execution.
+
 All HTTP, MCP, graph and agent target calls MUST enter through the same existing boundary, with explicit transport identities. The `/api/crossapp/invoke` JSON envelope is `{operationId,version,targetWorkspaceId,invocationId,input}` only, and bearer belongs solely in the Authorization header. Discovery is `GET /api/crossapp/operations?workspace=<id>`, subject to the target guard. HTTP redirects are rejected. Caller-side automatic retries are disabled.
 
 ## Current verification boundary
