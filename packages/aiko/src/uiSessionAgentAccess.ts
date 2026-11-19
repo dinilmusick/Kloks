@@ -160,9 +160,15 @@ export function createConsentedUiAgentAccess(options: UiAgentAccessOptions) {
     permission: 'inspect' | 'action', signal?: AbortSignal) {
     const current = await checked(session, previous.grant.windowId, permission, signal);
     if (current.caller.sessionId !== previous.caller.sessionId ||
+        current.caller.userId !== previous.caller.userId ||
+        current.caller.appId !== previous.caller.appId ||
+        current.caller.workspaceId !== previous.caller.workspaceId ||
+        current.caller.appOrigin !== previous.caller.appOrigin ||
         current.grant.grantId !== previous.grant.grantId ||
+        current.grant.windowId !== previous.grant.windowId ||
         current.grant.tabId !== previous.grant.tabId ||
-        current.grant.origin !== previous.grant.origin) {
+        current.grant.origin !== previous.grant.origin ||
+        current.grant.expiresAt !== previous.grant.expiresAt) {
       throw new Error('UI session approval is stale, replaced or revoked.');
     }
     return current;
