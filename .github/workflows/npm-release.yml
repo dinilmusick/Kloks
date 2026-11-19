@@ -72,6 +72,29 @@ jobs:
       - name: Verify actual packed package in independent Node and Worker consumers
         run: node scripts/clean-room-boundary.mjs
 
+      - name: Embed approved exact-source release attestation
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          inputs.publish &&
+          steps.registry.outputs.exists == 'false'
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const sourceCommit = process.env.SOURCE_SHA;
+          if (!/^[0-9a-f]{40}$/.test(sourceCommit)) throw new Error('Invalid immutable release SHA');
+          fs.writeFileSync('.krusbl-release-attestation.json', JSON.stringify({
+            schema: 1,
+            packageName: pkg.name,
+            version: pkg.version,
+            sourceCommit,
+            releaseWorkflow: process.env.GITHUB_WORKFLOW,
+            workflowRunId: process.env.GITHUB_RUN_ID
+          }, null, 2) + '\n');
+          NODE
+
       - name: Pack exact artifact once and retain its checksum
         run: |
           set -euo pipefail
