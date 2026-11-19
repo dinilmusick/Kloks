@@ -5,7 +5,7 @@
 ## Verified source and dependency identity
 
 1. Read the actual PR head SHA and required main SHA from GitHub, never infer one from branch names.
-2. Require `actions/checkout` to use the event's immutable PR SHA for validation or `workflow_run.head_sha` for a release triggered by successful main CI. Assert `git rev-parse HEAD` equals that SHA.
+2. Require `actions/checkout` to use the immutable PR head SHA for validation. For publication, the only allowed trigger is a manually approved `workflow_dispatch` on `main`, which checks out the event's fixed `github.sha`. Assert `git rev-parse HEAD` equals that SHA.
 3. Hash `package.json` and committed `pnpm-lock.yaml` or `package-lock.json`; install only `pnpm install --frozen-lockfile` or `npm ci --include=optional`.
 4. Require the actual build, typecheck/lint, unit/integration/security tests, packaged import tests, and any browser/Worker consumer checks to **run and succeed**. A skipped gate or a failed job without steps is not passing evidence.
 5. Post-merge check must match the eventual merged commit; PR-head green does not certify a later main commit.
@@ -40,8 +40,8 @@ For Skipo run `pnpm test`, `pnpm typecheck`, `pnpm build`, and `bash tests/smoke
 
 - Do not write a version already present on npm; published versions are immutable. Candidate versions must be compared against registry metadata before any approved bump.
 - `npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version` returning a successful response means **do not publish**. Only an unambiguous E404 means absent; timeouts, 401/403, outages and unexpected responses must fail closed.
-- A release workflow must not check out moving `main` after verifying a different SHA. Avoid scheduled or push-triggered unreviewed lockfile upgrades, implicit version bump commits or direct pushes to `main`.
-- Publishing, if independently approved later, requires GitHub OIDC Trusted Publishing (`id-token: write`, trusted npm workflow match, `npm publish --provenance`); do not add a long-lived npm token.
+- Release workflows must use manual main-only approval (`inputs.publish=true`), never a successful CI event, schedule, tag or push as implicit permission to publish. Do not check out moving `main` after verifying a different SHA. Avoid unreviewed lockfile upgrades, implicit version commits, and direct pushes to `main`.
+- Publishing, if independently approved later, requires GitHub OIDC Trusted Publishing (`id-token: write`, trusted npm workflow match, `npm publish "$archive" --provenance` of the **same hashed prepacked tarball**); do not add a long-lived npm token.
 - Re-download the **actual public npm tarball** anonymously in a clean consumer, record `npm view ... dist --json`, hash the tarball, inspect `package.json` and exported paths and compare its provenance to the verified source commit. An `npm pack --dry-run` does not prove registry availability.
 
 At review time repository manifests declared Kloks 2.2.4, Floks 2.0.8 and Skipo 1.3.0. Proposed **patch candidates only, subject to registry uniqueness checks and explicit approval**, are Kloks 2.2.5, Floks 2.0.9 and Skipo 1.3.1. Do not release or edit consumer lockfiles in this PR.
