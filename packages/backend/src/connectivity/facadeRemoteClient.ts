@@ -251,18 +251,24 @@ export function createFacadeRemoteClient(options: FacadeRemoteClientOptions) {
 
   async function invoke(targetAppId: string, request: FacadeInvocation, signal?: AbortSignal, deadlineAt?: number): Promise<RemoteFacadeResult> {
     requireInvocation(request);
-    const operation = { id: request.operationId, version: request.version };
-    const body = await exchange(targetAppId, request.targetWorkspaceId, operation, 'POST', {
-      operationId: request.operationId, version: request.version, targetWorkspaceId: request.targetWorkspaceId,
-      invocationId: request.invocationId, input: request.input,
-    }, signal, deadlineAt);
+    // Deep snapshot before any async Skipo/Luth lookup, so a graph caller cannot
+    // change the authorized operation, workspace or input while a proof is minted.
+    let input: unknown;
+    try { input = structuredClone(request.input); }
+    catch { denied('MALFORMED_INPUT', 400); }
+    const captured = {
+      operationId: request.operationId, version: request.version,
+      targetWorkspaceId: request.targetWorkspaceId, invocationId: request.invocationId, input,
+    };
+    const operation = { id: captured.operationId, version: captured.version };
+    const body = await exchange(targetAppId, captured.targetWorkspaceId, operation, 'POST', captured, signal, deadlineAt);
     if (!body || typeof body !== 'object' || Array.isArray(body) ||
-        !own(body, 'output') || (body as Record<string, unknown>).invocationId !== request.invocationId) {
+        !own(body, 'output') || (body as Record<string, unknown>).invocationId !== captured.invocationId) {
       denied('CORRELATION_MISMATCH', 502);
     }
     // Target-provided replyTo is deliberately NOT exposed as routing authority.
     // The verified local ImmediateCallerRouter already owns return destinations.
-    return { output: (body as { output: unknown }).output, invocationId: request.invocationId };
+    return { output: (body as { output: unknown }).output, invocationId: captured.invocationId };
   }
 
   return { discover, invoke };
