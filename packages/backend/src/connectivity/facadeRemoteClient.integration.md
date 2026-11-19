@@ -147,3 +147,47 @@ The target FacadeInvocationOptions.invokePublishedWorkflow callback now receives
 An owning FOD host that calls its registered FOD execution command MUST propagate this already single-use-admitted context through a protected local transport scope. Do NOT re-run consuming Luth /api/oauth/introspect inside the FOD host; it would always reject an already-consumed valid invocation. FOD's verifyInvocation callback must validate this trusted canonical admission context plus the CURRENT owning workspace, publication version, owner grant, source+target scope and budget. The outer target guard independently performs non-consuming Luth output receipt revalidation and live grant/deployment checks before releasing any output. A FOD host may also revalidate its own live current permission; it cannot skip target-side final checks.
 
 The trusted context must remain request-local; do not store it in workspace files, workflow graphs, global tables, URLs, analytics or browser state. FOD nested child invocations require separately audience-bound Luth credentials, fresh scoped grants, current ancestry/budget and explicit host consent. Never reuse or replay the parent bearer or its output-only receipt for nested admission. If request-scoped context propagation is unavailable, disable nested cross-app execution and fail closed.
+
+
+## Persistable static capability handles (Skipo exact instance + revision)
+
+The remote client provides an opt-in pair of operations:
+
+    const handles = await remote.discoverPinned(targetAppId, targetWorkspaceId);
+    // Persist only one authorized handle's appId, deploymentId, environment,
+    // id, version, kind='static', targetWorkspaceId and display metadata.
+    const result = await remote.invokePinned(handles[0], typedInput, uniqueInvocationId);
+
+**discoverPinned** fetches the target guard's currently authorized operation catalog,
+then **independently revalidates every static operation** against the current
+Skipo capability revision and the same verified deployment UUID. It filters
+workflow publications: those need the owning FOD authority and invokeWorkflow
+instead of the static registry. The per-operation reauthorization runs inside
+the original request deadline; stalled Skipo lookups do not hang discovery.
+It refuses malformed deployment UUIDs before minting the Luth credential.
+Only operation metadata and immutable identity are persisted, never URL,
+bearer, grant, principal or workflow graph contents.
+
+**invokePinned** snapshots the saved operation handle and input and passes its
+exact deploymentId to the first Skipo resolver call, the pre-send resolver
+call, and output-time resolver call. A newer deployment for the same app and
+capability version is NOT a valid substitute. Wrong environment, workflow kind,
+malformed IDs, stale grant, expired lease, deployment change and withdrawn
+operation versions fail closed. The deployment UUID is a local authority
+selector, NOT sent in the untrusted target request body or as a URL. Every
+invocation still requires fresh Skipo/owner and Luth checks.
+
+The existing discover/invoke APIs are preserved for existing callers; new
+generated Floks/Skipo graph integrations should persist discoverPinned handles
+and use invokePinned so graph reopening or agent continuation cannot silently
+switch target instance. Cross-app workflow agents use the distinct owner FOD
+grant and invokeWorkflow path instead.
+
+Integration dependency: Skipo #208 current candidate head
+39a1dc98be3aa59a3f90f186f466155d73a12487 exposes the optional
+CapabilitySelector.deploymentId selector and exact static-capability
+revalidation. Luth #23 current candidate head
+de509cf05bbf99a090d57fd06180c8104fd3eac3 retains single-use admission
+and distinct output receipt contracts. These candidate branches are not
+production live authorities until coordinated merge, hosting configuration,
+isolated database grant tests and independent two-user/two-deployment E2E.
