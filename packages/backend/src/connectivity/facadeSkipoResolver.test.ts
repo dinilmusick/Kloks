@@ -245,4 +245,31 @@ describe('Skipo #208 verified capability resolution into Kloks remote HTTP bound
     expect(state.resolved).toBe(0);
     expect(state.listed).toBe(0);
   });
+
+  it('persists Skipo-attested static identity and invokes that same instance through the real target guard', async () => {
+    const { client, state, discovery, fetcher } = fixture();
+    const pinnedSelectors: Array<string | undefined> = [];
+    const revalidate = discovery.revalidate;
+    discovery.revalidate = async (req, selector) => {
+      pinnedSelectors.push(selector.deploymentId);
+      return revalidate(req, selector);
+    };
+    const [handle] = await client.discoverPinned('app-b', 'workspace-B');
+    expect(handle).toEqual({
+      id: 'math.add', version: '2', name: 'Addition', kind: 'static',
+      appId: 'app-b', targetWorkspaceId: 'workspace-B',
+      environment: 'production', deploymentId,
+    });
+    const result = await client.invokePinned(handle, { a: 7, b: 2 }, 'skipo-persisted-static-1');
+    expect(result).toEqual({ output: { result: 9 }, invocationId: 'skipo-persisted-static-1' });
+    expect(state.admitted).toBe(2);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    // Discovery validates each capability against this exact deployment.
+    // Invocation keeps the same instance pinned across all three phases.
+    expect(pinnedSelectors).toEqual([deploymentId, deploymentId, deploymentId, deploymentId]);
+    state.current = false;
+    await expect(client.invokePinned(handle, { a: 1, b: 1 }, 'skipo-persisted-after-revoke'))
+      .rejects.toMatchObject({ code: 'DEPLOYMENT_UNAVAILABLE' });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
 });
