@@ -17,11 +17,11 @@ describe('canonical storage and Google provider families', () => {
     expect(google?.category).toBe('suite');
     expect(google?.children.map(c => c.id)).toEqual(expect.arrayContaining([
       'google-gemini', 'google-drive', 'google-cloud-run',
-      'google-cloud-storage', 'google-cloud-shell', 'google-vertex-ai',
+      'google-cloud-storage', 'google-cloud-shell', 'google-vertex-ai', 'google-compute-engine',
     ]));
     expect(tree.some(s => s.id === 'google-drive')).toBe(false);
     expect(getProviderServicePath('google-drive').map(s => s.id)).toEqual(['google','google-drive']);
-    expect(listProviderServiceChildren('google')).toHaveLength(6);
+    expect(listProviderServiceChildren('google')).toHaveLength(7);
   });
   it('declares implemented storage types but does not promote unimplemented cloud storage', () => {
     const ids = listRecognizedAccountServices().map(s => s.id);
