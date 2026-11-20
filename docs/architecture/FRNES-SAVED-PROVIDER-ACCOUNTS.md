@@ -30,7 +30,8 @@ consumer claim is accepted as authority.
 | Railway | Account identity | Account bearer token |
 | Google Cloud Run | Services | Project ID and region |
 
-Each new connection requires a successful provider-backed API read BEFORE
+Each new connection requires an independently verified Luth owner and owned
+workspace from the calling service, plus a successful provider-backed API read BEFORE
 persistence. The authorization proves only access to that service page at
 that moment. It does not prove paid lifecycle privileges, billing coverage,
 renewable free capacity, future token validity, or ownership of unrelated
@@ -43,12 +44,15 @@ Frnes schema: db/004_frnes_provider_accounts.sql in dinilmusick/Frnes.
 
 The table enables row-level security, publishes no table policy, and revokes
 PUBLIC privileges. All SQL uses parameter bindings and an exact owner filter.
-Every server API must hold its own privileged database access, not a user-side
+Every server API must additionally verify the exact workspace before calling Kloks.
+The store filters by BOTH owner ID and workspace ID; a saved account in one
+workspace is never automatically available from another. It must not use a
+user-side
 direct SQL/Data API connection.
 
 A canonical system-owned Kloks storageConnections encryption key is reused.
 AES-256-GCM uses a unique 96-bit IV and immutable additional authenticated
-data comprising owner ID, account UUID, provider, resource kind, account scope,
+data comprising owner ID, workspace ID, account UUID, provider, resource kind, account scope,
 project and region. Switching any field invalidates decryption. Initializing
 a key is permitted only for encryption; decryption requires the existing
 canonical key and cannot silently mint a new one.
