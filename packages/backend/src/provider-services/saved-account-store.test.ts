@@ -16,23 +16,24 @@ function database() {
       id:'system', credentials:{storageConnections:{encryptionKey:key,encryptionKeyVersion:1}},
     }] };
     if (sql.includes('INSERT INTO public.frnes_provider_accounts')) {
-      const [id,owner,provider,kind,accountScope,projectId,region,label,checked,envelope] = args;
-      const row = { id,owner_user_id:owner,provider_id:provider,resource_kind:kind,
+      const [id,owner,workspace,provider,kind,accountScope,projectId,region,label,checked,envelope] = args;
+      const row = { id,owner_user_id:owner,workspace_id:workspace,provider_id:provider,resource_kind:kind,
         account_scope:accountScope,project_id:projectId,region,label,enabled:true,
         checked_at:checked,created_at:new Date().toISOString(),
         credential_envelope:JSON.parse(String(envelope)),revoked_at:null };
       rows.push(row); return { rows: [row] };
     }
     if (sql.includes('UPDATE public.frnes_provider_accounts')) {
-      const row=rows.find(x=>x.owner_user_id===args[0] && x.id===args[1] && !x.revoked_at);
+      const row=rows.find(x=>x.owner_user_id===args[0] && x.workspace_id===args[1] && x.id===args[2] && !x.revoked_at);
       if (!row) return { rows:[] };
       row.enabled=false;row.revoked_at=new Date().toISOString();
       return { rows:[{id:row.id}] };
     }
     if (sql.includes('FROM public.frnes_provider_accounts')) {
-      return { rows:rows.filter(x=>x.owner_user_id===args[0] && !x.revoked_at
-        && (args.length<2 || x.id===args[1]) &&
-        (args.length<2 || !sql.includes('enabled=true') || x.enabled)) };
+      return { rows:rows.filter(x=>x.owner_user_id===args[0] &&
+        x.workspace_id===args[1] && !x.revoked_at &&
+        (args.length<3 || x.id===args[2]) &&
+        (args.length<3 || !sql.includes('enabled=true') || x.enabled)) };
     }
     return { rows:[] };
   };
@@ -72,12 +73,12 @@ describe('Frnes Kloks saved cloud-provider accounts',()=>{
     ];
     const db=database(), transport=providerApi();
     for(const input of values) {
-      const saved=await saveVerifiedProviderAccount('owner-1',input as any,{
+      const saved=await saveVerifiedProviderAccount('owner-1','ws-one',input as any,{
         query:db.query,transport });
       expect(saved.providerId).toBe(input.providerId);
       expect(saved.enabled).toBe(true);
       expect(JSON.stringify(saved)).not.toContain(token);
-      const read=await readSavedProviderAccount('owner-1',saved.id,{query:db.query,transport});
+      const read=await readSavedProviderAccount('owner-1','ws-one',saved.id,{query:db.query,transport});
       expect(read.resources).toHaveLength(1);
       expect(read.complete).toBe(false);
       expect(JSON.stringify(read)).not.toContain(token);
@@ -85,18 +86,21 @@ describe('Frnes Kloks saved cloud-provider accounts',()=>{
     expect(db.rows).toHaveLength(6);
     expect(JSON.stringify(db.rows)).not.toContain(token);
     expect(db.rows[0].credential_envelope.algorithm).toBe('AES-GCM-256');
-    expect(await listSavedProviderAccounts('owner-1',db.query)).toHaveLength(6);
+    expect(await listSavedProviderAccounts('owner-1','ws-one',db.query)).toHaveLength(6);
   });
   it('refuses cross-owner reads and revokes exact account access',async()=>{
     const db=database(),transport=providerApi();
-    const saved=await saveVerifiedProviderAccount('owner-1',account('fly','apps'),{query:db.query,transport});
+    const saved=await saveVerifiedProviderAccount('owner-1','ws-one',account('fly','apps'),{query:db.query,transport});
     const calls=(transport as any).mock.calls.length;
-    await expect(readSavedProviderAccount('owner-2',saved.id,{query:db.query,transport}))
+    await expect(readSavedProviderAccount('owner-2','ws-one',saved.id,{query:db.query,transport}))
       .rejects.toThrow(/DENIED/);
     expect((transport as any).mock.calls).toHaveLength(calls);
-    expect(await revokeSavedProviderAccount('owner-2',saved.id,db.query)).toBe(false);
-    expect(await revokeSavedProviderAccount('owner-1',saved.id,db.query)).toBe(true);
-    await expect(readSavedProviderAccount('owner-1',saved.id,{query:db.query,transport}))
+    await expect(readSavedProviderAccount('owner-1','ws-two',saved.id,{query:db.query,transport}))
+      .rejects.toThrow(/DENIED/);
+    expect(await listSavedProviderAccounts('owner-1','ws-two',db.query)).toEqual([]);
+    expect(await revokeSavedProviderAccount('owner-2','ws-one',saved.id,db.query)).toBe(false);
+    expect(await revokeSavedProviderAccount('owner-1','ws-one',saved.id,db.query)).toBe(true);
+    await expect(readSavedProviderAccount('owner-1','ws-one',saved.id,{query:db.query,transport}))
       .rejects.toThrow(/DENIED/);
   });
   it('rejects invalid/foreign provider scopes before network and database',async()=>{
@@ -110,20 +114,23 @@ describe('Frnes Kloks saved cloud-provider accounts',()=>{
       account('oracle-cloud','instances'),
     ]) {
       expect(()=>validateSavedProviderInput(value)).toThrow();
-      await expect(saveVerifiedProviderAccount('owner-1',value as any,{
+      await expect(saveVerifiedProviderAccount('owner-1','ws-one',value as any,{
         query:db.query,transport })).rejects.toThrow();
     }
     expect(db.rows).toHaveLength(0);
     expect((transport as any).mock.calls).toHaveLength(0);
   });
   it('authenticates AES-GCM encryption to owner, account and scope',async()=>{
-    const bound={ownerUserId:'owner-1',id:'account-1',providerId:'fly',
+    const bound={ownerUserId:'owner-1',workspaceId:'ws-one',id:'account-1',providerId:'fly',
       resourceKind:'apps',accountScope:'',projectId:'',region:''};
     const encrypted=await encryptSavedCredential(token,key,bound);
     expect(JSON.stringify(encrypted)).not.toContain(token);
     expect(await decryptSavedCredential(encrypted,key,bound)).toBe(token);
     await expect(decryptSavedCredential(encrypted,key,{
       ...bound,ownerUserId:'owner-2',
+    })).rejects.toThrow(/DECRYPTION_DENIED/);
+    await expect(decryptSavedCredential(encrypted,key,{
+      ...bound,workspaceId:'ws-two',
     })).rejects.toThrow(/DECRYPTION_DENIED/);
     await expect(decryptSavedCredential(encrypted,key,{
       ...bound,resourceKind:'services',
