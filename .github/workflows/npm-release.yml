@@ -75,8 +75,7 @@ jobs:
       - name: Embed approved exact-source release attestation
         if: >-
           github.event_name == 'workflow_dispatch' &&
-          inputs.publish &&
-          steps.registry.outputs.exists == 'false'
+          inputs.publish
         env:
           SOURCE_SHA: ${{ github.sha }}
         run: |
