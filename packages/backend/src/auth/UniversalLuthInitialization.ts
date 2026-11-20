@@ -11,6 +11,8 @@ interface UniversalDiscoveryV1 {
   application: { appId: string; ecosystemId: string; name: string };
   issuer: string;
   configurationUrl: string;
+  workloadConfigurationUrl?: string;
+  capabilities: { trustedWorkloads: boolean };
 }
 interface UniversalConfigurationV1 {
   application: { appId: string; ecosystemId: string; name: string };
