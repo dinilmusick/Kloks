@@ -2,9 +2,10 @@
  * @file systemDatabaseUrl.ts
  * @description The canonical system database URL contract for all runtime targets.
  *
- * SYSTEM_DATABASE_URL is the primary and required deployment binding.
- * SYSTEM_DATABASE_URL_2 and SYSTEM_DATABASE_URL_3 are ordered failover URLs.
- * Generic DATABASE_URL and the retired SYSTEM_DATABASE_URL_1 alias are not accepted.
+ * SYSTEM_DATABASE_URL_1 is the canonical protected primary binding.
+ * Unsuffixed SYSTEM_DATABASE_URL is retained temporarily for existing workloads.
+ * SYSTEM_DATABASE_URL_2 and SYSTEM_DATABASE_URL_3 are optional ordered failovers.
+ * Generic DATABASE_URL is never an accepted configuration alias.
  */
 
 export type SystemDatabaseEnvironment = Record<string, unknown>;
@@ -19,6 +20,7 @@ export function resolveSystemDatabaseUrlCandidates(
   env: SystemDatabaseEnvironment = {},
 ): string[] {
   const urls = [
+    normalizeUrl(env.SYSTEM_DATABASE_URL_1),
     normalizeUrl(env.SYSTEM_DATABASE_URL),
     normalizeUrl(env.SYSTEM_DATABASE_URL_2),
     normalizeUrl(env.SYSTEM_DATABASE_URL_3),
@@ -31,6 +33,7 @@ export function tryResolveSystemDatabaseUrl(
   env: SystemDatabaseEnvironment = {},
 ): string | null {
   return (
+    normalizeUrl(env.SYSTEM_DATABASE_URL_1) ||
     normalizeUrl(env.SYSTEM_DATABASE_URL) ||
     normalizeUrl(env.SYSTEM_DATABASE_URL_2) ||
     normalizeUrl(env.SYSTEM_DATABASE_URL_3) ||
@@ -47,8 +50,8 @@ export function resolveSystemDatabaseUrl(
 
   throw new Error(
     '[SKIPO DATABASE_INVARIANT] Missing system database configuration. ' +
-    'Set SYSTEM_DATABASE_URL (primary), SYSTEM_DATABASE_URL_2, or SYSTEM_DATABASE_URL_3. ' +
-    'DATABASE_URL and SYSTEM_DATABASE_URL_1 are not supported configuration aliases.',
+    'Set SYSTEM_DATABASE_URL_1 (primary), temporarily legacy SYSTEM_DATABASE_URL, ' +
+    'SYSTEM_DATABASE_URL_2, or SYSTEM_DATABASE_URL_3. DATABASE_URL is not supported.',
   );
 }
 
@@ -66,7 +69,8 @@ export function normalizeSystemEnvironment<T extends Record<string, unknown>>(
 ): T & Record<string, unknown> {
   const normalized: Record<string, unknown> = { ...env };
 
-  for (const key of ['SYSTEM_DATABASE_URL', 'SYSTEM_DATABASE_URL_2', 'SYSTEM_DATABASE_URL_3']) {
+  for (const key of ['SYSTEM_DATABASE_URL_1', 'SYSTEM_DATABASE_URL',
+    'SYSTEM_DATABASE_URL_2', 'SYSTEM_DATABASE_URL_3']) {
     const value = normalizeUrl(env[key]) || normalizeUrl(runtimeEnvironment[key]);
     if (value) normalized[key] = value;
     else if (Object.prototype.hasOwnProperty.call(env, key)) normalized[key] = undefined;
