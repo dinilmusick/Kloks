@@ -75,3 +75,6 @@ export function createUniversalAuthFetch(authClient: { getAuthHeaders: () => Hea
 }
 
 
+
+// Portable GutTS discovery/configuration v1 exports; remains a single identity protocol.
+export * from '@dinilmusick/gutts/auth';

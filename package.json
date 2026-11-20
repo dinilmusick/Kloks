@@ -1,6 +1,6 @@
 {
   "name": "@ultrst-armada/kloks",
-  "version": "2.2.8",
+  "version": "2.2.9",
   "private": false,
   "publishConfig": {
     "access": "public",
@@ -361,7 +361,7 @@
     "verify:package-exports": "node scripts/verify-package-exports.mjs"
   },
   "dependencies": {
-    "@dinilmusick/gutts": "2.2.3",
+    "@dinilmusick/gutts": "2.2.4",
     "@jitl/quickjs-wasmfile-release-sync": "0.32.0",
     "@webcontainer/api": "^1.6.4",
     "quickjs-emscripten-core": "0.32.0",

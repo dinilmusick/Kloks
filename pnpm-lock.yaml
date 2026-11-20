@@ -15,8 +15,8 @@ importers:
         specifier: ^3.1164.0
         version: 3.1165.0(@aws-sdk/client-s3@3.1164.0)
       '@dinilmusick/gutts':
-        specifier: 2.2.3
-        version: 2.2.3(@aws-sdk/client-s3@3.1164.0)(@huggingface/transformers@4.3.2(@types/node@22.20.5))(cactus-needle@0.3.0)
+        specifier: 2.2.4
+        version: 2.2.4(@aws-sdk/client-s3@3.1164.0)(@huggingface/transformers@4.3.2(@types/node@22.20.5))(cactus-needle@0.3.0)
       '@jitl/quickjs-wasmfile-release-sync':
         specifier: 0.32.0
         version: 0.32.0
@@ -95,8 +95,8 @@ importers:
         specifier: ^3.1164.0
         version: 3.1164.0
       '@dinilmusick/gutts':
-        specifier: 2.2.3
-        version: 2.2.3(@aws-sdk/client-s3@3.1164.0)(@huggingface/transformers@4.3.2(@types/node@22.20.5))(cactus-needle@0.3.0)
+        specifier: 2.2.4
+        version: 2.2.4(@aws-sdk/client-s3@3.1164.0)(@huggingface/transformers@4.3.2(@types/node@22.20.5))(cactus-needle@0.3.0)
       '@kloks/functions':
         specifier: workspace:*
         version: link:../functions
@@ -129,8 +129,8 @@ importers:
   packages/client:
     dependencies:
       '@dinilmusick/gutts':
-        specifier: 2.2.3
-        version: 2.2.3(@aws-sdk/client-s3@3.1164.0)(@huggingface/transformers@4.3.2(@types/node@22.20.5))(cactus-needle@0.3.0)
+        specifier: 2.2.4
+        version: 2.2.4(@aws-sdk/client-s3@3.1164.0)(@huggingface/transformers@4.3.2(@types/node@22.20.5))(cactus-needle@0.3.0)
       react:
         specifier: ^18.0.0 || ^19.0.0
         version: 19.3.0
@@ -353,8 +353,8 @@ packages:
   '@dinilmusick/gutts@1.6.0':
     resolution: {integrity: sha512-HE5dL/CZUNiB7wF5xhzJ6UL6jLMv3Tp9BgcSgaUEKd2dZGRPEbCkB8XfCdSpdJKrmks/KB75U/GAunOREikfgg==}
 
-  '@dinilmusick/gutts@2.2.3':
-    resolution: {integrity: sha512-L6XACBkEP7Iwt7+mteP2yotbsNT19LHnlx+yJZaLjyA2pSRS7iCBE8zl6BZvfDQqM6OA0LWg1N6VFU1cUk0daA==}
+  '@dinilmusick/gutts@2.2.4':
+    resolution: {integrity: sha512-7BiU6I5eTg7KZePqt8FEgrXYSTOZXLk7/xvzDdG+MeHqV9fRZTmueCFEhOS4JhFXTr0y1OIlYdyzfEB9tVLIWA==}
     peerDependencies:
       '@aws-sdk/client-s3': ^3.1164.0
       '@huggingface/transformers': ^4.3.2
@@ -2209,7 +2209,7 @@ snapshots:
       - ai
       - supports-color
 
-  '@dinilmusick/gutts@2.2.3(@aws-sdk/client-s3@3.1164.0)(@huggingface/transformers@4.3.2(@types/node@22.20.5))(cactus-needle@0.3.0)':
+  '@dinilmusick/gutts@2.2.4(@aws-sdk/client-s3@3.1164.0)(@huggingface/transformers@4.3.2(@types/node@22.20.5))(cactus-needle@0.3.0)':
     dependencies:
       lodash-es: 4.18.1
       validator: 13.15.35
