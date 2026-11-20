@@ -51,4 +51,29 @@ describe('Fly Machines real lifecycle API contracts',()=>{
       .rejects.toThrow(/incomplete/);
     await expect(listFlyMachines(auth,'app',fetcher({machines:[]}))).rejects.toThrow();
   });
+  it('forces HTTP routing to the chosen running machine without leaking Fly API token',async()=>{
+    const fetchMock=fetcher({ok:true});
+    const {invokeFlyMachineHttp}=await import('./fly-machines.js');
+    const out=await invokeFlyMachineHttp({app:'app-1',machineId:'machineA',
+      path:'/jobs/run',method:'POST',payload:{job:'test'}},fetchMock);
+    expect(out.status).toBe(200);
+    expect(out.body).toContain('ok');
+    const [url,options]=fetchMock.mock.calls[0];
+    expect(String(url)).toBe('https://app-1.fly.dev/jobs/run');
+    const headers=options?.headers as Record<string,string>;
+    expect(headers['Fly-Force-Instance-Id']).toBe('machineA');
+    expect(headers.Authorization).toBeUndefined();
+    expect(options?.body).toBe(JSON.stringify({job:'test'}));
+  });
+  it('refuses untrusted HTTP paths and oversize payload before network call',async()=>{
+    const fetchMock=vi.fn<typeof fetch>();
+    const {invokeFlyMachineHttp}=await import('./fly-machines.js');
+    await expect(invokeFlyMachineHttp({app:'bad.example.com',machineId:'vm',
+      path:'/run',method:'POST'},fetchMock)).rejects.toThrow();
+    await expect(invokeFlyMachineHttp({app:'good',machineId:'vm',
+      path:'//host.invalid/run',method:'GET'},fetchMock)).rejects.toThrow();
+    await expect(invokeFlyMachineHttp({app:'good',machineId:'vm',
+      path:'/run',method:'POST',payload:{data:'x'.repeat(140000)}},fetchMock)).rejects.toThrow();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

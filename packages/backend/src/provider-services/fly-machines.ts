@@ -1,4 +1,5 @@
 import {createProviderClient} from './client.js';
+import {resolveTrustedApiUrl} from '@dinilmusick/gutts/urls/safety';
 import type {ProviderConnection} from './types.js';
 /** Typed Fly.io Machines API; does not claim that an API acceptance means a VM is running. */
 export interface FlyMachine {
@@ -85,4 +86,64 @@ export async function mutateFlyMachine(
     path,method:operation==='delete'?'DELETE':'POST',
   });
   return {accepted:true,app,id,operation};
+}
+
+/** Dispatch an HTTP request to the exact Fly Machine through Fly Proxy.
+ * The selected app must expose a public HTTP service and the invoking backend
+ * must independently authorize the owner, workspace and machine.
+ * NO Fly API bearer token is forwarded to the application.
+ */
+export interface FlyHttpInvocation {
+  app:string; machineId:string; path:string;
+  method:'GET'|'POST'; payload?:unknown; appAuthorization?:string;
+}
+export async function invokeFlyMachineHttp(
+  input:FlyHttpInvocation,transport:typeof fetch=fetch,
+):Promise<{status:number;contentType:string;body:string}> {
+  const app=identifier(input.app,'app name');
+  const machineId=identifier(input.machineId,'machine ID');
+  if(typeof input.path!=='string'||input.path.length>512||!input.path.startsWith('/')
+    ||input.path.startsWith('//')||!/^[\x20-\x7e]*$/.test(input.path))
+    throw new Error('Invalid Fly application path');
+  if(!['GET','POST'].includes(input.method)|| (input.method==='GET'&&input.payload!==undefined))
+    throw new Error('Invalid Fly HTTP method or request');
+  if(input.appAuthorization!==undefined
+    &&(typeof input.appAuthorization!=='string'||input.appAuthorization.length>4096
+      ||/[\r\n]/.test(input.appAuthorization)))
+    throw new Error('Invalid application authorization');
+  const payload=input.payload===undefined?undefined:JSON.stringify(input.payload);
+  if(payload!==undefined&&new TextEncoder().encode(payload).byteLength>131072)
+    throw new Error('Fly request exceeds the allowed size');
+  const target=resolveTrustedApiUrl('https://'+app+'.fly.dev',input.path);
+  const headers:Record<string,string>={
+    Accept:'application/json',
+    'Fly-Force-Instance-Id':machineId,
+    ...(payload===undefined?{}:{'Content-Type':'application/json'}),
+    ...(input.appAuthorization?{Authorization:input.appAuthorization}:{}),
+  };
+  const response=await transport(target.toString(),{
+    method:input.method,headers,body:payload,redirect:'error',
+    signal:AbortSignal.timeout(15000),
+  });
+  const limit=131072;
+  const reader=response.body?.getReader();
+  if(!reader)return {status:response.status,contentType:response.headers.get('content-type')||'',body:''};
+  const chunks:Uint8Array[]=[];
+  let size=0;
+  try{
+    for(;;){
+      const part=await reader.read();
+      if(part.done)break;
+      size+=part.value.byteLength;
+      if(size>limit)throw new Error('Fly response exceeds the allowed size');
+      chunks.push(part.value);
+    }
+  }finally{
+    if(size>limit)await reader.cancel().catch(()=>undefined);
+    reader.releaseLock();
+  }
+  const bytes=new Uint8Array(size);let position=0;
+  for(const chunk of chunks){bytes.set(chunk,position);position+=chunk.byteLength;}
+  return {status:response.status,contentType:response.headers.get('content-type')||'',
+    body:new TextDecoder('utf-8',{fatal:true}).decode(bytes)};
 }
