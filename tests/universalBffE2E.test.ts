@@ -43,6 +43,9 @@ describe('Kloks BFF authorized configuration continuation', () => {
         if (statement.startsWith('SELECT principal_id,access_encrypted')) {
           return { rows: session ? [session] : [] };
         }
+        if (statement.startsWith('SELECT 1 FROM public.kloks_oidc_sessions')) {
+          return { rows: session ? [{ authorized: true }] : [] };
+        }
         throw new Error('Unexpected test query (fail closed)');
       },
     };
