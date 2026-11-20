@@ -1,6 +1,8 @@
 name: npm Release
 
 on:
+  repository_dispatch:
+    types: [atax-kloks-npm-release]
   workflow_dispatch:
     inputs:
       publish:
@@ -19,7 +21,14 @@ concurrency:
 
 jobs:
   publish:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'repository_dispatch' &&
+        github.event.action == 'atax-kloks-npm-release' &&
+        github.actor == 'dinilmusick' &&
+        github.event.client_payload.publish == true &&
+        github.event.client_payload.expected_head == github.sha))
     runs-on: ubuntu-latest
     steps:
       - name: Check out the exact verified release commit
@@ -74,8 +83,8 @@ jobs:
 
       - name: Embed approved exact-source release attestation
         if: >-
-          github.event_name == 'workflow_dispatch' &&
-          inputs.publish
+          (github.event_name == 'workflow_dispatch' && inputs.publish ||
+           github.event_name == 'repository_dispatch')
         env:
           SOURCE_SHA: ${{ github.sha }}
         run: |
@@ -142,8 +151,8 @@ jobs:
 
       - name: Publish only on explicit approved main-branch dispatch
         if: >-
-          github.event_name == 'workflow_dispatch' &&
-          inputs.publish &&
+          (github.event_name == 'workflow_dispatch' && inputs.publish ||
+           github.event_name == 'repository_dispatch') &&
           steps.registry.outputs.exists == 'false'
         run: |
           set -euo pipefail
@@ -154,7 +163,7 @@ jobs:
       - name: Independently verify downloadable npm tarball
         if: >-
           steps.registry.outputs.exists == 'true' ||
-          (github.event_name == 'workflow_dispatch' && inputs.publish)
+          (github.event_name == 'workflow_dispatch' && inputs.publish || github.event_name == 'repository_dispatch')
         env:
           PACKAGE_NAME: ${{ steps.package.outputs.name }}
           PACKAGE_VERSION: ${{ steps.package.outputs.version }}
@@ -207,8 +216,8 @@ jobs:
       - name: Notify downstream consumers after successful upstream publication
         if: >-
           success() &&
-          github.event_name == 'workflow_dispatch' &&
-          inputs.publish &&
+          (github.event_name == 'workflow_dispatch' && inputs.publish ||
+           github.event_name == 'repository_dispatch') &&
           steps.registry.outputs.exists == 'false'
         env:
           SYNC_TOKEN: ${{ secrets.ECOSYSTEM_SYNC_TOKEN }}
