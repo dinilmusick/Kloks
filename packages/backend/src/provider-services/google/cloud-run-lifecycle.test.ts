@@ -34,7 +34,8 @@ describe('Cloud Run real v2 lifecycle API',()=>{
     expect(body.scaling.minInstanceCount).toBe(0);
   });
   it('sets manual instance count only when explicitly approved',async()=>{
-    const fetcher=respond({name:operationName,done:true});
+    const fetcher=vi.fn<typeof fetch>().mockImplementation(async()=>
+      new Response(JSON.stringify({name:operationName,done:true}),{status:200}));
     for(const count of [0,1] as const){
       const op=await setCloudRunManualInstances(auth,scope,count,true,fetcher);
       expect(op.success).toBe(true);
