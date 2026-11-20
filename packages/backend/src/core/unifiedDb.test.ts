@@ -104,7 +104,7 @@ describe('canonical system database URL contract', () => {
 
     const nodeEnv = normalizeSystemEnvironment(
       {},
-      { SYSTEM_DATABASE_URL: 'postgresql://node/db', APP_URL: 'https://node.example' },
+      { SYSTEM_DATABASE_URL_1: 'postgresql://node/db', APP_URL: 'https://node.example' },
       'http://localhost:3000/api',
     );
     expect(nodeEnv.SYSTEM_DATABASE_URL_1).toBe('postgresql://node/db');
