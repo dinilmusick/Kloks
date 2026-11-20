@@ -40,6 +40,7 @@ export function cleanDbUrl(url?: unknown): string {
 export function getUnifiedDbUrl(env?: Record<string, unknown>): string {
   const supplied = env || {};
   const hasCanonicalBindings = [
+    'SYSTEM_DATABASE_URL_1',
     'SYSTEM_DATABASE_URL',
     'SYSTEM_DATABASE_URL_2',
     'SYSTEM_DATABASE_URL_3',
@@ -94,6 +95,7 @@ export async function queryUnifiedDb<T = any>(
 ): Promise<UnifiedQueryResult<T>> {
   const supplied = env || {};
   const hasCanonicalBindings = [
+    'SYSTEM_DATABASE_URL_1',
     'SYSTEM_DATABASE_URL',
     'SYSTEM_DATABASE_URL_2',
     'SYSTEM_DATABASE_URL_3',
@@ -107,7 +109,7 @@ export async function queryUnifiedDb<T = any>(
   if (databaseUrls.length === 0) {
     throw new Error(
       '[UnifiedDB] Missing system database configuration. ' +
-      'Set SYSTEM_DATABASE_URL; SYSTEM_DATABASE_URL_2 and SYSTEM_DATABASE_URL_3 are optional failover URLs.',
+      'Set SYSTEM_DATABASE_URL_1; legacy SYSTEM_DATABASE_URL remains temporarily supported. _2 and _3 are optional failovers.',
     );
   }
 
