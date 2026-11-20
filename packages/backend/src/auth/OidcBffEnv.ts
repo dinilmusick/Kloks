@@ -9,6 +9,8 @@ import { createOAuthBff } from './OidcBff.js';
  */
 export interface CanonicalApplicationAuthEnvironment {
   APP_URL?: unknown;
+  SYSTEM_DATABASE_URL_1?: unknown;
+  /** Transitional only: migrate to SYSTEM_DATABASE_URL_1 after full E2E. */
   SYSTEM_DATABASE_URL?: unknown;
   SYSTEM_DATABASE_URL_2?: unknown;
   SYSTEM_DATABASE_URL_3?: unknown;
@@ -36,7 +38,8 @@ export function createCanonicalApplicationOAuthBff(
   }
   const origin = String(env.APP_URL || '').trim();
   const candidates = [
-    env.SYSTEM_DATABASE_URL, env.SYSTEM_DATABASE_URL_2, env.SYSTEM_DATABASE_URL_3,
+    env.SYSTEM_DATABASE_URL_1, env.SYSTEM_DATABASE_URL,
+    env.SYSTEM_DATABASE_URL_2, env.SYSTEM_DATABASE_URL_3,
   ].filter((value): value is string => typeof value === 'string' && !!value.trim())
     .map(value => value.trim());
   if (!origin || !candidates.length) throw new Error('CANONICAL_APP_AUTH_NOT_PROVISIONED');
@@ -112,6 +115,7 @@ export function createCanonicalApplicationOAuthBff(
   return {
     handle: async (current: Request) => (await resolve(current)).handle(current),
     getSession: async (current: Request) => (await resolve(current)).getSession(current),
+    configuration: async (current: Request) => (await resolve(current)).configuration(current),
     start: async (current: Request) => (await resolve(current)).start(current),
     callback: async (current: Request) => (await resolve(current)).callback(current),
     session: async (current: Request) => (await resolve(current)).session(current),
