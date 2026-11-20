@@ -18,7 +18,7 @@ export interface LuthWorkloadConfiguration {
   protocol: 'ultrst.configuration.workload.v1';
   version: 1;
   application: { appId: string; ecosystemId: string; name: string };
-  principal: { workloadId: string };
+  principal: { kind: 'workload'; clientId: string };
   workspaceId: null;
   settings: {
     supportedServices: string[];
@@ -50,7 +50,7 @@ function parseWorkloadConfig(
   const settings = asRecord(data.settings), cache = asRecord(data.cache);
   if (data.protocol !== 'ultrst.configuration.workload.v1' || data.version !== 1 ||
       app.appId !== appId || typeof app.name !== 'string' ||
-      typeof app.ecosystemId !== 'string' || principal.workloadId !== clientId ||
+      typeof app.ecosystemId !== 'string' || principal.kind !== 'workload' || principal.clientId !== clientId ||
       data.workspaceId !== null || cache.maxAgeSeconds !== 0 ||
       typeof cache.generatedAt !== 'string' || typeof cache.revision !== 'string' ||
       !Array.isArray(settings.supportedServices) ||
@@ -62,7 +62,7 @@ function parseWorkloadConfig(
       !keysEqual(data, ['protocol', 'version', 'application', 'principal',
         'workspaceId', 'settings', 'cache']) ||
       !keysEqual(app, ['appId', 'ecosystemId', 'name']) ||
-      !keysEqual(principal, ['workloadId']) ||
+      !keysEqual(principal, ['kind', 'clientId']) ||
       !keysEqual(settings, ['supportedServices', 'deploymentOrigin',
         'deploymentEnvironment']) ||
       !keysEqual(cache, ['maxAgeSeconds', 'generatedAt', 'revision'])) {
