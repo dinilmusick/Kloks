@@ -1,3 +1,4 @@
+import { parseUniversalConfigurationV1 } from '@dinilmusick/gutts/auth';
 /**
  * Canonical application-side OAuth 2.1 backend-for-frontend (BFF).
  *
@@ -334,9 +335,77 @@ export function createOAuthBff(config: OAuthBffConfig) {
     return response;
   }
 
+  /**
+   * Authenticated same-origin configuration bridge.
+   * Browser code never sees an OAuth access token or confidential client
+   * credentials. The existing BFF verifies session + Luth userinfo first,
+   * then uses its server-held token only against the pinned Luth config API.
+   */
+  async function configuration(request: Request): Promise<Response> {
+    if (request.method !== 'GET') return reply({ error: 'METHOD_NOT_ALLOWED' }, 405);
+    const url = new URL(request.url);
+    if (url.pathname !== '/api/initialization/config' || url.search || url.hash ||
+        url.origin !== configOrigin(config).origin) {
+      return reply({ error: 'INVALID_CONFIGURATION_REQUEST' }, 400);
+    }
+    const origin = request.headers.get('origin');
+    if ((origin && origin !== url.origin) ||
+        request.headers.get('sec-fetch-site') === 'cross-site') {
+      return reply({ error: 'ORIGIN_DENIED' }, 403);
+    }
+    try {
+      const verified = await getSession(request);
+      if (!verified) return reply({ error: 'AUTHENTICATION_REQUIRED' }, 401);
+      const opaque = exactCookie(request, cookieName(config, 'session'));
+      if (!opaque) return reply({ error: 'AUTHENTICATION_REQUIRED' }, 401);
+      const found = await db.query(
+        'SELECT principal_id,access_encrypted FROM public.kloks_oidc_sessions ' +
+        'WHERE session_hash=$1 AND app_id=$2 AND principal_id=$3 ' +
+        'AND revoked_at IS NULL AND expires_at>clock_timestamp() ' +
+        'AND access_expires_at>clock_timestamp() LIMIT 1',
+        [await sha256(opaque), config.appId, verified.user.id],
+      );
+      if (found.rows.length !== 1) return reply({ error: 'AUTHENTICATION_REQUIRED' }, 401);
+      const token = await unseal(String(found.rows[0].access_encrypted), config);
+      const endpoint = new URL('/api/config/v1', config.issuer);
+      endpoint.searchParams.set('app_id', config.appId);
+      const upstream = await (config.fetcher || fetch)(endpoint, {
+        method: 'GET', cache: 'no-store', credentials: 'omit',
+        redirect: 'error', headers: {
+          authorization: 'Bearer ' + token,
+          accept: 'application/json',
+        },
+      });
+      if (!upstream.ok) {
+        const status = upstream.status === 401 ? 401 :
+          upstream.status === 403 ? 403 : 503;
+        return reply({ error: status === 401 ? 'AUTHENTICATION_REQUIRED' :
+          status === 403 ? 'AUTHORIZATION_DENIED' : 'CONFIG_UNAVAILABLE' }, status);
+      }
+      const payload = await upstream.json();
+      const validated = parseUniversalConfigurationV1(payload, config.appId, verified.user.id);
+      // Explicit projection also rejects excess top-level server metadata.
+      return reply({
+        protocol: validated.protocol, version: validated.version,
+        application: validated.application,
+        principal: { userId: verified.user.id }, workspaceId: validated.workspaceId,
+        settings: {
+          supportedServices: validated.settings.supportedServices,
+          deploymentOrigin: validated.settings.deploymentOrigin,
+          deploymentEnvironment: validated.settings.deploymentEnvironment,
+        },
+        cache: validated.cache,
+      }, 200);
+    } catch {
+      // Never forward OAuth tokens, SQL errors or upstream internal messages.
+      return reply({ error: 'CONFIG_UNAVAILABLE' }, 503);
+    }
+  }
+
   /** Routing is fixed, with no proxying of arbitrary Better Auth paths. */
   async function handle(request: Request): Promise<Response | null> {
     const path = new URL(request.url).pathname;
+    if (path === '/api/initialization/config') return configuration(request);
     if (path === '/api/auth/oidc/start') return start(request);
     if (path === '/api/auth/oidc/callback') return callback(request);
     if (path === '/api/auth/oidc/session') return session(request);
@@ -344,5 +413,5 @@ export function createOAuthBff(config: OAuthBffConfig) {
     return null;
   }
 
-  return { start, callback, getSession, session, signOut, handle };
+  return { start, callback, getSession, session, signOut, configuration, handle };
 }
