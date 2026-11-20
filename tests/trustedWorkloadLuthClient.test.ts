@@ -95,10 +95,11 @@ describe('Trusted headless discovery and client credentials continuation', () =>
     expect(network).toHaveBeenCalledTimes(1);
   });
   it('rejects http issuer rather than sending private assertions over insecure transport', async () => {
+    const privateKey = await key();
     expect(() => createTrustedWorkloadLuthClient({
       appId: 'srkl', clientId: 'srkl-worker-client',
       luthOrigin: 'http://public.example.test',
-      privateKey: await key(), keyId: 'key-1', algorithm: 'RS256',
+      privateKey, keyId: 'key-1', algorithm: 'RS256',
     })).toThrow('UNTRUSTED_LUTH_WORKLOAD_ISSUER');
   });
 });
