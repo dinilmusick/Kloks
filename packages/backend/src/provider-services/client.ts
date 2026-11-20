@@ -57,7 +57,8 @@ export function createProviderClient(connection: ProviderConnection, transport: 
       redirect: 'error', signal: AbortSignal.timeout(options.timeoutMs ?? 10_000),
     });
     if (!response.ok) throw new Error('Provider ' + id + ' returned HTTP ' + response.status);
-    const data = await response.json() as T;
+    const data = (response.status === 204 || response.status === 205
+      ? null : await response.json()) as T;
     return { data, status: response.status, headers: response.headers };
   }
   return { providerId: id, request };
