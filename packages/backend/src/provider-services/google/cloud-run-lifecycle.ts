@@ -15,7 +15,7 @@ export interface CloudRunCreate extends CloudRunScope {
 }
 const projectPattern=/^[a-z][a-z0-9-]{4,61}[a-z0-9]$/;
 const locationPattern=/^[a-z][a-z0-9-]{1,40}$/;
-const servicePattern=/^[a-z][a-z0-9-]{0,48}[a-z0-9]$/;
+const servicePattern=/^[a-z](?:[a-z0-9-]{0,47}[a-z0-9])?$/;
 function segment(input:string,name:string,pattern:RegExp):string{
   if(typeof input!=='string'||!pattern.test(input))throw new Error('Invalid '+name);
   return input;
