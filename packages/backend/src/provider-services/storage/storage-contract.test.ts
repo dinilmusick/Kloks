@@ -34,9 +34,10 @@ describe('canonical storage API contract', () => {
     const google = listProviderServiceTree().find(p => p.id === 'google');
     expect(google?.children.map(p => p.id)).toEqual(expect.arrayContaining([
       'google-drive','google-gemini','google-cloud-run','google-cloud-storage',
-      'google-cloud-shell','google-vertex-ai',
+      'google-cloud-shell','google-vertex-ai','google-compute-engine',
     ]));
-    expect(getProviderService('google-cloud-run')?.apiImplemented).toBe(false);
+    expect(getProviderService('google-cloud-run')?.apiImplemented).toBe(true)
+    expect(getProviderService('google-compute-engine')?.apiImplemented).toBe(false);
   });
   it('normalizes GitHub repositories, directory entries, and binary reads', async () => {
     const transport = vi.fn<typeof fetch>().mockImplementation(async input => {
