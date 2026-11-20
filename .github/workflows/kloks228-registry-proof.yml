@@ -8,7 +8,7 @@ permissions:
 jobs:
   prove:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -22,7 +22,21 @@ jobs:
           tmp="$(mktemp -d)"
           cd "$tmp"
           printf '{"private":true,"name":"kloks-registry-proof","version":"1.0.0","dependencies":{"@ultrst-armada/kloks":"2.2.8"}}\n' > package.json
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund --legacy-peer-deps
+          ready=false
+          for attempt in $(seq 1 40); do
+            npm cache clean --force >/dev/null 2>&1 || true
+            if npm install --package-lock-only --ignore-scripts --no-audit --no-fund --legacy-peer-deps \
+                 --prefer-online >/tmp/npm-probe.log 2>&1; then
+              ready=true
+              break
+            fi
+            echo "Public npm version not yet visible (attempt ${attempt}/40)"
+            sleep 15
+          done
+          if [[ "$ready" != true ]]; then
+            tail -n 20 /tmp/npm-probe.log
+            exit 1
+          fi
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const lock = JSON.parse(fs.readFileSync('package-lock.json','utf8'));
