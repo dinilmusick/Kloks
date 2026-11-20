@@ -14,3 +14,4 @@ export * from './compute-operations.js';
 export * from './free-compute.js';
 export * from './compute-routing.js';
 export * from './fly-machines.js';
+export * from './google/cloud-run-lifecycle.js';
