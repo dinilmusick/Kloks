@@ -1,10 +1,47 @@
-import {
-  createUniversalInitializationClient,
-  type UniversalBootstrapOptions,
-  type UniversalConfigurationV1,
-  type UniversalDiscoveryV1,
-  type UniversalAuthReadiness,
-} from '@dinilmusick/gutts/auth';
+import * as PortableLuthAuth from '@dinilmusick/gutts/auth';
+
+/** Structural invocation type only. The actual wire validator lives in GutTS. */
+type UniversalRuntimeKind =
+  | 'browser' | 'cloudflare-worker' | 'serverless' | 'server'
+  | 'desktop' | 'android' | 'ios' | 'headless';
+type UniversalAuthReadiness =
+  | 'discovery' | 'unauthenticated' | 'authenticating' | 'authenticated'
+  | 'configuring' | 'ready' | 'denied' | 'unavailable';
+interface UniversalDiscoveryV1 {
+  application: { appId: string; ecosystemId: string; name: string };
+  issuer: string;
+  configurationUrl: string;
+}
+interface UniversalConfigurationV1 {
+  application: { appId: string; ecosystemId: string; name: string };
+  principal: { userId: string };
+  settings: { supportedServices: string[] };
+}
+interface PortableClient {
+  discover(): Promise<UniversalDiscoveryV1>;
+  configuration(): Promise<UniversalConfigurationV1>;
+  invalidate(): void;
+  readonly readiness: UniversalAuthReadiness;
+}
+type PortableClientFactory = (
+  bootstrap: { appId: string; runtime: UniversalRuntimeKind; discoveryUrl?: string },
+  transport: {
+    expectedIssuerOrigin: string;
+    authorize?: () => Promise<HeadersInit>;
+    fetcher?: typeof fetch;
+    onStateChange?: (state: UniversalAuthReadiness) => void;
+  },
+) => PortableClient;
+
+function requiredGutTSFactory(): PortableClientFactory {
+  const source = PortableLuthAuth as Record<string, unknown>;
+  const factory = source.createUniversalInitializationClient;
+  if (typeof factory !== 'function') {
+    throw new Error('UNIVERSAL_INITIALIZATION_CONTRACT_UNAVAILABLE');
+  }
+  // No fallback to untrusted app URL, custom credential source or raw SQL.
+  return factory as PortableClientFactory;
+}
 
 /**
  * Canonical Kloks service for public discovery and least-privilege user
@@ -16,7 +53,7 @@ import {
  * until authenticated confidential workload provisioning is implemented.
  */
 export interface UniversalLuthRuntimeAdapter {
-  runtime: UniversalBootstrapOptions['runtime'];
+  runtime: UniversalRuntimeKind;
   appId: string;
   /** Existing Luth issuer origin; pinned before accepting discovery URLs. */
   issuerOrigin: string;
@@ -44,7 +81,7 @@ export function createUniversalLuthRuntimeService(
     // environment-string identity or a public caller-provided header.
     throw new Error('VERIFIED_WORKLOAD_AUTHENTICATION_REQUIRED');
   }
-  const client = createUniversalInitializationClient(
+  const client = requiredGutTSFactory()(
     { appId: adapter.appId, runtime: adapter.runtime,
       ...(adapter.discoveryUrl ? { discoveryUrl: adapter.discoveryUrl } : {}) },
     {
