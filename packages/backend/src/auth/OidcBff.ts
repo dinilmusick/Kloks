@@ -384,6 +384,17 @@ export function createOAuthBff(config: OAuthBffConfig) {
       }
       const payload = await upstream.json();
       const validated = parseUniversalConfigurationV1(payload, config.appId, verified.user.id);
+      // Recheck the app-local session after crossing the Luth network
+      // boundary: concurrent logout/revocation must not produce a late 200.
+      const stillAuthorized = await db.query(
+        'SELECT 1 FROM public.kloks_oidc_sessions ' +
+        'WHERE session_hash=$1 AND app_id=$2 AND principal_id=$3 ' +
+        'AND revoked_at IS NULL AND expires_at>clock_timestamp() LIMIT 1',
+        [await sha256(opaque), config.appId, verified.user.id],
+      );
+      if (stillAuthorized.rows.length !== 1) {
+        return reply({ error: 'AUTHENTICATION_REQUIRED' }, 401);
+      }
       // Explicit projection also rejects excess top-level server metadata.
       return reply({
         protocol: validated.protocol, version: validated.version,
