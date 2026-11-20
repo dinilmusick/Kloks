@@ -58,8 +58,12 @@ export async function signPrivateKeyJwtClientAssertion(
     : signer.algorithm === 'ES256'
       ? { name: 'ECDSA', hash: 'SHA-256' }
       : { name: 'Ed25519' };
+  const encoded = bytes(signingInput);
+  // Make the backing buffer unambiguously ArrayBuffer for WebCrypto typings.
+  const signingBytes = new Uint8Array(new ArrayBuffer(encoded.byteLength));
+  signingBytes.set(encoded);
   const signature = await crypto.subtle.sign(
-    algorithm, signer.privateKey, bytes(signingInput),
+    algorithm, signer.privateKey, signingBytes,
   );
   return signingInput + '.' + base64url(new Uint8Array(signature));
 }
