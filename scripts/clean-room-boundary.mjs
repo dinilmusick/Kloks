@@ -115,14 +115,23 @@ try {
   // installed from its packed tarball, and runtime/typing probes still execute.
   const fixtureManifestFile = path.join(consumer, "package.json");
   const fixtureManifest = JSON.parse(fs.readFileSync(fixtureManifestFile, "utf8"));
+  // Pin the disposable consumer's AWS SDK peers as a compatible tested pair.
+  // Floating npm replicas can expose lib-storage N+1 before client-s3 N+1,
+  // producing a false ERESOLVE failure even for the published package.
+  // This never changes Kloks peer ranges or relaxes npm peer validation.
+  const pinnedConsumerPeers = {
+    '@aws-sdk/client-s3': '3.1164.0',
+    '@aws-sdk/lib-storage': '3.1165.0',
+  };
   fixtureManifest.overrides = {
     ...(fixtureManifest.overrides || {}),
     "@supabase/auth-js": "2.119.1",
+    ...pinnedConsumerPeers,
   };
   fs.writeFileSync(fixtureManifestFile, JSON.stringify(fixtureManifest, null, 2) + "\n");
   const optionalPeers = Object.entries(pkg.peerDependenciesMeta || {})
     .filter(([name, meta]) => meta?.optional && pkg.peerDependencies?.[name])
-    .map(([name]) => `${name}@${pkg.peerDependencies[name]}`);
+    .map(([name]) => `${name}@${pinnedConsumerPeers[name] || pkg.peerDependencies[name]}`);
   if (optionalPeers.length) {
     execFileSync("npm", ["install", "--no-audit", "--no-fund", ...optionalPeers], {cwd: consumer, stdio: "pipe"});
     const authManifest = path.join(consumer, "node_modules", "@supabase", "auth-js", "package.json");
