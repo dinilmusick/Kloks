@@ -144,3 +144,54 @@ export async function getCloudRunOperation(
     .request<unknown>({path:'/v2/'+name});
   return operation(data,scope);
 }
+
+/** Invoke only a provider-read, ready Cloud Run service using its own ID token.
+ * Google Cloud Run expects an audience-matched ID token, not the Admin API
+ * OAuth access token. The Google service enforces its IAM independently.
+ */
+export async function invokeCloudRunHttp(
+  auth:ProviderConnection,scope:CloudRunScope,idToken:string,
+  request:{path:string;method:'GET'|'POST';payload?:unknown},
+  serviceTransport:typeof fetch=fetch,adminTransport:typeof fetch=fetch,
+):Promise<{status:number;contentType:string;body:string}>{
+  if(typeof idToken!=='string'||!/^[A-Za-z0-9_.-]{64,8192}$/.test(idToken))
+    throw new Error('A Google-signed Cloud Run ID token is required');
+  if(!request||typeof request.path!=='string'||request.path.length>512
+    ||!/^\/[a-zA-Z0-9/_-]*$/.test(request.path)||request.path.includes('..')
+    ||!['GET','POST'].includes(request.method)
+    ||(request.method==='GET'&&request.payload!==undefined))
+    throw new Error('Invalid Cloud Run HTTP invocation');
+  const payload=request.payload===undefined?undefined:JSON.stringify(request.payload);
+  if(payload!==undefined&&new TextEncoder().encode(payload).byteLength>131072)
+    throw new Error('Cloud Run request exceeds size limit');
+  const details=await getCloudRunService(auth,scope,adminTransport);
+  if(!details.ready||!details.uri||details.manualInstanceCount===0)
+    throw new Error('Selected Cloud Run service is not ready');
+  const response=await serviceTransport(details.uri+request.path,{
+    method:request.method,redirect:'error',signal:AbortSignal.timeout(15_000),
+    headers:{'X-Serverless-Authorization':'Bearer '+idToken,Accept:'application/json',
+      ...(payload===undefined?{}:{'Content-Type':'application/json'})},
+    body:payload,
+  });
+  const reader=response.body?.getReader();
+  if(!reader)return {status:response.status,contentType:response.headers.get('content-type')||'',body:''};
+  const parts:Uint8Array[]=[];
+  let length=0;
+  try{
+    for(;;){
+      const result=await reader.read();
+      if(result.done)break;
+      length+=result.value.byteLength;
+      if(length>131072)throw new Error('Cloud Run response exceeds size limit');
+      parts.push(result.value);
+    }
+  }finally{
+    if(length>131072)await reader.cancel().catch(()=>undefined);
+    reader.releaseLock();
+  }
+  const bytes=new Uint8Array(length);
+  let offset=0;
+  for(const item of parts){bytes.set(item,offset);offset+=item.byteLength;}
+  return {status:response.status,contentType:response.headers.get('content-type')||'',
+    body:new TextDecoder('utf-8',{fatal:true}).decode(bytes)};
+}

@@ -67,6 +67,35 @@ describe('Cloud Run real v2 lifecycle API',()=>{
       .rejects.toThrow();
     expect(remote).not.toHaveBeenCalled();
   });
+  it('invokes an exact ready Cloud Run URI using an ID token separate from management OAuth',async()=>{
+    const {invokeCloudRunHttp}=await import('./cloud-run-lifecycle.js');
+    const management=respond({name,uri:'https://worker-123.a.run.app',reconciling:false,
+      terminalCondition:{state:'CONDITION_SUCCEEDED'},
+      template:{containers:[{resources:{limits:{cpu:'2',memory:'2Gi'}}}]}});
+    const workload=respond({ok:true});
+    const idToken='e'.repeat(180);
+    const result=await invokeCloudRunHttp(auth,scope,idToken,
+      {method:'POST',path:'/work',payload:{hello:'world'}},workload,management);
+    expect(result.status).toBe(200);
+    const [url,options]=workload.mock.calls[0];
+    expect(String(url)).toBe('https://worker-123.a.run.app/work');
+    expect((options?.headers as Record<string,string>)['X-Serverless-Authorization'])
+      .toBe('Bearer '+idToken);
+    expect(JSON.stringify(options?.headers)).not.toContain(auth.credential);
+    expect(JSON.parse(String(options?.body)).hello).toBe('world');
+  });
+  it('rejects unsafe workload requests and does not invoke disabled services',async()=>{
+    const {invokeCloudRunHttp}=await import('./cloud-run-lifecycle.js');
+    const blocked=vi.fn<typeof fetch>();
+    const admin=respond({name,uri:'https://worker-123.a.run.app',reconciling:false,
+      terminalCondition:{state:'CONDITION_SUCCEEDED'},scaling:{manualInstanceCount:0},
+      template:{containers:[{resources:{limits:{cpu:'2',memory:'2Gi'}}}]}});
+    await expect(invokeCloudRunHttp(auth,scope,'x'.repeat(120),
+      {method:'GET',path:'//metadata'},blocked,admin)).rejects.toThrow();
+    await expect(invokeCloudRunHttp(auth,scope,'x'.repeat(120),
+      {method:'POST',path:'/ok',payload:{}},blocked,admin)).rejects.toThrow(/not ready/);
+    expect(blocked).not.toHaveBeenCalled();
+  });
   it('rejects wrong provider tokens, malicious service URI and fabricated operations',async()=>{
     const bad={...auth,providerId:'vercel'};
     await expect(getCloudRunService(bad,scope,vi.fn<typeof fetch>())).rejects.toThrow();

@@ -29,3 +29,9 @@ Official references:
 - https://docs.cloud.google.com/run/docs/managing/services
 - https://docs.cloud.google.com/run/docs/reference/rest/v2/projects.locations.services/delete
 - https://docs.cloud.google.com/run/docs/authenticating/service-to-service
+
+- `invokeCloudRunHttp` re-reads the exact ready service from the Cloud Run
+  Admin API, refuses manual scaling zero and invokes its verified `run.app`
+  URL using a caller-provided ID token in `X-Serverless-Authorization`. It
+  never forwards Admin API access credentials. Request/response bodies are
+  capped at 128 KiB, and redirects are refused.
