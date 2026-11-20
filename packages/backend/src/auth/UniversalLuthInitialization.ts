@@ -34,7 +34,7 @@ type PortableClientFactory = (
 ) => PortableClient;
 
 function requiredGutTSFactory(): PortableClientFactory {
-  const source = PortableLuthAuth as Record<string, unknown>;
+  const source = PortableLuthAuth as unknown as Record<string, unknown>;
   const factory = source.createUniversalInitializationClient;
   if (typeof factory !== 'function') {
     throw new Error('UNIVERSAL_INITIALIZATION_CONTRACT_UNAVAILABLE');
