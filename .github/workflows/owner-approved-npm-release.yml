@@ -1,0 +1,65 @@
+name: Owner-approved exact-head npm Release request
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  actions: write
+  issues: write
+
+jobs:
+  request:
+    if: >-
+      github.event.issue.user.id == 155351357 &&
+      github.event.issue.title == '[kloks-npm-release] publish'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out only the public Kloks release metadata
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Verify owner request is pinned to current main SHA
+        shell: bash
+        env:
+          REQUEST_SHA: ${{ github.event.issue.body }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$REQUEST_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo 'Request body must contain only the current 40-character main commit SHA' >&2
+            exit 1
+          }
+          [[ "$EXPECTED_SHA" == "$REQUEST_SHA" ]] || {
+            echo 'Stale release request: main commit has changed' >&2
+            exit 1
+          }
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const pkg = JSON.parse(fs.readFileSync('package.json','utf8'));
+          if (pkg.private || pkg.name !== '@ultrst-armada/kloks' ||
+              !/^\d+\.\d+\.\d+$/.test(pkg.version)) {
+            throw new Error('Refusing to publish invalid package metadata');
+          }
+          console.log('Validated canonical Kloks release metadata');
+          NODE
+
+      - name: Dispatch existing trusted npm Release pipeline
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Re-check main just before dispatch, avoiding stale issue races.
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          test "$latest" = "$GITHUB_SHA" || {
+            echo 'Main advanced after owner approval; dispatch denied' >&2
+            exit 1
+          }
+          gh api -X POST "repos/$GITHUB_REPOSITORY/actions/workflows/npm-release.yml/dispatches" \
+            -f ref=main -F 'inputs[publish]=true'
+          echo 'Trusted main-only npm Release workflow dispatched.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Publication is successful only after downstream build, tests, signed provenance and independent npm artifact verification.' >> "$GITHUB_STEP_SUMMARY"
