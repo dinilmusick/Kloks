@@ -11,3 +11,4 @@ export * from './storage-providers.js';
 export * from './storage/index.js';
 
 export * from './compute-operations.js';
+export * from './free-compute.js';

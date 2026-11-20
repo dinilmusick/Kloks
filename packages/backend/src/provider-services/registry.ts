@@ -1,4 +1,5 @@
 import type { ProviderDefinition } from './types.js';
+import { supplementalComputeProviders, getFreeComputeOffer } from './free-compute.js';
 
 /** One canonical catalog, independent of account instances and secrets. */
 const definitions: readonly ProviderDefinition[] = [
@@ -88,6 +89,7 @@ const definitions: readonly ProviderDefinition[] = [
   { id: 'xai', name: 'xAI Grok API', category: 'ai', status: 'excluded',
     credentialModes: ['api-key'], capabilities: ['inference'], renewal: 'unknown',
     apiImplemented: false, usageImplemented: false, docsUrl: 'https://docs.x.ai/' },
+  ...supplementalComputeProviders,
 ];
 const byId = new Map(definitions.map(def => [def.id, def]));
 const aliases: Record<string, string> = {
@@ -104,7 +106,9 @@ export function resolveProviderServiceId(id: string): string {
 }
 export function getProviderService(id: string): ProviderDefinition | undefined {
   const item = byId.get(resolveProviderServiceId(id));
-  return item && { ...item, credentialModes: [...item.credentialModes], capabilities: [...item.capabilities] };
+  const freeCompute = item && getFreeComputeOffer(item.id);
+  return item && { ...item, ...(freeCompute ? { freeCompute } : {}),
+    credentialModes: [...item.credentialModes], capabilities: [...item.capabilities] };
 }
 export function listProviderServices(category?: ProviderDefinition['category']): ProviderDefinition[] {
   return definitions.filter(item => !category || item.category === category)
