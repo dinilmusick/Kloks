@@ -22,7 +22,7 @@ function configuration() {
   return {
     protocol: 'ultrst.configuration.workload.v1', version: 1,
     application: { appId: 'aiko', ecosystemId: 'ultrst-armada', name: 'Aiko' },
-    principal: { workloadId: 'aiko-worker-client' },
+    principal: { kind: 'workload', clientId: 'aiko-worker-client' },
     workspaceId: null,
     settings: {
       supportedServices: ['agents'], deploymentOrigin: 'https://aiko.example.test',
@@ -64,7 +64,7 @@ describe('confidential Luth workload identity', () => {
       issuerOrigin: origin, keyId: 'worker-key-1', privateKeyJwk,
       fetcher: fetcher as typeof fetch,
     });
-    expect((await service.configuration()).principal.workloadId).toBe('aiko-worker-client');
+    expect((await service.configuration()).principal.clientId).toBe('aiko-worker-client');
     expect(calls.map(c => c.url)).toEqual([
       origin + '/api/discovery/v1?app_id=aiko',
       origin + '/api/auth/oauth2/token',
