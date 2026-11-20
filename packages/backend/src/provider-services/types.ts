@@ -1,7 +1,7 @@
 /** Canonical provider/service identity and quota contracts. No secrets are persisted here. */
 export type ProviderCategory = 'suite' | 'deployment' | 'cloud' | 'ai' | 'storage' | 'developer';
 export type ProviderStatus = 'ready' | 'catalogued' | 'excluded';
-export type CredentialMode = 'api-token' | 'api-key' | 'oauth2' | 'application-key';
+export type CredentialMode = 'api-token' | 'api-key' | 'aws-sigv4' | 'oauth2' | 'application-key';
 export type RenewalPolicy = 'daily' | 'weekly' | 'monthly' | 'ongoing' | 'unknown' | 'trial';
 
 export interface FreeComputeOffer {
