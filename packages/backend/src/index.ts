@@ -12,3 +12,4 @@ export type {
 } from './architecture/types.js';
 
 export * from './provider-services/index.js';
+export * from './auth/UniversalLuthInitialization.js';
