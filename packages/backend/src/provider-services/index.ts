@@ -13,3 +13,4 @@ export * from './storage/index.js';
 export * from './compute-operations.js';
 export * from './free-compute.js';
 export * from './compute-routing.js';
+export * from './fly-machines.js';
