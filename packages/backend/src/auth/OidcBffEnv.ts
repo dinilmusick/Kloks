@@ -76,7 +76,7 @@ export function createCanonicalApplicationOAuthBff(
       const sql = neon(dbUrl);
       let rows: Record<string, any>[];
       try {
-        rows = [...await sql.query(statement, [applicationId, verifiedOrigin.origin, settingsKey])];
+        rows = [...await sql(statement, [applicationId, verifiedOrigin.origin, settingsKey])];
       } catch (error) {
         lastError = error;
         continue; // Only transport/database errors may fail over to a backup.
@@ -102,7 +102,7 @@ export function createCanonicalApplicationOAuthBff(
         encryptionSecret: credential.bffSecret,
         database: {
           async query(query, values) {
-            const result = await sql.query(query, [...values]);
+            const result = await sql(query, [...values]);
             return { rows: [...result] };
           },
         },
