@@ -1,8 +1,12 @@
+import { getProviderService } from './registry.js';
 import {
-  getProviderService, listCloudflareWorkers, listCloudflarePages,
-  listVercelProjects, listVercelDeployments, listFlyApps,
-  listRenderServices, getRailwayAccount, listGoogleCloudRunServices,
-} from './index.js';
+  listCloudflareWorkers, listCloudflarePages, listVercelProjects,
+  listVercelDeployments,
+} from './operations.js';
+import {
+  listFlyApps, listRenderServices, getRailwayAccount,
+  listGoogleCloudRunServices,
+} from './compute-operations.js';
 import type { ProviderConnection } from './types.js';
 
 /** Do not add undocumented providers: this is the live API allowlist. */
