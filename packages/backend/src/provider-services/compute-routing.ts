@@ -70,6 +70,8 @@ export interface ComputeRouteRequest {
   customSpec?:ComputeSpec;
   /** Explicit choice: unknown telemetry excluded or manually user-weighted. */
   missingUsage:MissingUsagePolicy;
+  /** Explicit decision to keep using a paid/over-quota account after its free allocation is exhausted. */
+  exhaustedUsage?:'exclude'|'user-weight';
   allowAccountIds?:readonly string[];
 }
 export interface RankedComputeRoute {
@@ -107,6 +109,8 @@ export function rankComputeRoutes(request:ComputeRouteRequest,resources:readonly
     throw new Error('An authenticated user and workspace are required');
   if(!['exclude','user-weight'].includes(request.missingUsage))
     throw new Error('Missing-usage policy must be explicit');
+  if(request.exhaustedUsage!==undefined&&!['exclude','user-weight'].includes(request.exhaustedUsage))
+    throw new Error('Invalid exhausted-quota policy');
   if(request.allowAccountIds && (!Array.isArray(request.allowAccountIds)
     ||request.allowAccountIds.some(id=>typeof id!=='string'||!id)))
     throw new Error('Invalid account allowlist');
@@ -133,14 +137,18 @@ export function rankComputeRoutes(request:ComputeRouteRequest,resources:readonly
     }
     if(account.preferenceWeight===0){reject('Disabled by user account weight');continue;}
     let remainingFraction:number|null=null;
+    let exhaustedManualOverride=false;
     let weightSource:RankedComputeRoute['weightSource']='user-weight';
     if(account.usage&&account.usage.accountId===account.accountId
       &&account.usage.providerId===account.providerId){
       const decision=calculateProviderCapacity(account.usage,now);
-      if(decision.status==='exhausted'){reject('Provider-measured quota exhausted');continue;}
+      if(decision.status==='exhausted'){
+        if(request.exhaustedUsage!=='user-weight'){reject('Provider-measured quota exhausted');continue;}
+        exhaustedManualOverride=true;
+      }
       if(decision.status==='eligible'){remainingFraction=decision.weight;weightSource='verified-usage';}
     }
-    if(remainingFraction===null && request.missingUsage==='exclude'){
+    if(remainingFraction===null && request.missingUsage==='exclude' && !exhaustedManualOverride){
       reject('Verified quota measurement unavailable');continue;
     }
     const rawWeight=fitScore*account.preferenceWeight*(remainingFraction??1);

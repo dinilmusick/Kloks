@@ -52,6 +52,13 @@ describe('Frnes Compute Spec capability and remaining-usage routing',()=>{
     expect(ranked.candidates).toHaveLength(0);
     expect(ranked.rejected).toHaveLength(4);
   });
+  it('user can deliberately select exhausted paid accounts without claiming free capacity',()=>{
+    const ranked=rankComputeRoutes(request({exhaustedUsage:'user-weight'}),[account('a',100)],now);
+    expect(ranked.candidates).toHaveLength(1);
+    expect(ranked.candidates[0].remainingFraction).toBeNull();
+    expect(ranked.candidates[0].weightSource).toBe('user-weight');
+    expect(()=>rankComputeRoutes(request({exhaustedUsage:'unknown' as never}),[],now)).toThrow();
+  });
   it('supports explicitly user-weighted unmetered routing without fake quota',()=>{
     const ranked=rankComputeRoutes(request({missingUsage:'user-weight'}),
       [account('a',1,{usage:undefined}),account('b',1,{usage:undefined,preferenceWeight:3})],now);
