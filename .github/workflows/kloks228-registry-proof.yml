@@ -1,0 +1,34 @@
+name: Verify Kloks 2.2.8 exact public registry metadata
+on:
+  push:
+    branches:
+      - verify/kloks228-public-registry-digest-20261120
+permissions:
+  contents: read
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - name: Resolve published exact version with registry integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          cd "$tmp"
+          printf '{"private":true,"name":"kloks-registry-proof","version":"1.0.0","dependencies":{"@ultrst-armada/kloks":"2.2.8"}}\n' > package.json
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund --legacy-peer-deps
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const lock = JSON.parse(fs.readFileSync('package-lock.json','utf8'));
+          const pkg = lock.packages['node_modules/@ultrst-armada/kloks'];
+          if (pkg?.version !== '2.2.8' || !pkg.integrity?.startsWith('sha512-') ||
+              !pkg.resolved?.startsWith('https://registry.npmjs.org/'))
+            throw new Error('Exact published tarball digest unavailable');
+          console.log('KLOKS228_PUBLIC_PACKAGE '+JSON.stringify(pkg));
+          NODE
