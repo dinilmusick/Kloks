@@ -13,3 +13,5 @@ export type {
 
 export * from './provider-services/index.js';
 export * from './auth/UniversalLuthInitialization.js';
+export * from './auth/TrustedWorkloadLuthClient.js';
+export * from './auth/WorkloadJwtAssertion.js';
