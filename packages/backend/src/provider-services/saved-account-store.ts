@@ -63,14 +63,14 @@ function assertId(id: string): string {
 function binding(row: SavedRow): BoundSecret {
   return {
     ownerUserId: row.owner_user_id, workspaceId: row.workspace_id,
-    id: row.id, workspaceId: row.workspace_id, providerId: row.provider_id,
+    id: row.id, providerId: row.provider_id,
     resourceKind: row.resource_kind, accountScope: row.account_scope,
     projectId: row.project_id, region: row.region,
   };
 }
 function publicAccount(row: SavedRow): PublicSavedProviderAccount {
   return {
-    id: row.id, providerId: row.provider_id,
+    id: row.id, workspaceId: row.workspace_id, providerId: row.provider_id,
     resourceKind: row.resource_kind, accountScope: row.account_scope,
     projectId: row.project_id, region: row.region, label: row.label,
     enabled: row.enabled, checkedAt: new Date(row.checked_at).toISOString(),
