@@ -1,0 +1,72 @@
+name: Reconcile verified GutTS 2.2.4 lockfile
+on:
+  push:
+    branches:
+      - feat/universal-luth-client-v1-20261120
+permissions:
+  contents: write
+concurrency:
+  group: kloks-gutts224-lock-refresh
+  cancel-in-progress: false
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: true
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org/
+          cache: pnpm
+      - name: Wait until the immutable upstream package is publicly retrievable
+        shell: bash
+        run: |
+          set -euo pipefail
+          ready=false
+          for attempt in $(seq 1 48); do
+            if npm view '@dinilmusick/gutts@2.2.4' version --registry=https://registry.npmjs.org/ | grep -Fx '2.2.4' >/dev/null; then
+              ready=true
+              break
+            fi
+            echo "Waiting for GutTS 2.2.4 npm propagation ($attempt/48)"
+            sleep 15
+          done
+          test "$ready" = true
+      - name: Refresh the real pnpm dependency graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --lockfile-only --ignore-scripts --no-frozen-lockfile
+          pnpm install --frozen-lockfile --ignore-scripts
+      - name: Assert canonical package and lock versions
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          for (const path of ['package.json','packages/backend/package.json','packages/client/package.json']) {
+            const pkg=JSON.parse(fs.readFileSync(path,'utf8'));
+            if (pkg.dependencies?.['@dinilmusick/gutts']!=='2.2.4') throw new Error(path+' has stale GutTS');
+            if (path==='package.json' && pkg.version!=='2.2.9') throw new Error('Incorrect Kloks release version');
+          }
+          const lock=fs.readFileSync('pnpm-lock.yaml','utf8');
+          if (!lock.includes("@dinilmusick/gutts@2.2.4")) throw new Error('Missing immutable upstream tarball in pnpm lock');
+          console.log('Exact GutTS dependency and Kloks 2.2.9 release manifest verified.');
+          NODE
+      - name: Commit only package-manager generated lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- pnpm-lock.yaml; then
+            echo "Lockfile already matches; no commit needed."
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add pnpm-lock.yaml
+          git commit -m 'chore(lock): resolve published GutTS 2.2.4 with frozen pnpm graph'
+          git push origin HEAD:refs/heads/feat/universal-luth-client-v1-20261120
