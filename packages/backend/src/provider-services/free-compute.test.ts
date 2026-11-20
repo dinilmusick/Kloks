@@ -4,7 +4,7 @@ import { getFreeComputeOffer, listFreeComputeOffers } from './free-compute.js';
 describe('Frnes renewable compute offer catalogue', () => {
   it('provides cited, typed renewals without granting allocation authority', () => {
     const offers = listFreeComputeOffers();
-    expect(offers.length).toBeGreaterThanOrEqual(30);
+    expect(offers.length).toBeGreaterThanOrEqual(33);
     for (const offer of offers) {
       expect(offer.sourceUrl).toMatch(/^https:\/\//);
       expect(offer.verifiedDate).toBe('2026-11-20');
@@ -31,6 +31,7 @@ describe('Frnes renewable compute offer catalogue', () => {
     expect(recognized).toContain('railway');
     expect(recognized).not.toContain('modal');
     expect(recognized).not.toContain('kaggle-notebooks');
+    expect(recognized).not.toContain('huggingface-spaces-cpu');
   });
   it('returns copies rather than exposing mutable canonical registry metadata', () => {
     const offer = getFreeComputeOffer('modal')!;
