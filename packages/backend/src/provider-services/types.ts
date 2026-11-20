@@ -1,14 +1,29 @@
 /** Canonical provider/service identity and quota contracts. No secrets are persisted here. */
 export type ProviderCategory = 'suite' | 'deployment' | 'cloud' | 'ai' | 'storage' | 'developer';
 export type ProviderStatus = 'ready' | 'catalogued' | 'excluded';
-export type CredentialMode = 'api-token' | 'api-key' | 'oauth2' | 'application-key';
-export type RenewalPolicy = 'daily' | 'monthly' | 'ongoing' | 'unknown' | 'trial';
+export type CredentialMode = 'api-token' | 'api-key' | 'aws-sigv4' | 'oauth2' | 'application-key';
+export type RenewalPolicy = 'daily' | 'weekly' | 'monthly' | 'ongoing' | 'unknown' | 'trial';
+
+export interface FreeComputeOffer {
+  providerId: string;
+  allowance: string;
+  renewal: RenewalPolicy;
+  quotaScope: 'account' | 'workspace' | 'organization' | 'project' | 'billing-account' | 'subscription' | 'namespace';
+  workload: 'vm' | 'container' | 'function' | 'gpu' | 'sandbox' | 'ci' | 'notebook' | 'browser' | 'developer';
+  access: 'general' | 'restricted';
+  sourceUrl: string;
+  notes: string;
+  verifiedDate: string;
+  /** Catalogued allowance is NEVER proof of available account capacity. */
+  allocationEnabled: false;
+}
 
 export interface ProviderDefinition {
   /** A suite groups related service adapters and can expose its own identity API. */
   kind?: 'suite' | 'service';
   id: string;
   name: string;
+  freeCompute?: FreeComputeOffer;
   category: ProviderCategory;
   status: ProviderStatus;
   parentId?: string;

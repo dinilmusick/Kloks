@@ -21,7 +21,7 @@ describe('canonical storage and Google provider families', () => {
     ]));
     expect(tree.some(s => s.id === 'google-drive')).toBe(false);
     expect(getProviderServicePath('google-drive').map(s => s.id)).toEqual(['google','google-drive']);
-    expect(listProviderServiceChildren('google')).toHaveLength(7);
+    expect(listProviderServiceChildren('google')).toHaveLength(9);
   });
   it('declares implemented storage types but does not promote unimplemented cloud storage', () => {
     const ids = listRecognizedAccountServices().map(s => s.id);
