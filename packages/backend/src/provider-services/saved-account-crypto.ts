@@ -7,6 +7,7 @@ export interface ProviderSecretEnvelope {
 }
 export interface BoundSecret {
   ownerUserId: string;
+  workspaceId: string;
   id: string;
   providerId: string;
   resourceKind: string;
@@ -35,7 +36,7 @@ function unb64(value: string): Uint8Array {
 }
 function aad(bound: BoundSecret): ArrayBuffer {
   return bytes(encoder.encode(JSON.stringify([
-    'ultrst-provider-account:v1', bound.ownerUserId, bound.id,
+    'ultrst-provider-account:v1', bound.ownerUserId, bound.workspaceId, bound.id,
     bound.providerId, bound.resourceKind, bound.accountScope,
     bound.projectId, bound.region,
   ])));
