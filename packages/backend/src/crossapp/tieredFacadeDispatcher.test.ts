@@ -29,7 +29,7 @@ function fixture(runtime: 'composed' | 'desktop' | 'cloud' = 'composed') {
       peer: [target('peer', 'peer-1')],
       cloud: [target('cloud', 'cloud-low', 2), target('cloud', 'cloud-high', 99)],
     },
-    results: {} as Record<string, 'down' | 'forbidden' | 'hang' | 'network'>,
+    results: {} as Record<string, 'down' | 'forbidden' | 'guarded401' | 'guarded403' | 'hang' | 'network'>,
     calls: [] as Array<{ tier: string; id: string; invocationId: string; bearer: string; input: unknown }>,
     issues: [] as string[],
     phases: [] as string[],
@@ -62,6 +62,8 @@ function fixture(runtime: 'composed' | 'desktop' | 'cloud' = 'composed') {
       const mode = state.results[candidate.deploymentId];
       if (mode === 'down') throw new TieredFacadeDenied('TARGET_UNAVAILABLE', 503);
       if (mode === 'forbidden') throw new TieredFacadeDenied('ACCESS_DENIED', 403);
+      if (mode === 'guarded401') throw Object.assign(new Error('distinct target guard class'), { status: 401, code: 'AUTH_INVALID' });
+      if (mode === 'guarded403') throw Object.assign(new Error('distinct target guard class'), { status: 403, code: 'ACCESS_DENIED' });
       if (mode === 'network') throw new Error('internal network failure with secret data');
       if (mode === 'hang') return new Promise<never>(() => undefined);
       return { invocationId: req.invocationId, output: { total: 5 } };
@@ -103,6 +105,16 @@ describe('tiered BackendFacade dispatcher with independent trusted adapters', ()
     const { dispatch, state } = fixture('desktop');
     state.results['peer-1'] = 'forbidden';
     await expectDenied(() => dispatch.invoke(request), 'ACCESS_DENIED');
+    assert.deepEqual(state.calls.map(c => c.id), ['peer-1']);
+  });
+  it('never downgrades a target-side 401/403 from another guarded error class', async () => {
+    const { dispatch, state } = fixture('desktop');
+    state.results['peer-1'] = 'guarded403';
+    await expectDenied(() => dispatch.invoke(request), 'ACCESS_DENIED');
+    assert.deepEqual(state.calls.map(c => c.id), ['peer-1']);
+    state.calls.length = 0;
+    state.results['peer-1'] = 'guarded401';
+    await expectDenied(() => dispatch.invoke(request), 'AUTH_INVALID');
     assert.deepEqual(state.calls.map(c => c.id), ['peer-1']);
   });
   it('rejects missing identity and cross-workspace grants', async () => {
