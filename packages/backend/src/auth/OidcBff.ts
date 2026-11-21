@@ -186,6 +186,9 @@ export function createOAuthBff(config: OAuthBffConfig) {
     const target = new URL(config.issuer + '/oauth2/authorize');
     for (const [key, value] of Object.entries({
       response_type: 'code', client_id: config.clientId,
+      // Standard OIDC reauthentication: an app's explicit Sign in action
+      // must not silently reuse a different existing Luth identity.
+      prompt: 'login',
       redirect_uri: config.redirectUri, scope: 'openid profile email offline_access',
       state, code_challenge: challenge, code_challenge_method: 'S256',
     })) target.searchParams.set(key, value);
