@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const query = vi.hoisted(() => vi.fn());
-vi.mock('@neondatabase/serverless', () => ({ neon: () => query }));
+vi.mock('@neondatabase/serverless', () => ({
+  neon: () => Object.assign(
+    () => { throw new Error('NEON_V1_TAGGED_TEMPLATE_MISUSE'); },
+    { query },
+  ),
+}));
 import { createCanonicalApplicationOAuthBff } from './OidcBffEnv.js';
 
 const url = 'https://srkl.example.test';
