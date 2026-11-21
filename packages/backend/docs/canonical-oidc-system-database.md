@@ -1,62 +1,78 @@
-# Canonical application OAuth 2.1 configuration
+# Canonical public Luth OAuth 2.1 / OpenID Connect integration
 
-**System database is the source of truth.** All applications, regardless of
-local, Cloudflare, Vercel, or server process runtime, accept only these runtime
-configuration entries:
+Luth is the single OAuth 2.1 / OpenID Connect issuer. Kloks provides
+the canonical application backend-for-frontend (BFF). Do not introduce a
+trusted-source URL catalogue, administrator application-enrollment gate,
+application-owned identity provider, or copied confidential OAuth secrets.
 
-- `APP_URL` — exact origin of this deployed application.
-- `SYSTEM_DATABASE_URL` — canonical system database.
-- `SYSTEM_DATABASE_URL_2`, `SYSTEM_DATABASE_URL_3` — optional system
-  database failovers.
+## Open application registration
 
-Luth remains the only Better Auth OAuth issuer. The application ID is an
-immutable argument embedded in the consumer code, not a request field or an
-environment variable.
+- Any application, Cloudflare Worker, server or native/desktop client can
+  request its own OAuth client using the standard unauthenticated
+  `POST /api/auth/oauth2/register` (RFC 7591) endpoint on Luth.
+- Public clients use `token_endpoint_auth_method: none`, authorization-code
+  flow, and Proof Key for Code Exchange (PKCE) with `S256`.
+- A client registers its exact redirect URI. Luth verifies the redirect
+  against that client's own registration during authorization and code
+  exchange. This per-client redirect check is **not** a privileged-origin
+  allowlist and must not be removed.
+- Luth enforces state, login, consent, code validity, PKCE, refresh-token
+  security, scopes, token revocation, and account authorization.
+- Signed-in administrative OAuth client-management privileges are distinct
+  from public dynamic registration; they do not gate application creation.
+- No `luth_auth_origins`, `ultrst-apps`, `trustedOrigins`, manual origin
+  approval or pre-provisioned client secret is used as an enrollment gate.
 
-## Enrollment authority and storage
+## Server application integration
 
-Only an authenticated *active Luth administrator* can create an OAuth client.
-The operator chooses an HTTPS origin already enabled in the canonical
-`ultrst-apps` + `luth_auth_origins` registry. Luth calls the official
-Better Auth `adminCreateOAuthClient` API, then stores the returned
-confidential secret and a cryptographically random, stable encryption key in:
+Use the published `@ultrst-armada/kloks` backend auth package,
+`createCanonicalApplicationOAuthBff`, and the production schema migrations
+`006_kloks_oidc_bff.sql` and `007_kloks_open_oauth_registration.sql`.
 
-`public."ultrst-credentials".credentials.applicationOAuth["<appId>|<origin>"]`
+Each application supplies its immutable application ID and canonical
+`APP_URL`. A request origin must match its own configured `APP_URL`;
+this is **self-origin integrity**, not a global trusted-origin catalogue.
+The BFF discovers or creates its client through public Luth registration,
+and caches only the issued client ID and server-only encryption secret in
+`kloks_oidc_registrations`, keyed by application and exact redirect URI.
+It never reads or requires `luth_auth_origins`, `ultrst-apps`, Luth user
+admin privileges, or a preapproved client-secret registry.
 
-The object contains `clientId`, `clientSecret`, and `bffSecret`. Neither
-client secret nor BFF key is exposed in the administrator's browser. The
-system credentials table **must** be readable only by the trusted backend
-database role; no browser API/public role grants are permitted.
+`SYSTEM_DATABASE_URL_1` is required; `_2` and `_3` are optional
+database failovers. Do not ship Neon URLs, app session secrets, Luth
+tokens or client management credentials to browsers. The BFF controls
+one-use login state, server-side encrypted tokens, first-party HttpOnly
+cookies, authenticated userinfo, refresh and logout. Invalid or redirected
+client registrations fail closed.
 
-On every request Kloks resolves this record through the canonical system
-database, verifies active app, ecosystem, registered origin, and official
-non-disabled OAuth client bound to that same origin, then calls its existing
-OAuth BFF with the verified credentials. The BFF maintains PKCE, one-use
-login state, encrypted server-side tokens, first-party HttpOnly cookies,
-refresh and logout. Credentials are not cached across requests so a disabled
-client or origin immediately fails closed.
+## Cloudflare Workers portability
 
-A database outage may use the optional configured failover URL, but a
-successful query reporting disabled/missing or mismatched credentials does
-**not** fall through to another database: explicit revocation is authoritative.
+For the 2024-10-01 Workers compatibility date, configure
+`global_fetch_strictly_public` and `cache_option_enabled` in
+`compatibility_flags`. Cloudflare Workers rejects Fetch API
+`redirect: 'error'`, so Kloks uses `redirect: 'manual'` and rejects
+non-success responses rather than following a DCR redirect.
+Do not add a Cloudflare-only OAuth implementation or hardcoded
+administrator-approved Worker URL.
 
-**Do not introduce** `LUTH_OAUTH_CLIENT_ID`,
-`LUTH_OAUTH_CLIENT_SECRET`, `LUTH_OAUTH_BFF_SECRET`,
-`BETTER_AUTH_SECRET`, Google keys, or any other application secrets as
-environment bindings or browser state.
+Public `workers.dev` hostnames may have Worker-to-Worker routing
+differences. Independently test the deployed server-side call to the
+public Luth issuer and consider a production custom domain if Cloudflare
+still returns 404; never conceal a routing failure by whitelisting origins.
 
-## Release and verification
+## Desktop and native applications
 
-1. Verify this implementation and its packaged exports in Kloks exact-head CI.
-2. Publish the immutable `@ultrst-armada/kloks@2.2.8` from the verified
-   `main` release workflow using explicit operator approval.
-3. Pin its **actual npm registry tarball integrity** in SRKL and Aiko,
-   regenerate their lockfiles, and independently build/test/deploy both.
-4. Remove legacy `LUTH_OAUTH_BFF_SECRET` Worker bindings only after
-   the deployed apps use this database-backed Kloks implementation.
-5. In the authenticated Luth console, enroll SRKL and Aiko using their
-   canonical Worker origins. The Luth backend persists the credentials;
-   no additional Worker bindings are needed.
-6. Complete independent Chrome/Safari login, OIDC callback, refresh,
-   logout, replay, failure and revoked-session/cross-workspace checks
-   before asserting production E2E readiness.
+Use a separate public OAuth client with system-browser sign-in, S256 PKCE
+and a native redirect method supported by the issuer (such as a loopback
+URI, where permitted). Do not embed a confidential client secret in a
+desktop application. Native clients do not need an application-specific
+trusted-source URL entry.
+
+## Independent acceptance
+
+Verify: public DCR with no administrator enrollment; rejection of invalid
+redirects; authorization-code/PKCE and one-use state; authenticated
+callback; refresh and revocation; logout; session isolation; denial of
+cross-app or cross-workspace access; and actual desktop, Cloudflare
+Worker and non-Cloudflare client behavior. A green build or a healthy
+issuer endpoint alone is not end-to-end certification.
