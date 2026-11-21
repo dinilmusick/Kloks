@@ -23,7 +23,7 @@ function runSql(sql: ReturnType<typeof neon>, statement: string, values: unknown
   const client = sql as typeof sql & { query?: (text: string, params: unknown[]) => Promise<unknown[]> };
   return typeof client.query === 'function'
     ? client.query(statement, values)
-    : sql(statement, values);
+    : sql(statement, values) as unknown as Promise<unknown[]>;
 }
 
 function secret(): string {
