@@ -41,7 +41,9 @@ function connections(env: CanonicalApplicationAuthEnvironment): string[] {
 async function selfRegister(appId: string, redirectUri: string): Promise<string> {
   const issuer = DEFAULT_LUTH_URL.replace(/\/$/, '');
   const response = await fetch(issuer + '/api/auth/oauth2/register', {
-    method: 'POST', credentials: 'omit', redirect: 'error', cache: 'no-store',
+    // Cloudflare Workers (and some other runtimes) reject redirect: 'error'.
+    // Manual redirects remain fail-closed: non-2xx responses are rejected below.
+    method: 'POST', credentials: 'omit', redirect: 'manual', cache: 'no-store',
     headers: { 'content-type': 'application/json', accept: 'application/json' },
     body: JSON.stringify({
       client_name: appId,
