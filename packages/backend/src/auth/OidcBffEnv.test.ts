@@ -53,7 +53,7 @@ describe('open OAuth BFF registration without a trusted-origin catalogue', () =>
     const response = await createCanonicalApplicationOAuthBff(request, env, 'srkl', skipoConfig).handle(request);
     expect(response?.status).toBe(401);
     expect(transport).toHaveBeenCalledTimes(1);
-    expect(String(transport.mock.calls[0]?.[0])).toContain('/api/auth/oauth2/register');
+    expect(String(transport.mock.calls[0]?.[0])).toBe('https://luth.example.test/api/auth/oauth2/register');
     expect(saved?.client_id).toBe(registration.client_id);
     const statements = query.mock.calls.map(call => String(call[0])).join(' ');
     expect(statements).not.toMatch(/luth_auth_origins|ultrst-apps|applicationOAuth|oauthClient/);
