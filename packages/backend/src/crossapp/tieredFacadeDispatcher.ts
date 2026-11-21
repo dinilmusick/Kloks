@@ -92,6 +92,14 @@ const sameOperation = (a: TrustedFacadeOperation, b: TrustedFacadeOperation) =>
   a.version === b.version && a.effect === b.effect;
 const availabilityError = (e: unknown) => e instanceof TieredFacadeDenied &&
   ['TARGET_UNAVAILABLE', 'DISPATCH_TIMEOUT', 'REMOTE_TRANSPORT_FAILED'].includes(e.code);
+/** Treat target-side auth denial as terminal even if it uses a different guard error class. */
+const terminalAuthorityError = (error: unknown): TieredFacadeDenied | null => {
+  if (!error || typeof error !== 'object') return null;
+  const status = (error as { status?: unknown }).status;
+  if (status === 401) return new TieredFacadeDenied('AUTH_INVALID', 401);
+  if (status === 403) return new TieredFacadeDenied('ACCESS_DENIED', 403);
+  return null;
+};
 
 function assertRequest(request: CrossAppRequest): void {
   if (!request || typeof request !== 'object' || Array.isArray(request) ||
@@ -185,7 +193,8 @@ export function createTieredFacadeDispatcher(options: TieredFacadeDispatcherOpti
         catch (error) {
           if (error instanceof TieredFacadeDenied && error.code === 'CANCELLED') throw error;
           if (tier === 'cloud') throw error;
-          if (error instanceof TieredFacadeDenied && [401, 403].includes(error.status)) throw error;
+          const authFailure = terminalAuthorityError(error);
+          if (authFailure) throw authFailure;
           lastFailure = new TieredFacadeDenied('TARGET_UNAVAILABLE', 503);
           continue;
         }
@@ -222,6 +231,8 @@ export function createTieredFacadeDispatcher(options: TieredFacadeDispatcherOpti
               sent = true;
               try { returned = await options.invokeTarget(candidate, snapshot, bearer, attemptSignal); }
               catch (e) {
+                const authFailure = terminalAuthorityError(e);
+                if (authFailure) throw authFailure;
                 if (e instanceof TieredFacadeDenied) throw e;
                 denied('REMOTE_TRANSPORT_FAILED', 502);
               }
