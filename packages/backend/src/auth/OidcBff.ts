@@ -13,9 +13,10 @@ export interface OAuthBffDatabase {
 export interface OAuthBffConfig {
   /** Luth's exact Better Auth issuer, including /api/auth. */
   issuer: string;
-  /** Exact, administratively verified Luth OAuth client and callback binding. */
+  /** Luth-issued OAuth client registered dynamically, never preapproved by origin. */
   clientId: string;
-  clientSecret: string;
+  /** Optional: public PKCE clients do not have a secret. */
+  clientSecret?: string;
   appId: string;
   redirectUri: string;
   /** Stable server-side secret, never serialized to a browser or log. */
@@ -96,7 +97,7 @@ function configOrigin(config: OAuthBffConfig): URL {
   const url = new URL(config.redirectUri);
   const issuer = new URL(config.issuer);
   if (issuer.protocol !== 'https:' || issuer.pathname !== '/api/auth' || issuer.search || issuer.hash ||
-      !config.clientId || !config.clientSecret || !config.appId ||
+      !config.clientId || !config.appId ||
       url.username || url.password || url.search || url.hash ||
       (url.protocol !== 'https:' && !(url.protocol === 'http:' &&
        ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)))) {
@@ -129,7 +130,10 @@ function reply(body: unknown, status: number): Response {
   return Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
 }
 function clientCredentials(config: OAuthBffConfig): URLSearchParams {
-  return new URLSearchParams({ client_id: config.clientId, client_secret: config.clientSecret });
+  // Public clients authenticate with client_id + S256 PKCE, not a shared secret.
+  const fields = new URLSearchParams({ client_id: config.clientId });
+  if (config.clientSecret) fields.set('client_secret', config.clientSecret);
+  return fields;
 }
 async function exchange(config: OAuthBffConfig, body: URLSearchParams): Promise<{
   access_token: string; refresh_token?: string; expires_in: number;
