@@ -58,3 +58,39 @@ describe('FrontendSession disposal revocation', () => {
     expect(callback).not.toHaveBeenCalled();
   });
 });
+
+
+describe('FrontendSession agent consent operation lifetime', () => {
+  it('aborts every outstanding consented operation on sign-out', () => {
+    const session = new FrontendSession({ sessionId: 'luth-session-one' });
+    const a = new AbortController();
+    const b = new AbortController();
+    session.trackAbortController(a);
+    session.trackAbortController(b);
+    session.dispose();
+    expect(a.signal.aborted).toBe(true);
+    expect(b.signal.aborted).toBe(true);
+    expect(session.isDisposed()).toBe(true);
+  });
+
+  it('does not abort a completed operation and immediately aborts late registration', () => {
+    const session = new FrontendSession();
+    const finished = new AbortController();
+    const release = session.trackAbortController(finished);
+    release();
+    session.dispose();
+    expect(finished.signal.aborted).toBe(false);
+    const late = new AbortController();
+    session.trackAbortController(late);
+    expect(late.signal.aborted).toBe(true);
+  });
+
+  it('runs tracked subscription cleanup only once across disposal and unsubscribe', () => {
+    const session = new FrontendSession();
+    const cleanup = vi.fn();
+    const unsubscribe = session.trackSubscription(cleanup);
+    session.dispose();
+    unsubscribe();
+    expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+});

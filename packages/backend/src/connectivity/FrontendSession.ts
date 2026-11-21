@@ -21,6 +21,7 @@ export class FrontendSession {
   public readonly callbackRegistry: CallbackRegistry;
   public readonly sequenceTracker: SequenceTracker;
   private subscriptions: Set<() => void> = new Set();
+  private operations: Set<AbortController> = new Set();
   private disposed = false;
 
   constructor(options: FrontendSessionOptions = {}) {
@@ -55,19 +56,28 @@ export class FrontendSession {
     return this.capabilities.has(capability) || this.capabilities.has('*');
   }
 
+  /** Dispose each subscription exactly once, even across sign-out/unsubscribe races. */
   trackSubscription(cleanup: () => void): () => void {
-    if (this.disposed) {
-      // Async subscription attachment can resolve after sign-out. Release it
-      // immediately rather than leaving a live listener on a closed session.
+    let active = true;
+    const release = () => {
+      if (!active) return;
+      active = false;
+      this.subscriptions.delete(release);
       try { cleanup(); } catch {}
-      return () => {};
-    }
-    this.subscriptions.add(cleanup);
-    return () => {
-      this.subscriptions.delete(cleanup);
-      cleanup();
     };
+    if (this.disposed) { release(); return release; }
+    this.subscriptions.add(release);
+    return release;
   }
+
+  /** Bind an in-flight inspection/action to this exact frontend session lifetime. */
+  trackAbortController(controller: AbortController): () => void {
+    if (this.disposed) { controller.abort(); return () => {}; }
+    this.operations.add(controller);
+    return () => { this.operations.delete(controller); };
+  }
+
+  isDisposed(): boolean { return this.disposed; }
 
   clearSubscriptions(): void {
     for (const cleanup of this.subscriptions) {
@@ -82,6 +92,9 @@ export class FrontendSession {
     // Revoke credentials and in-memory grants before listener cleanup can run.
     this.credentials = {};
     this.capabilities.clear();
+    // Prevent a UI approval, snapshot, or queued client request from surviving logout.
+    for (const controller of this.operations) controller.abort();
+    this.operations.clear();
     this.clearSubscriptions();
     this.callbackRegistry.clear();
     this.sequenceTracker.reset();
