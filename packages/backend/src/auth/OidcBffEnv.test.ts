@@ -72,7 +72,7 @@ describe('open OAuth BFF registration without a trusted-origin catalogue', () =>
 
   it('rejects OAuth registration redirects without following them', async () => {
     query.mockResolvedValue([]);
-    const transport = vi.fn(async () => new Response(null, {
+    const transport = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(null, {
       status: 302, headers: { location: 'https://unrelated.example.test/login' },
     }));
     vi.stubGlobal('fetch', transport);
