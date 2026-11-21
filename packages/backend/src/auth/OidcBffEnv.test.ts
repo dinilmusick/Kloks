@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const query = vi.hoisted(() => vi.fn());
+const driver = vi.hoisted(() => ({ legacy: false }));
 vi.mock('@neondatabase/serverless', () => ({
-  neon: () => Object.assign(
+  neon: () => driver.legacy ? query : Object.assign(
     () => { throw new Error('NEON_V1_TAGGED_TEMPLATE_MISUSE'); },
     { query },
   ),
@@ -16,7 +17,7 @@ const env = { APP_URL: url, SYSTEM_DATABASE_URL_1: 'postgres://canonical-db' };
 const registration = { client_id: 'registered-public-client',
   encryption_secret: 'stable-server-only-encryption-secret-32-characters' };
 
-beforeEach(() => { query.mockReset(); vi.unstubAllGlobals(); });
+beforeEach(() => { driver.legacy = false; query.mockReset(); vi.unstubAllGlobals(); });
 afterEach(() => vi.unstubAllGlobals());
 
 describe('open OAuth BFF registration without a trusted-origin catalogue', () => {
@@ -65,6 +66,17 @@ describe('open OAuth BFF registration without a trusted-origin catalogue', () =>
     expect(response?.status).toBe(401);
     expect(transport).not.toHaveBeenCalled();
     expect(query.mock.calls[0][1]).toEqual(['srkl', callback]);
+  });
+
+  it('also uses parameterized SQL on Neon 0.10 without the v1 query method', async () => {
+    driver.legacy = true;
+    query.mockResolvedValue([registration]);
+    const response = await createCanonicalApplicationOAuthBff(request, env, 'srkl').handle(request);
+    expect(response?.status).toBe(401);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('WHERE app_id=$1 AND redirect_uri=$2'),
+      ['srkl', callback],
+    );
   });
 
   it('fails closed on provider rejection, malformed response and missing local state', async () => {
