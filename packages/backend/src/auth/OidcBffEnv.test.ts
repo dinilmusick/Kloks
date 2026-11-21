@@ -1,72 +1,84 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const query = vi.hoisted(() => vi.fn());
 vi.mock('@neondatabase/serverless', () => ({ neon: () => query }));
 import { createCanonicalApplicationOAuthBff } from './OidcBffEnv.js';
 
 const url = 'https://srkl.example.test';
-const session = new Request(url + '/api/auth/oidc/session');
-const env = { APP_URL: url, SYSTEM_DATABASE_URL: 'postgres://trusted-host' };
+const callback = url + '/api/auth/oidc/callback';
+const request = new Request(url + '/api/auth/oidc/session');
+const env = { APP_URL: url, SYSTEM_DATABASE_URL_1: 'postgres://canonical-db' };
+const registration = { client_id: 'registered-public-client',
+  encryption_secret: 'stable-server-only-encryption-secret-32-characters' };
 
-const credential = {
-  clientId: 'verified-official-client',
-  clientSecret: 'official-client-secret-never-in-browser',
-  bffSecret: 'a-stable-server-only-secret-longer-than-32-characters',
-};
-beforeEach(() => {
-  query.mockReset();
-});
+beforeEach(() => { query.mockReset(); vi.unstubAllGlobals(); });
+afterEach(() => vi.unstubAllGlobals());
 
-describe('canonical ULTRST four-variable authentication bootstrap', () => {
-  it('reads only from the canonical database and rejects removed or inactive credentials', async () => {
+describe('open OAuth BFF registration without a trusted-origin catalogue', () => {
+  it('self-registers unknown clients through public Luth DCR without preapproved apps or confidential secrets', async () => {
+    let saved: typeof registration | null = null;
+    query.mockImplementation(async (sql: string, params: unknown[]) => {
+      if (sql.startsWith('SELECT client_id,encryption_secret')) return saved ? [saved] : [];
+      if (sql.startsWith('INSERT INTO public.kloks_oidc_registrations')) {
+        saved = { client_id: String(params[2]), encryption_secret: String(params[3]) };
+        return [];
+      }
+      throw new Error('unexpected SQL ' + sql);
+    });
+    const transport = vi.fn(async (_input: RequestInfo | URL, options?: RequestInit) => {
+      const body = JSON.parse(String(options?.body)) as Record<string, unknown>;
+      expect(body).toMatchObject({
+        token_endpoint_auth_method: 'none',
+        redirect_uris: [callback],
+        grant_types: ['authorization_code', 'refresh_token'],
+      });
+      expect(options?.credentials).toBe('omit');
+      expect(body).not.toHaveProperty('appId');
+      expect(body).not.toHaveProperty('origin');
+      return Response.json({
+        client_id: registration.client_id,
+        redirect_uris: [callback],
+        token_endpoint_auth_method: 'none',
+      }, { status: 201 });
+    });
+    vi.stubGlobal('fetch', transport);
+    const response = await createCanonicalApplicationOAuthBff(request, env, 'srkl').handle(request);
+    expect(response?.status).toBe(401);
+    expect(transport).toHaveBeenCalledTimes(1);
+    expect(String(transport.mock.calls[0]?.[0])).toContain('/api/auth/oauth2/register');
+    expect(saved?.client_id).toBe(registration.client_id);
+    const statements = query.mock.calls.map(call => String(call[0])).join(' ');
+    expect(statements).not.toMatch(/luth_auth_origins|ultrst-apps|applicationOAuth|oauthClient/);
+  });
+
+  it('reuses its own issued client without registering again or requiring operator enrollment', async () => {
+    query.mockResolvedValue([registration]);
+    const transport = vi.fn();
+    vi.stubGlobal('fetch', transport);
+    const response = await createCanonicalApplicationOAuthBff(request, env, 'srkl').handle(request);
+    expect(response?.status).toBe(401);
+    expect(transport).not.toHaveBeenCalled();
+    expect(query.mock.calls[0][1]).toEqual(['srkl', callback]);
+  });
+
+  it('fails closed on provider rejection, malformed response and missing local state', async () => {
     query.mockResolvedValue([]);
-    const bff = createCanonicalApplicationOAuthBff(session, {
-      ...env,
-      LUTH_OAUTH_CLIENT_ID: 'injected-attacker-id',
-      LUTH_OAUTH_CLIENT_SECRET: 'injected-attacker-secret',
-      LUTH_OAUTH_BFF_SECRET: 'injected-attacker-encryption-secret',
-    }, 'srkl');
-    await expect(bff.handle(session)).rejects.toThrow('CANONICAL_APP_AUTH_NOT_PROVISIONED');
-    expect(query).toHaveBeenCalledTimes(1);
-    const [statement, values] = query.mock.calls[0];
-    expect(statement).toContain('public."ultrst-credentials"');
-    expect(statement).toContain('public."oauthClient"');
-    expect(statement).toContain("a.status = 'active'");
-    expect(statement).toContain('o.enabled = true');
-    expect(statement).toContain('COALESCE(c.disabled, false) = false');
-    expect(values).toEqual(['srkl', url, 'srkl|' + url]);
-    expect(JSON.stringify(values)).not.toContain('injected-attacker');
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      Response.json({ error: 'rate_limited' }, { status: 429 })));
+    await expect(createCanonicalApplicationOAuthBff(request, env, 'srkl').handle(request))
+      .rejects.toThrow('OAUTH_CLIENT_REGISTRATION_UNAVAILABLE');
   });
 
-  it('preserves anonymous 401 without credentials ever entering the response', async () => {
-    query.mockResolvedValue([{ client_id: credential.clientId, settings: credential }]);
-    const result = await createCanonicalApplicationOAuthBff(session, env, 'srkl').handle(session);
-    expect(result?.status).toBe(401);
-    const serialized = await result!.text();
-    expect(serialized).not.toContain(credential.clientSecret);
-    expect(serialized).not.toContain(credential.bffSecret);
-  });
-
-  it('fails closed on any OAuth client ID mismatch', async () => {
-    query.mockResolvedValue([{ client_id: 'an-other-client', settings: credential }]);
-    const bff = createCanonicalApplicationOAuthBff(session, env, 'srkl');
-    await expect(bff.getSession(session)).rejects.toThrow('CANONICAL_APP_AUTH_NOT_PROVISIONED');
-  });
-
-  it('rejects origin spoofing before reading the database', async () => {
+  it('rejects spoofed request hosts before any database or provider request', () => {
     expect(() => createCanonicalApplicationOAuthBff(
       new Request('https://foreign.example.test/api/auth/oidc/session'), env, 'srkl',
     )).toThrow('APPLICATION_ORIGIN_MISMATCH');
     expect(query).not.toHaveBeenCalled();
   });
 
-  it('uses an eligible backup only when the primary throws, not after a denied client', async () => {
-    query.mockRejectedValueOnce(new Error('database offline')).mockResolvedValueOnce([
-      { client_id: credential.clientId, settings: credential },
-    ]);
-    const alternative = { ...env, SYSTEM_DATABASE_URL_2: 'postgres://backup-host' };
-    const bff = createCanonicalApplicationOAuthBff(session, alternative, 'srkl');
-    expect((await bff.handle(session))?.status).toBe(401);
-    expect(query).toHaveBeenCalledTimes(2);
+  it('fails closed when canonical registration database is not migrated', async () => {
+    query.mockRejectedValue(new Error('no such table'));
+    await expect(createCanonicalApplicationOAuthBff(request, env, 'srkl').handle(request))
+      .rejects.toThrow('OAUTH_CLIENT_REGISTRATION_UNAVAILABLE');
   });
 });

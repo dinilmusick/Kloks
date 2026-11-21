@@ -14,7 +14,9 @@ describe('Kloks public canonical auth package export', () => {
     expect(fs.existsSync(path.join(root, auth.import))).toBe(true);
     expect(fs.existsSync(path.join(root, auth.types))).toBe(true);
     const publicApi = fs.readFileSync(path.join(root, 'packages/client/src/auth.ts'), 'utf8');
-    expect(publicApi).toContain('createCanonicalAuthClient');
-    expect(publicApi).toContain('LuthAuthClient');
+    expect(publicApi).not.toContain('createCanonicalAuthClient');
+    expect(publicApi).toContain('verifyLuthRequest');
+    expect(publicApi).not.toContain('LuthAuthClient');
+    expect(publicApi).toContain('DEFAULT_LUTH_URL');
   });
 });

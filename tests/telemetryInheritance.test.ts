@@ -117,7 +117,8 @@ describe('Kloks Telemetry Inheritance via KrnlTS', () => {
 
   it('Backend services automatically inherit telemetry', async () => {
     expect(AuthServiceFacade.telemetry).toBeDefined();
-    expect((AuthServiceFacade as any).definition.operations.login).toBeDefined();
+    expect((AuthServiceFacade as any).definition.operations.login).toBeUndefined();
+    expect((AuthServiceFacade as any).definition.operations.resolveUser).toBeDefined();
     expect((AuthServiceFacade as any).definition.operations.resolveUser).toBeDefined();
 
     expect(StorageServiceFacade.telemetry).toBeDefined();

@@ -7,7 +7,6 @@ export * from './data/index.js';
 export * from './connectivity/index.js';
 export * from './client/index.js';
 export * from './srkl/index.js';
-export * from './luth/index.js';
 export type {
   Runtime,
   Deployment,

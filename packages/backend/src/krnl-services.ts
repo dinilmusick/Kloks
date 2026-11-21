@@ -13,7 +13,7 @@ import {
   type IService,
   type ServiceDefinition,
 } from '@ultrst-armada/krnl';
-import { loginSystemUser, resolveUserFromToken } from './auth/UnifiedAuthCore.js';
+import { verifyLuthOAuthAccessToken } from './auth/LuthOAuthUserInfo.js';
 import { queryUnifiedDb } from './core/unifiedDb.js';
 import { executeB2Explorer } from './core/b2ExplorerOperations.js';
 import type { B2ExplorerInput } from './core/b2ExplorerContext.js';
@@ -68,18 +68,13 @@ export const AuthServiceDefinition: ServiceDefinition = createServiceDefinition(
     initial: { activeSessions: 0 },
   },
   operations: {
-    login: {
-      id: 'AuthService.login',
-      name: 'login',
-      handler: async (input: { email: string; password: string; isAdmin?: boolean; env?: Record<string, unknown> }) =>
-        loginSystemUser(input.email, input.password, Boolean(input.isAdmin), (sql, params) => queryUnifiedDb(sql, params, input.env), input.env),
-    },
     resolveUser: {
       id: 'AuthService.resolveUser',
       name: 'resolveUser',
-      handler: async (input: { tokenOrUserId: string; env?: Record<string, unknown> }) =>
-        resolveUserFromToken(input.tokenOrUserId, (sql, params) => queryUnifiedDb(sql, params, input.env), input.env),
+      handler: async (input: { accessToken: string }) =>
+        verifyLuthOAuthAccessToken(input.accessToken),
     },
+
   },
 });
 
