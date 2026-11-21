@@ -95,3 +95,43 @@ jobs:
           path: artifacts/
           if-no-files-found: warn
           retention-days: 14
+
+  oauth-database:
+    name: Verify Open OAuth Registration on Disposable PostgreSQL
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci_oauth
+          POSTGRES_PASSWORD: disposable-only
+          POSTGRES_DB: ci_oauth
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci_oauth -d ci_oauth"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 6
+    env:
+      DATABASE_URL: postgresql://ci_oauth:disposable-only@localhost:5432/ci_oauth
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install ephemeral PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client
+      - name: Create only the historical prerequisite table, not a registered app
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c             'CREATE TABLE public."ultrst-apps"(app_id varchar(120) PRIMARY KEY)'
+      - name: Replay official Kloks BFF schema and public DCR migration
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1             -f packages/backend/db/migrations/006_kloks_oidc_bff.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1             -f packages/backend/db/migrations/007_kloks_open_oauth_registration.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1             -f packages/backend/db/migrations/007_kloks_open_oauth_registration.sql
+      - name: Independently verify arbitrary client and RLS without production data
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1             -f packages/backend/db/tests/007_open_public_oauth_registration.test.sql
