@@ -93,7 +93,7 @@ export function createCanonicalApplicationOAuthBff(
       let phase = 'read_registration';
       try {
         const sql = neon(url);
-        let rows = [...await sql(
+        let rows = [...await sql.query(
           'SELECT client_id,encryption_secret FROM public.kloks_oidc_registrations ' +
           'WHERE app_id=$1 AND redirect_uri=$2 LIMIT 2',
           [applicationId, redirectUri],
@@ -104,14 +104,14 @@ export function createCanonicalApplicationOAuthBff(
           phase = 'public_registration';
           const clientId = await selfRegister(applicationId, redirectUri);
           phase = 'persist_registration';
-          await sql(
+          await sql.query(
             'INSERT INTO public.kloks_oidc_registrations ' +
             '(app_id,redirect_uri,client_id,encryption_secret) VALUES ($1,$2,$3,$4) ' +
             'ON CONFLICT (app_id,redirect_uri) DO NOTHING',
             [applicationId, redirectUri, clientId, secret()],
           );
           phase = 'reload_registration';
-          rows = [...await sql(
+          rows = [...await sql.query(
             'SELECT client_id,encryption_secret FROM public.kloks_oidc_registrations ' +
             'WHERE app_id=$1 AND redirect_uri=$2 LIMIT 2',
             [applicationId, redirectUri],
@@ -131,7 +131,7 @@ export function createCanonicalApplicationOAuthBff(
           encryptionSecret: rows[0].encryption_secret,
           database: {
             async query(statement, values) {
-              const result = await sql(statement, [...values]);
+              const result = await sql.query(statement, [...values]);
               return { rows: [...result] };
             },
           },
