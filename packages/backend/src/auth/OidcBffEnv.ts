@@ -90,9 +90,9 @@ export function createCanonicalApplicationOAuthBff(
     }
     let lastError: unknown;
     for (const url of databaseUrls) {
-      const sql = neon(url);
       let phase = 'read_registration';
       try {
+        const sql = neon(url);
         let rows = [...await sql(
           'SELECT client_id,encryption_secret FROM public.kloks_oidc_registrations ' +
           'WHERE app_id=$1 AND redirect_uri=$2 LIMIT 2',
