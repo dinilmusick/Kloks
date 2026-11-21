@@ -82,6 +82,24 @@ describe('open OAuth BFF registration without a trusted-origin catalogue', () =>
     expect(transport.mock.calls[0]?.[1]?.redirect).toBe('manual');
   });
 
+  it('emits bounded server diagnostics without connection strings or redirect URLs', async () => {
+    query.mockResolvedValue([]);
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      Response.json({ error: 'provider-unavailable' }, { status: 503 })));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      await expect(createCanonicalApplicationOAuthBff(request, env, 'srkl').handle(request))
+        .rejects.toThrow('OAUTH_CLIENT_REGISTRATION_UNAVAILABLE');
+      expect(log).toHaveBeenCalledWith('[Kloks OAuth bootstrap failed]', {
+        phase: 'public_registration', code: 'LUTH_PUBLIC_OAUTH_REGISTRATION_DENIED',
+        sqlstate: 'UNKNOWN',
+      });
+      const output = JSON.stringify(log.mock.calls);
+      expect(output).not.toContain(env.SYSTEM_DATABASE_URL_1);
+      expect(output).not.toContain(callback);
+    } finally { log.mockRestore(); }
+  });
+
   it('rejects spoofed request hosts before any database or provider request', () => {
     expect(() => createCanonicalApplicationOAuthBff(
       new Request('https://foreign.example.test/api/auth/oidc/session'), env, 'srkl',
