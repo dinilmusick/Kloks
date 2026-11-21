@@ -5,7 +5,7 @@ const issuer = 'https://luth.example.test/api/auth';
 const appOrigin = 'https://srkl.example.test';
 const redirectUri = appOrigin + '/api/auth/oidc/callback';
 
-function fixture() {
+function fixture(publicClient = false) {
   let login: { stateHash: string; verifier: string; returnTo: string; consumed: boolean } | null = null;
   let browserSession: any = null;
   const database: OAuthBffDatabase = {
@@ -64,7 +64,8 @@ function fixture() {
     if (path === '/api/auth/oauth2/token') {
       const body = new URLSearchParams(init?.body as string);
       if (body.get('client_id') !== 'verified-srkl-client' ||
-          body.get('client_secret') !== 'server-private-client-secret') {
+          (publicClient ? body.has('client_secret') :
+            body.get('client_secret') !== 'server-private-client-secret')) {
         return Response.json({ error: 'invalid_client' }, { status: 401 });
       }
       if (body.get('grant_type') === 'authorization_code') {
@@ -99,7 +100,8 @@ function fixture() {
   });
   let time = Date.parse('2026-11-19T14:00:00Z');
   const config: OAuthBffConfig = {
-    issuer, clientId: 'verified-srkl-client', clientSecret: 'server-private-client-secret',
+    issuer, clientId: 'verified-srkl-client',
+    ...(publicClient ? {} : { clientSecret: 'server-private-client-secret' }),
     appId: 'srkl', redirectUri, encryptionSecret: 'this-is-a-server-only-32-byte-oidc-encryption-secret',
     database, fetcher: transport as typeof fetch, now: () => time,
   };
@@ -124,6 +126,20 @@ function fixture() {
 }
 
 describe('Kloks canonical Better Auth application OAuth BFF', () => {
+  it('uses only client_id plus PKCE for public self-registered OAuth clients', async () => {
+    const f = fixture(true);
+    const { state, flowCookie } = await f.begin();
+    const callback = await f.finish(state, flowCookie);
+    expect(callback?.status).toBe(303);
+    const tokenCalls = f.transport.mock.calls.filter(call =>
+      new URL(String(call[0])).pathname === '/api/auth/oauth2/token');
+    expect(tokenCalls).toHaveLength(1);
+    const payload = new URLSearchParams(tokenCalls[0]![1]?.body as string);
+    expect(payload.get('client_id')).toBe('verified-srkl-client');
+    expect(payload.has('client_secret')).toBe(false);
+    expect(payload.get('code_verifier')).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  });
+
   it('starts only S256 PKCE with exact registered redirect and host-scoped HttpOnly cookie', async () => {
     const f = fixture();
     const { authorization, flowCookie } = await f.begin('/workspaces');
