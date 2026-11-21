@@ -175,6 +175,13 @@ export function createOAuthBff(config: OAuthBffConfig) {
   async function start(request: Request): Promise<Response> {
     if (request.method !== 'GET') return reply({ error: 'METHOD_NOT_ALLOWED' }, 405);
     const url = new URL(request.url);
+    // The requested identity method travels as a signed authorization query.
+    // A provider choice is a login-screen hint, never an authorization grant.
+    const methods = url.searchParams.getAll('method');
+    if (methods.length > 1 || (methods[0] && !['google', 'email'].includes(methods[0]))) {
+      return reply({ error: 'INVALID_LOGIN_METHOD' }, 400);
+    }
+    const loginMethod = methods[0] || 'email';
     const state = nonce(), verifier = nonce();
     const challenge = await sha256(verifier);
     await db.query(
@@ -189,6 +196,9 @@ export function createOAuthBff(config: OAuthBffConfig) {
       // Standard OIDC reauthentication: an app's explicit Sign in action
       // must not silently reuse a different existing Luth identity.
       prompt: 'login',
+      // Better Auth signs all authorization parameters, including extensions.
+      // Luth verifies this before selecting its Google/email hosted action.
+      login_method: loginMethod,
       redirect_uri: config.redirectUri, scope: 'openid profile email offline_access',
       state, code_challenge: challenge, code_challenge_method: 'S256',
     })) target.searchParams.set(key, value);
