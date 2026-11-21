@@ -44,24 +44,51 @@ export interface FacadeInvocation {
   input: unknown;
 }
 
+/** Immutable operation identity passed to Luth admission, output revalidation and atomic replay/budget authority. */
+export interface FacadeInvocationAuthorityContext {
+  readonly operationId: string;
+  readonly version: string;
+  readonly targetWorkspaceId: string;
+  readonly invocationId: string;
+  readonly transport: FacadeTransport;
+}
+
+/**
+ * Trusted owning-app FOD execution context. Target-side admitted, never
+ * sourced from untrusted invocation JSON; contains no bearer/receipt.
+ */
+export interface FacadeTrustedWorkflowContext {
+  readonly targetAppId: string;
+  readonly caller: Readonly<VerifiedFacadeCaller>;
+  readonly authority: Readonly<FacadeInvocationAuthorityContext>;
+  readonly operation: Readonly<FacadeOperationDescriptor>;
+}
+
 export interface FacadeDecision {
   caller: Readonly<VerifiedFacadeCaller>;
   operation: Readonly<FacadeOperationDescriptor>;
   transport: FacadeTransport;
+  /** Durable, authority-verified invocation correlation; never taken from caller claims. */
+  invocationId?: string;
 }
 
 export interface FacadeInvocationOptions {
   targetAppId: string;
   facade: BackendFacade;
   /** Must validate Luth signature, audience, session status, revocation and delegation chain at each use. */
-  verifyLuthCredential: (credential: string, targetAudience: string) => Promise<VerifiedFacadeCaller | null>;
+  verifyLuthCredential: (credential: string, targetAudience: string, context?: Readonly<FacadeInvocationAuthorityContext>) => Promise<VerifiedFacadeCaller | null>;
   /**
    * Fresh, NON-CONSUMING Luth/session authority check for an already admitted caller.
    * Must validate the live session, delegation/grant revocation, target app and
    * audience against trusted state; must NEVER introspect or replay the one-use
    * admission bearer. Return the current trusted identity or null.
    */
-  revalidateLuthCaller: (admitted: Readonly<VerifiedFacadeCaller>, targetAudience: string) => Promise<VerifiedFacadeCaller | null>;
+  revalidateLuthCaller: (
+    admitted: Readonly<VerifiedFacadeCaller>, targetAudience: string,
+    context: Readonly<FacadeInvocationAuthorityContext>,
+    /** Exact original trusted admission object; only the Luth adapter can dereference its server-only receipt. */
+    admissionEvidence: Readonly<VerifiedFacadeCaller>,
+  ) => Promise<VerifiedFacadeCaller | null>;
   /** Must return only current static definitions and explicitly published workflow references. */
   listCurrentOperations: (workspaceId: string) => Promise<FacadeOperationDescriptor[]>;
   /** Must re-read current owner, publication, ACL, grant, scopes, input and output rules. */
@@ -69,9 +96,15 @@ export interface FacadeInvocationOptions {
   /** Must verify registry attestation, active lease, environment and target-workspace access. */
   deploymentEligible: (decision: FacadeDecision) => Promise<boolean>;
   /** Durable, atomic replay rejection and shared work-budget debit. No in-memory fallback. */
-  consumeInvocation: (caller: VerifiedFacadeCaller, invocationId: string) => Promise<boolean>;
-  /** Resolve the workflow from its owning workspace, then invoke via existing FOD runtime. */
-  invokePublishedWorkflow: (reference: { workspaceId: string; workflowId: string; version: string }, input: unknown, signal: AbortSignal) => Promise<unknown>;
+  consumeInvocation: (caller: VerifiedFacadeCaller, invocationId: string, context: Readonly<FacadeInvocationAuthorityContext>) => Promise<boolean>;
+  /**
+   * Execute via owning request-bound FOD runtime using this already admitted
+   * caller/context. Never consume the original Luth bearer again.
+   */
+  invokePublishedWorkflow: (
+    reference: { workspaceId: string; workflowId: string; version: string },
+    input: unknown, signal: AbortSignal, context: Readonly<FacadeTrustedWorkflowContext>,
+  ) => Promise<unknown>;
   /** Issue a new Luth-verifiable, audience-scoped delegated credential after atomic budget reservation. */
   delegateCredential: (caller: VerifiedFacadeCaller, targetAppId: string, invocationId: string, signal?: AbortSignal) => Promise<string>;
 }
@@ -119,8 +152,118 @@ function sameDispatchReference(before: FacadeOperationDescriptor, after: FacadeO
       : before.serviceId === after.serviceId && before.serviceOperation === after.serviceOperation);
 }
 
-function parseJson(body: Request): Promise<unknown> {
-  return body.json().catch(() => fail('MALFORMED_JSON', 400));
+/**
+ * Cross-app operations are JSON-only. Reject non-finite numbers, class/Map
+ * instances, accessors and cycles before authority evaluation or dispatch.
+ * Cap nesting and serialized bytes to stop unbounded work on graph inputs.
+ */
+export function assertFacadeJsonInput(value: unknown): void {
+  const seen = new WeakSet<object>();
+  let nodes = 0;
+  let approximateStringUnits = 0;
+  const visit = (item: unknown, depth: number): void => {
+    if (++nodes > 10_000 || depth > 32) fail('MALFORMED_INPUT', 400);
+    if (typeof item === 'string') {
+      approximateStringUnits += item.length;
+      if (approximateStringUnits > 1_048_576) fail('PAYLOAD_TOO_LARGE', 413);
+      return;
+    }
+    if (item === null || typeof item === 'boolean') return;
+    if (typeof item === 'number' && Number.isFinite(item)) return;
+    if (typeof item !== 'object') fail('MALFORMED_INPUT', 400);
+    const object = item as object;
+    if (seen.has(object)) fail('MALFORMED_INPUT', 400);
+    seen.add(object);
+    if (Array.isArray(item)) {
+      for (const child of item) visit(child, depth + 1);
+    } else {
+      const proto = Object.getPrototypeOf(object);
+      if (proto !== Object.prototype && proto !== null) fail('MALFORMED_INPUT', 400);
+      for (const [key, child] of Object.entries(object)) {
+        approximateStringUnits += key.length;
+        if (approximateStringUnits > 1_048_576) fail('PAYLOAD_TOO_LARGE', 413);
+        if (['__proto__', 'prototype', 'constructor'].includes(key)) fail('MALFORMED_INPUT', 400);
+        const descriptor = Object.getOwnPropertyDescriptor(object, key);
+        if (!descriptor || !Object.hasOwn(descriptor, 'value')) fail('MALFORMED_INPUT', 400);
+        visit(child, depth + 1);
+      }
+      if (Reflect.ownKeys(object).length !== Object.keys(object).length) fail('MALFORMED_INPUT', 400);
+    }
+    seen.delete(object);
+  };
+  visit(value, 0);
+  let encoded: string | undefined;
+  try { encoded = JSON.stringify(value); }
+  catch { fail('MALFORMED_INPUT', 400); }
+  if (typeof encoded !== 'string') fail('MALFORMED_INPUT', 400);
+  if (new TextEncoder().encode(encoded).byteLength > 1_048_576) fail('PAYLOAD_TOO_LARGE', 413);
+}
+
+/** Read and bound actual request bytes, not an untrusted Content-Length. */
+async function parseJson(body: Request): Promise<unknown> {
+  const declared = body.headers.get('content-length');
+  if (declared !== null && Number(declared) > 1_048_576) fail('PAYLOAD_TOO_LARGE', 413);
+  if (!body.body) fail('MALFORMED_JSON', 400);
+  const reader = body.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  let finished = false;
+  try {
+    while (true) {
+      if (body.signal.aborted) fail('CANCELLED', 408);
+      const { done, value } = await reader.read();
+      if (done) { finished = true; break; }
+      total += value.byteLength;
+      if (total > 1_048_576) fail('PAYLOAD_TOO_LARGE', 413);
+      chunks.push(value);
+    }
+  } catch (error) {
+    if (error instanceof FacadeInvocationDenied) throw error;
+    fail('MALFORMED_JSON', 400);
+  } finally {
+    if (!finished) void reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  try { return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)); }
+  catch { fail('MALFORMED_JSON', 400); }
+}
+
+/**
+ * Bound admission and preflight authority lookups by the SAME absolute deadline.
+ * Auth checks may stall while a deployment or grant is being revoked. Their
+ * returned decisions must not outlive the request, even when the host ignores
+ * an aborted fetch. This utility does not itself cancel upstream authority I/O;
+ * hosts should honor any cancellation signals they receive separately.
+ */
+async function boundedAuthority<T>(
+  run: () => Promise<T>, deadlineAt: number, signal?: AbortSignal,
+): Promise<T> {
+  if (signal?.aborted) fail('CANCELLED', 408);
+  const remaining = deadlineAt - Date.now();
+  if (remaining <= 0) fail('DEADLINE_EXCEEDED', 408);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  try {
+    const stopped = new Promise<never>((_resolve, reject) => {
+      onAbort = () => reject(new FacadeInvocationDenied('CANCELLED', 408));
+      signal?.addEventListener('abort', onAbort, { once: true });
+      timer = setTimeout(() => reject(new FacadeInvocationDenied('DEADLINE_EXCEEDED', 408)), remaining);
+      if (signal?.aborted) onAbort();
+    });
+    return await Promise.race([
+      Promise.resolve().then(() => {
+        if (signal?.aborted) fail('CANCELLED', 408);
+        return run();
+      }),
+      stopped,
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    if (onAbort) signal?.removeEventListener('abort', onAbort);
+  }
 }
 
 /**
@@ -134,9 +277,9 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
     if (typeof options[name] !== 'function') throw new Error(`Missing required facade authority: ${name}`);
   }
 
-  async function callerFor(credential: string): Promise<VerifiedFacadeCaller> {
+  async function callerFor(credential: string, context?: Readonly<FacadeInvocationAuthorityContext>): Promise<VerifiedFacadeCaller> {
     if (!credential || typeof credential !== 'string') fail('AUTH_REQUIRED', 401);
-    const caller = await options.verifyLuthCredential(credential, options.targetAppId);
+    const caller = await options.verifyLuthCredential(credential, options.targetAppId, context);
     if (!caller || !validId(caller.principalId) || !validId(caller.sourceAppId) ||
         !validId(caller.sourceWorkspaceId) || !validId(caller.sessionId) ||
         caller.audience !== options.targetAppId || !validId(caller.invoker?.id) ||
@@ -153,40 +296,113 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
     return caller;
   }
 
-  async function discover(credential: string, workspaceId: string, transport: FacadeTransport) {
-    const caller = await callerFor(credential);
+  async function discover(
+    credential: string, workspaceId: string, transport: FacadeTransport, signal?: AbortSignal,
+  ) {
     if (!validId(workspaceId)) fail('INVALID_WORKSPACE', 400);
-    const rows = await options.listCurrentOperations(workspaceId);
-    const visible: Array<Pick<FacadeOperationDescriptor, 'id' | 'version' | 'name' | 'kind' | 'targetWorkspaceId'>> = [];
-    for (const op of rows) {
-      if (!assertDescriptor(op) || op.targetWorkspaceId !== workspaceId) continue;
-      const decision = { caller, operation: op, transport };
-      if (!await options.deploymentEligible(decision) || !await options.authorize(decision, 'discover')) continue;
-      visible.push({ id: op.id, version: op.version, name: op.name, kind: op.kind, targetWorkspaceId: op.targetWorkspaceId });
+    // Discovery is scoped to an explicit catalog authority rather than an
+    // arbitrary operation. Hosts must validate this identity with Luth.
+    const proofContext: FacadeInvocationAuthorityContext = Object.freeze({
+      operationId: 'catalog.discover', version: 'current',
+      targetWorkspaceId: workspaceId, invocationId: crypto.randomUUID(), transport,
+    });
+    const initialDeadline = Date.now() + 30_000;
+    const verified = await boundedAuthority(
+      () => callerFor(credential, proofContext), initialDeadline, signal,
+    );
+    const caller: VerifiedFacadeCaller = Object.freeze({
+      ...verified, invoker: Object.freeze({ ...verified.invoker }),
+      chain: Object.freeze([...verified.chain]),
+    });
+    const deadline = Math.min(initialDeadline, caller.deadlineAt, caller.expiresAt);
+    const rows = await boundedAuthority(() => options.listCurrentOperations(workspaceId), deadline, signal);
+    if (!Array.isArray(rows) || rows.length > 1000) fail('CATALOG_UNAVAILABLE', 503);
+    const visible: FacadeOperationDescriptor[] = [];
+    for (const listed of rows) {
+      if (!assertDescriptor(listed) || listed.targetWorkspaceId !== workspaceId) continue;
+      const operation = Object.freeze({ ...listed });
+      const decision: FacadeDecision = { caller, operation, transport };
+      if (!await boundedAuthority(() => options.deploymentEligible(decision), deadline, signal) ||
+          !await boundedAuthority(() => options.authorize(decision, 'discover'), deadline, signal)) continue;
+      visible.push(operation);
     }
-    return visible;
+    // A grant or deployment may disappear while a large capability list is
+    // being projected. Never return metadata based on only the initial admission.
+    const currentCaller = await boundedAuthority(
+      () => options.revalidateLuthCaller(caller, options.targetAppId, proofContext, verified), deadline, signal,
+    );
+    if (!currentCaller || !currentCaller.invoker || !Array.isArray(currentCaller.chain) ||
+        !Number.isFinite(currentCaller.expiresAt) || currentCaller.expiresAt <= Date.now() ||
+        !Number.isFinite(currentCaller.deadlineAt) || currentCaller.deadlineAt <= Date.now() ||
+        currentCaller.audience !== options.targetAppId) fail('AUTH_INVALID', 401);
+    if (!sameCallerIdentity(caller, currentCaller)) fail('CALLER_CHANGED', 401);
+    const latest = await boundedAuthority(() => options.listCurrentOperations(workspaceId), deadline, signal);
+    if (!Array.isArray(latest) || latest.length > 1000) fail('CATALOG_UNAVAILABLE', 503);
+    const allowed: Array<Pick<FacadeOperationDescriptor, 'id' | 'version' | 'name' | 'kind' | 'targetWorkspaceId'>> = [];
+    for (const previous of visible) {
+      const current = latest.find(op => assertDescriptor(op) && sameDispatchReference(previous, op));
+      if (!current) continue;
+      const decision: FacadeDecision = { caller: currentCaller, operation: current, transport };
+      if (!await boundedAuthority(() => options.deploymentEligible(decision), deadline, signal) ||
+          !await boundedAuthority(() => options.authorize(decision, 'discover'), deadline, signal)) continue;
+      allowed.push({
+        id: current.id, version: current.version, name: current.name,
+        kind: current.kind, targetWorkspaceId: current.targetWorkspaceId,
+      });
+    }
+    return allowed;
   }
 
   async function invoke(credential: string, request: FacadeInvocation, transport: FacadeTransport, parentSignal?: AbortSignal) {
     assertInvocation(request);
-    const verified = await callerFor(credential);
+    // Snapshot the input handle so caller-side mutation cannot change the target
+    // workspace, immutable revision or invocation correlation during execution.
+    const admittedRequest: FacadeInvocation = {
+      operationId: request.operationId, version: request.version,
+      targetWorkspaceId: request.targetWorkspaceId, invocationId: request.invocationId,
+      input: (() => {
+        try { return structuredClone(request.input); }
+        catch { return fail('MALFORMED_INPUT', 400); }
+      })(),
+    };
+    assertFacadeJsonInput(admittedRequest.input);
+    const proofContext: FacadeInvocationAuthorityContext = Object.freeze({
+      operationId: admittedRequest.operationId, version: admittedRequest.version,
+      targetWorkspaceId: admittedRequest.targetWorkspaceId,
+      invocationId: admittedRequest.invocationId, transport,
+    });
+    const initialDeadline = Date.now() + 30_000;
+    const verified = await boundedAuthority(() => callerFor(credential, proofContext), initialDeadline, parentSignal);
     // Snapshot the signed caller so a host adapter cannot mutate the original
     // object during a long-running operation and bypass the final identity check.
-    const caller: VerifiedFacadeCaller = {
-      ...verified, invoker: { ...verified.invoker }, chain: [...verified.chain],
-    };
-    const current = await options.listCurrentOperations(request.targetWorkspaceId);
-    const operation = current.find(op => assertDescriptor(op) && op.id === request.operationId &&
-      op.targetWorkspaceId === request.targetWorkspaceId && op.version === request.version);
+    const caller: VerifiedFacadeCaller = Object.freeze({
+      ...verified, invoker: Object.freeze({ ...verified.invoker }),
+      chain: Object.freeze([...verified.chain]),
+    });
+    const preflightDeadline = Math.min(initialDeadline, caller.deadlineAt, caller.expiresAt);
+    const current = await boundedAuthority(
+      () => options.listCurrentOperations(admittedRequest.targetWorkspaceId), preflightDeadline, parentSignal,
+    );
+    const matching = current.find(op => assertDescriptor(op) && op.id === admittedRequest.operationId &&
+      op.targetWorkspaceId === admittedRequest.targetWorkspaceId && op.version === admittedRequest.version);
+    const operation = matching && Object.freeze({ ...matching });
     if (!operation) fail('OPERATION_UNAVAILABLE', 404);
-    const decision = { caller, operation, transport };
-    if (!await options.deploymentEligible(decision)) fail('DEPLOYMENT_UNAVAILABLE', 503);
-    if (!await options.authorize(decision, 'invoke', request.input)) fail('ACCESS_DENIED');
+    const decision = { caller, operation, transport, invocationId: admittedRequest.invocationId };
+    if (!await boundedAuthority(() => options.deploymentEligible(decision), preflightDeadline, parentSignal)) {
+      fail('DEPLOYMENT_UNAVAILABLE', 503);
+    }
+    if (!await boundedAuthority(
+      () => options.authorize(decision, 'invoke', admittedRequest.input), preflightDeadline, parentSignal,
+    )) fail('ACCESS_DENIED');
+    // Do not debit an already-cancelled call or dispatch side effects after cancellation.
+    if (parentSignal?.aborted) fail('CANCELLED', 408);
     // This must be backed by durable atomic state, not a per-process Set.
-    if (!await options.consumeInvocation(caller, request.invocationId)) fail('REPLAY_OR_BUDGET_EXHAUSTED', 409);
+    if (!await boundedAuthority(
+      () => options.consumeInvocation(caller, admittedRequest.invocationId, proofContext), preflightDeadline, parentSignal,
+    )) fail('REPLAY_OR_BUDGET_EXHAUSTED', 409);
 
     const controller = new AbortController();
-    const deadline = Math.min(caller.deadlineAt, caller.expiresAt, Date.now() + 30_000);
+    const deadline = preflightDeadline;
     const remaining = deadline - Date.now();
     if (remaining <= 0) fail('DEADLINE_EXCEEDED', 408);
     const abort = () => controller.abort();
@@ -202,37 +418,51 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
         if (controller.signal.aborted) reject(abortError());
       });
       const work = async () => {
+        if (controller.signal.aborted) throw abortError();
         if (operation.kind === 'workflow') {
-          return options.invokePublishedWorkflow({ workspaceId: operation.targetWorkspaceId, workflowId: operation.workflowId!, version: operation.version }, request.input, controller.signal);
+          const executionContext: FacadeTrustedWorkflowContext = Object.freeze({
+            targetAppId: options.targetAppId, caller, authority: proofContext, operation,
+          });
+          return options.invokePublishedWorkflow(
+            { workspaceId: operation.targetWorkspaceId, workflowId: operation.workflowId!, version: operation.version },
+            admittedRequest.input, controller.signal, executionContext,
+          );
         }
         const services = options.facade.services as Record<string, unknown>;
         if (!own(services, operation.serviceId!)) fail('OPERATION_UNAVAILABLE', 404);
         const service = services[operation.serviceId!] as { execute?: (name: string, input: unknown, context?: unknown) => unknown };
         if (typeof service?.execute !== 'function') fail('OPERATION_UNAVAILABLE', 404);
-        return service.execute(operation.serviceOperation!, request.input, { signal: controller.signal, transport });
+        return service.execute(operation.serviceOperation!, admittedRequest.input, { signal: controller.signal, transport });
       };
-      const output = await Promise.race([work(), stopped]);
-      // Do not release an output based solely on the authorization made before execution.
+      // Deadline and cancellation must also bound *all output-time checks*;
+      // racing only the service execution would allow a stalled Luth/Skipo
+      // authority to exceed the deadline and hang the caller indefinitely.
+      const guardedWork = async () => {
+        const output = await work();
+        if (controller.signal.aborted) throw abortError();
+        // Do not release an output based solely on the authorization made before execution.
       // Session revocation, deployment expiry, workflow unpublication and operation
       // version/dispatch-reference replacement must all take effect while work is running.
       // Luth invocation bearers are single-use: a second consuming introspection
       // would reject every legitimate result. Consult a distinct non-consuming
       // live Luth/session authority instead; fail closed if it is unavailable.
-      const currentCaller = await options.revalidateLuthCaller(caller, options.targetAppId);
+      const currentCaller = await options.revalidateLuthCaller(caller, options.targetAppId, proofContext, verified);
       if (!currentCaller || !currentCaller.invoker || !Array.isArray(currentCaller.chain) ||
         !Number.isFinite(currentCaller.expiresAt) || currentCaller.expiresAt <= Date.now() ||
         !Number.isFinite(currentCaller.deadlineAt) || currentCaller.deadlineAt <= Date.now() ||
         currentCaller.audience !== options.targetAppId) fail('AUTH_INVALID', 401);
       if (!sameCallerIdentity(caller, currentCaller)) fail('CALLER_CHANGED', 401);
-      const currentOperations = await options.listCurrentOperations(request.targetWorkspaceId);
+      const currentOperations = await options.listCurrentOperations(admittedRequest.targetWorkspaceId);
       if (!currentOperations.some(op => assertDescriptor(op) && sameDispatchReference(operation, op))) {
         fail('OPERATION_REVOKED', 403);
       }
-      const currentDecision: FacadeDecision = { caller: currentCaller, operation, transport };
+      const currentDecision: FacadeDecision = { caller: currentCaller, operation, transport, invocationId: admittedRequest.invocationId };
       if (!await options.deploymentEligible(currentDecision)) fail('DEPLOYMENT_UNAVAILABLE', 503);
       if (!await options.authorize(currentDecision, 'output', output)) fail('ACCESS_REVOKED');
       if (controller.signal.aborted) throw abortError();
-      return { output, replyTo: { ...currentCaller.invoker }, invocationId: request.invocationId };
+        return { output, replyTo: { ...currentCaller.invoker }, invocationId: admittedRequest.invocationId };
+      };
+      return await Promise.race([guardedWork(), stopped]);
     } finally {
       if (timer) clearTimeout(timer);
       parentSignal?.removeEventListener('abort', abort);
@@ -298,10 +528,10 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
       const path = new URL(request.url).pathname;
       const credential = bearer(request);
       if (path === '/api/crossapp/operations' && request.method === 'GET') {
-        return Response.json({ operations: await discover(credential, new URL(request.url).searchParams.get('workspace') ?? '', 'http') }, { headers: { 'Cache-Control': 'no-store' } });
+        return Response.json({ operations: await discover(credential, new URL(request.url).searchParams.get('workspace') ?? '', 'http', request.signal) }, { headers: { 'Cache-Control': 'no-store' } });
       }
       if (path === '/api/crossapp/invoke' && request.method === 'POST') {
-        return Response.json(await invoke(credential, await parseJson(request) as FacadeInvocation, 'http', request.signal), { headers: { 'Cache-Control': 'no-store' } });
+        return Response.json(await invoke(credential, await boundedAuthority(() => parseJson(request), Date.now() + 5_000, request.signal) as FacadeInvocation, 'http', request.signal), { headers: { 'Cache-Control': 'no-store' } });
       }
       return errorResponse(new FacadeInvocationDenied('NOT_FOUND', 404));
     } catch (error) { return errorResponse(error); }
@@ -313,7 +543,7 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
       const credential = bearer(request);
       // tools/list and tools/call perform their own admission verification
       // inside discover/invoke. Do not consume a one-use Luth bearer twice.
-      const body = await parseJson(request) as { jsonrpc?: unknown; id?: unknown; method?: unknown; params?: Record<string, unknown> };
+      const body = await boundedAuthority(() => parseJson(request), Date.now() + 5_000, request.signal) as { jsonrpc?: unknown; id?: unknown; method?: unknown; params?: Record<string, unknown> };
       if (!body || typeof body !== 'object' || Array.isArray(body) || body.jsonrpc !== '2.0' ||
         typeof body.method !== 'string') fail('INVALID_MCP_REQUEST', 400);
       id = body.id ?? null;
@@ -335,7 +565,7 @@ export function createFacadeInvocationBoundary(options: FacadeInvocationOptions)
       if (body.method === 'tools/list') {
         const workspace = body.params?.workspaceId;
         if (typeof workspace !== 'string') throw new FacadeInvocationDenied('INVALID_WORKSPACE', 400);
-        const operations = await discover(credential, workspace, 'mcp');
+        const operations = await discover(credential, workspace, 'mcp', request.signal);
         return Response.json({ jsonrpc: '2.0', id, result: { tools: operations.map(op => ({
           name: op.id, description: op.name,
           inputSchema: {
