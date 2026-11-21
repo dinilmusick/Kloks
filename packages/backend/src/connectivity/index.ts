@@ -26,3 +26,11 @@ export * from './BackendClient.js';
 
 /** Target-side, host-authorized BackendFacade invocation guard (HTTP/MCP/graph/agent). */
 export * from './facadeInvocation.js';
+/** Attested Skipo deployment resolution and one-use Luth remote wire client. */
+export * from './facadeRemoteClient.js';
+/** Server-side Luth one-use admission and non-consuming output authority wire adapter. */
+export * from './facadeLuthAuthority.js';
+/** Server-side Skipo exact-revision, Luth-scoped deployment and lease resolver. */
+export * from './facadeSkipoResolver.js';
+/** Owning FOD publication/grant and verified Skipo workflow host integration. */
+export * from './facadeFodResolver.js';
