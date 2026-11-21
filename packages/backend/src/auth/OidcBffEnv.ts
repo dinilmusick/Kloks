@@ -16,6 +16,16 @@ export interface CanonicalApplicationAuthEnvironment {
 }
 type Registration = { client_id: string; encryption_secret: string };
 
+/** Neon 0.10 supports a conventional call; Neon 1.x requires .query().
+ * Keep one parameterized SQL path across both supported dependency versions.
+ */
+function runSql(sql: ReturnType<typeof neon>, statement: string, values: unknown[]) {
+  const client = sql as typeof sql & { query?: (text: string, params: unknown[]) => Promise<unknown[]> };
+  return typeof client.query === 'function'
+    ? client.query(statement, values)
+    : sql(statement, values) as unknown as Promise<unknown[]>;
+}
+
 function secret(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   return Array.from(bytes, x => x.toString(16).padStart(2, '0')).join('');
@@ -93,7 +103,7 @@ export function createCanonicalApplicationOAuthBff(
       let phase = 'read_registration';
       try {
         const sql = neon(url);
-        let rows = [...await sql(
+        let rows = [...await runSql(sql,
           'SELECT client_id,encryption_secret FROM public.kloks_oidc_registrations ' +
           'WHERE app_id=$1 AND redirect_uri=$2 LIMIT 2',
           [applicationId, redirectUri],
@@ -104,14 +114,14 @@ export function createCanonicalApplicationOAuthBff(
           phase = 'public_registration';
           const clientId = await selfRegister(applicationId, redirectUri);
           phase = 'persist_registration';
-          await sql(
+          await runSql(sql,
             'INSERT INTO public.kloks_oidc_registrations ' +
             '(app_id,redirect_uri,client_id,encryption_secret) VALUES ($1,$2,$3,$4) ' +
             'ON CONFLICT (app_id,redirect_uri) DO NOTHING',
             [applicationId, redirectUri, clientId, secret()],
           );
           phase = 'reload_registration';
-          rows = [...await sql(
+          rows = [...await runSql(sql,
             'SELECT client_id,encryption_secret FROM public.kloks_oidc_registrations ' +
             'WHERE app_id=$1 AND redirect_uri=$2 LIMIT 2',
             [applicationId, redirectUri],
@@ -131,7 +141,7 @@ export function createCanonicalApplicationOAuthBff(
           encryptionSecret: rows[0].encryption_secret,
           database: {
             async query(statement, values) {
-              const result = await sql(statement, [...values]);
+              const result = await runSql(sql,statement, [...values]);
               return { rows: [...result] };
             },
           },
