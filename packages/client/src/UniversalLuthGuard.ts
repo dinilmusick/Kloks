@@ -4,114 +4,75 @@ export interface LuthPrincipal {
   id: string;
   email: string;
   name: string;
-  role: string;
+  role: 'user';
 }
 
 export const CANONICAL_PUBLIC_ROUTES: (string | RegExp)[] = [
-  '/health',
-  '/api/health',
-  '/api/status',
-  '/api/auth',
-  /^\/api(\/v1)?\/auth(\/.*)?$/,
+  '/health', '/api/health', '/api/status',
+  '/api/auth/oidc/start', '/api/auth/oidc/callback',
+  '/api/auth/oidc/session', '/api/auth/oidc/logout',
   /^\/api(\/v1)?\/database\/status$/,
   /^\/api(\/v1)?\/guest(\/.*)?$/,
-  /^\/api(\/v1)?\/discovery(\/.*)?$/,
   /^\/api(\/v1)?\/spec(\/.*)?$/,
 ];
 
-const SESSION_CACHE_TTL_MS = 60_000;
-const sessionCache = new Map<string, { principal: LuthPrincipal; expiresAt: number }>();
-
+/** Never interpret a cookie, API key, user ID or Origin as a Luth token. */
 export function extractLuthToken(request: Request): string {
   const authorization = request.headers.get('authorization') || '';
-  const bearer = /^Bearer\s+([^\s]+)$/i.exec(authorization.trim());
-  if (bearer) return bearer[1];
-  const apiKey = request.headers.get('x-api-key')?.trim();
-  if (apiKey) return apiKey;
-  const cookieHeader = request.headers.get('cookie') || '';
-  const cookies = cookieHeader.split(';').map(c => c.trim());
-  for (const prefix of ['better-auth.session_token=', '__Secure-better-auth.session_token=', 'luth_session=']) {
-    const found = cookies.find(c => c.startsWith(prefix));
-    if (found) {
-      try {
-        return decodeURIComponent(found.slice(prefix.length));
-      } catch {
-        return '';
-      }
-    }
-  }
-  return '';
+  const match = /^Bearer ([A-Za-z0-9._~-]{16,2048})$/i.exec(authorization.trim());
+  return match?.[1] || '';
+}
+export function isPublicRoute(
+  path: string, extraPublicRoutes: (string | RegExp)[] = [],
+): boolean {
+  return [...CANONICAL_PUBLIC_ROUTES, ...extraPublicRoutes].some(route =>
+    typeof route === 'string' ? route === path : route.test(path));
+}
+function deny(request: Request, unavailable = false): Response {
+  const mcp = new URL(request.url).pathname.includes('/mcp');
+  const status = unavailable ? 503 : 401;
+  const message = unavailable ? 'Luth OAuth provider unavailable.' :
+    'Valid OAuth 2.1 Bearer token required.';
+  return Response.json(mcp ? {
+    jsonrpc: '2.0', id: null,
+    error: { code: unavailable ? -32603 : -32001, message },
+  } : { success: false, error: message }, {
+    status, headers: { 'cache-control': 'no-store' },
+  });
 }
 
-export function isPublicRoute(pathname: string, extraPublicRoutes?: (string | RegExp)[]): boolean {
-  const routes = extraPublicRoutes
-    ? [...CANONICAL_PUBLIC_ROUTES, ...extraPublicRoutes]
-    : CANONICAL_PUBLIC_ROUTES;
-  return routes.some(route => (typeof route === 'string' ? pathname === route : route.test(pathname)));
-}
-
+/**
+ * Verify the official OAuth Provider token on every protected request.
+ * Never forward an application cookie; never cache identity across revocation.
+ */
 export async function verifyLuthRequest(
   request: Request,
-  options?: { luthUrl?: string; extraPublicRoutes?: (string | RegExp)[] }
+  options?: { luthUrl?: string; extraPublicRoutes?: (string | RegExp)[] },
 ): Promise<LuthPrincipal | Response | null> {
-  const url = new URL(request.url);
-  if (request.method === 'OPTIONS') return null;
-  if (isPublicRoute(url.pathname, options?.extraPublicRoutes)) return null;
-
-  const isMcp = url.pathname.includes('/mcp');
+  const path = new URL(request.url).pathname;
+  if (request.method === 'OPTIONS' ||
+      isPublicRoute(path, options?.extraPublicRoutes)) return null;
   const token = extractLuthToken(request);
-  if (!token) {
-    const payload = isMcp
-      ? { jsonrpc: '2.0', id: null, error: { code: -32001, message: 'A verified Luth session is required.' } }
-      : { success: false, error: 'A verified Luth session is required.' };
-    return new Response(JSON.stringify(payload), { status: 401, headers: { 'Content-Type': 'application/json' } });
-  }
-
-  const now = Date.now();
-  const cached = sessionCache.get(token);
-  if (cached && cached.expiresAt > now) {
-    return cached.principal;
-  }
-
+  if (!token) return deny(request);
   try {
-    const luthUrl = options?.luthUrl || DEFAULT_LUTH_URL;
-    const res = await fetch(`${luthUrl}/api/session`, {
-      headers: {
-        authorization: `Bearer ${token}`,
-        cookie: request.headers.get('cookie') || '',
-        origin: url.origin,
-      },
+    const issuer = new URL(options?.luthUrl || DEFAULT_LUTH_URL);
+    if (issuer.protocol !== 'https:') return deny(request, true);
+    const response = await fetch(new URL('/api/auth/oauth2/userinfo', issuer.origin), {
+      method: 'GET', credentials: 'omit', cache: 'no-store', redirect: 'error',
+      headers: { authorization: 'Bearer ' + token, accept: 'application/json' },
     });
-
-    if (!res.ok) {
-      const payload = isMcp
-        ? { jsonrpc: '2.0', id: null, error: { code: -32001, message: 'The Luth session is invalid or expired.' } }
-        : { success: false, error: 'The Luth session is invalid or expired.' };
-      return new Response(JSON.stringify(payload), { status: 401, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    const data = await res.json() as any;
-    const user = data?.user || (data?.authenticated ? data?.session?.user : null);
-    if (!user || !user.id) {
-      const payload = isMcp
-        ? { jsonrpc: '2.0', id: null, error: { code: -32001, message: 'The Luth session is invalid or expired.' } }
-        : { success: false, error: 'The Luth session is invalid or expired.' };
-      return new Response(JSON.stringify(payload), { status: 401, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    const principal: LuthPrincipal = {
-      id: String(user.id),
-      email: String(user.email || ''),
-      name: String(user.name || user.email?.split('@')[0] || ''),
-      role: String(user.role || 'user'),
+    if (response.status === 401 || response.status === 403) return deny(request);
+    if (!response.ok) return deny(request, true);
+    const body = await response.json() as Record<string, unknown>;
+    if (typeof body.sub !== 'string' || !body.sub ||
+        typeof body.email !== 'string' || !body.email) return deny(request);
+    return {
+      id: body.sub,
+      email: body.email,
+      name: typeof body.name === 'string' && body.name ? body.name : body.email,
+      role: 'user',
     };
-
-    sessionCache.set(token, { principal, expiresAt: now + SESSION_CACHE_TTL_MS });
-    return principal;
   } catch {
-    const payload = isMcp
-      ? { jsonrpc: '2.0', id: null, error: { code: -32603, message: 'Canonical Luth authentication service unavailable.' } }
-      : { success: false, error: 'Canonical Luth authentication service unavailable.' };
-    return new Response(JSON.stringify(payload), { status: 503, headers: { 'Content-Type': 'application/json' } });
+    return deny(request, true);
   }
 }
