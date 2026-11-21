@@ -1,6 +1,6 @@
 {
   "name": "@ultrst-armada/kloks",
-  "version": "2.2.9",
+  "version": "3.0.0",
   "private": false,
   "publishConfig": {
     "access": "public",
