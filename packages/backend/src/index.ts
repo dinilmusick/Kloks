@@ -11,3 +11,5 @@ export type {
 } from './architecture/types.js';
 
 export * from './provider-services/index.js';
+/** Authority-preserving Hubrys/process, attested local peer, and ranked cloud dispatch. */
+export * from './crossapp/tieredFacadeDispatcher.js';
