@@ -91,6 +91,7 @@ export function createCanonicalApplicationOAuthBff(
     let lastError: unknown;
     for (const url of databaseUrls) {
       const sql = neon(url);
+      let phase = 'read_registration';
       try {
         let rows = [...await sql(
           'SELECT client_id,encryption_secret FROM public.kloks_oidc_registrations ' +
@@ -100,13 +101,16 @@ export function createCanonicalApplicationOAuthBff(
         if (!rows.length) {
           // Registration is open. Never query a trusted-origin or approved-app
           // list, and never require an operator to provision a client secret.
+          phase = 'public_registration';
           const clientId = await selfRegister(applicationId, redirectUri);
+          phase = 'persist_registration';
           await sql(
             'INSERT INTO public.kloks_oidc_registrations ' +
             '(app_id,redirect_uri,client_id,encryption_secret) VALUES ($1,$2,$3,$4) ' +
             'ON CONFLICT (app_id,redirect_uri) DO NOTHING',
             [applicationId, redirectUri, clientId, secret()],
           );
+          phase = 'reload_registration';
           rows = [...await sql(
             'SELECT client_id,encryption_secret FROM public.kloks_oidc_registrations ' +
             'WHERE app_id=$1 AND redirect_uri=$2 LIMIT 2',
@@ -118,6 +122,7 @@ export function createCanonicalApplicationOAuthBff(
             rows[0].encryption_secret.length < 32) {
           throw new Error('OAUTH_CLIENT_REGISTRATION_INVALID');
         }
+        phase = 'create_bff';
         return createOAuthBff({
           appId: applicationId,
           issuer: DEFAULT_LUTH_URL.replace(/\/$/, '') + '/api/auth',
@@ -133,6 +138,14 @@ export function createCanonicalApplicationOAuthBff(
         });
       } catch (error) {
         lastError = error;
+        // Server-only diagnostic. Never log driver messages, connection strings,
+        // user data, redirect URIs or client IDs.
+        const info = error as { message?: unknown; code?: unknown } | null;
+        const message = typeof info?.message === 'string' ? info.message : '';
+        const code = /^[A-Z_]{4,90}$/.test(message) ? message : 'UNCLASSIFIED';
+        const sqlstate = typeof info?.code === 'string' &&
+          /^[A-Z0-9]{5}$/.test(info.code) ? info.code : 'UNKNOWN';
+        console.error('[Kloks OAuth bootstrap failed]', { phase, code, sqlstate });
       }
     }
     throw new Error(lastError ? 'OAUTH_CLIENT_REGISTRATION_UNAVAILABLE' :
