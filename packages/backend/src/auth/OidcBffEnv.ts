@@ -1,5 +1,5 @@
 import { neon } from '@neondatabase/serverless';
-import { DEFAULT_LUTH_URL } from '@dinilmusick/gutts/auth';
+import { parseSkipoLuthUrls } from './LuthEndpointConfig.js';
 import { createOAuthBff } from './OidcBff.js';
 
 /**
@@ -48,8 +48,7 @@ function connections(env: CanonicalApplicationAuthEnvironment): string[] {
   return values.filter((value): value is string =>
     typeof value === 'string' && !!value.trim()).map(value => value.trim());
 }
-async function selfRegister(appId: string, redirectUri: string): Promise<string> {
-  const issuer = DEFAULT_LUTH_URL.replace(/\/$/, '');
+async function selfRegister(appId: string, redirectUri: string, issuer: string): Promise<string> {
   const response = await fetch(issuer + '/api/auth/oauth2/register', {
     // Cloudflare Workers (and some other runtimes) reject redirect: 'error'.
     // Manual redirects remain fail-closed: non-2xx responses are rejected below.
@@ -86,7 +85,13 @@ export function createCanonicalApplicationOAuthBff(
   request: Request,
   env: CanonicalApplicationAuthEnvironment,
   applicationId: string,
+  skipoConfig: unknown,
 ) {
+  const luthUrls = parseSkipoLuthUrls(skipoConfig);
+  // OAuth issuer/client/flow affinity is fixed for the full transaction.
+  // Failover of public discovery uses fetchLuthPublicEndpoint; a second
+  // independent OAuth issuer needs its own registration/session migration.
+  const issuer = luthUrls[0]!;
   if (!/^[a-z0-9][a-z0-9_-]{0,119}$/.test(applicationId)) {
     throw new Error('INVALID_APP_ID');
   }
@@ -112,7 +117,7 @@ export function createCanonicalApplicationOAuthBff(
           // Registration is open. Never query a trusted-origin or approved-app
           // list, and never require an operator to provision a client secret.
           phase = 'public_registration';
-          const clientId = await selfRegister(applicationId, redirectUri);
+          const clientId = await selfRegister(applicationId, redirectUri, issuer);
           phase = 'persist_registration';
           await runSql(sql,
             'INSERT INTO public.kloks_oidc_registrations ' +
@@ -135,7 +140,7 @@ export function createCanonicalApplicationOAuthBff(
         phase = 'create_bff';
         return createOAuthBff({
           appId: applicationId,
-          issuer: DEFAULT_LUTH_URL.replace(/\/$/, '') + '/api/auth',
+          issuer: issuer + '/api/auth',
           clientId: rows[0].client_id,
           redirectUri,
           encryptionSecret: rows[0].encryption_secret,

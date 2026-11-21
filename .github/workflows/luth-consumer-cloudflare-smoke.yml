@@ -1,0 +1,42 @@
+name: Luth consumer Cloudflare worker smoke
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/luth-consumer-cloudflare-smoke.yml'
+      - 'packages/backend/src/auth/**'
+  workflow_dispatch:
+jobs:
+  check-live-consumers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        base: [https://aiko.todadjp.workers.dev, https://srkl-engine.todadjp.workers.dev]
+    steps:
+      - name: Check deployed health, anonymous session, and OAuth start
+        env:
+          BASE: ${{ matrix.base }}
+        run: |
+          set -euo pipefail
+          echo "::group::Worker $BASE"
+          h=$(curl -sS --max-time 20 -o /tmp/h.json -w '%{http_code}' "$BASE/api/health")
+          echo "health=$h"
+          cat /tmp/h.json
+          echo
+          test "$h" = 200
+          s=$(curl -sS --max-time 20 -o /tmp/s.json -w '%{http_code}' "$BASE/api/auth/oidc/session")
+          echo "session=$s"
+          cat /tmp/s.json
+          echo
+          [[ "$s" = 200 || "$s" = 401 ]]
+          a=$(curl -sS --max-time 30 -D /tmp/start.headers -o /tmp/start.body -w '%{http_code}' "$BASE/api/auth/oidc/start")
+          echo "oauth_start=$a"
+          if [[ "$a" != 302 && "$a" != 303 && "$a" != 307 ]]; then
+            cat /tmp/start.body
+            exit 1
+          fi
+          # Never print the Location header: it may contain a short-lived OAuth state.
+          grep -qi '^location: https://' /tmp/start.headers
+          echo "PUBLIC_WORKER_SMOKE_PASS"
+          echo "::endgroup::"
