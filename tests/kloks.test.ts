@@ -121,7 +121,8 @@ describe('Kloks Public Package Library (@kloks/* built on KrnlTS)', () => {
       { provider: string; initialized: boolean }
     >('resolveAdapterType', { provider: 'local' });
     expect(storageStatus.initialized).toBe(true);
-    expect((AuthServiceFacade as any).definition.operations.login).toBeDefined();
+    expect((AuthServiceFacade as any).definition.operations.login).toBeUndefined();
+    expect((AuthServiceFacade as any).definition.operations.resolveUser).toBeDefined();
     expect((AuthServiceFacade as any).definition.operations.resolveUser).toBeDefined();
     expect((AuthServiceFacade as any).definition.operations.createSession).toBeUndefined();
     expect((AuthServiceFacade as any).definition.operations.checkRateLimit).toBeUndefined();
