@@ -146,6 +146,7 @@ describe('Kloks canonical Better Auth application OAuth BFF', () => {
     expect(authorization.origin).toBe('https://luth.example.test');
     expect(authorization.pathname).toBe('/api/auth/oauth2/authorize');
     expect(authorization.searchParams.get('response_type')).toBe('code');
+    expect(authorization.searchParams.get('prompt')).toBe('login');
     expect(authorization.searchParams.get('code_challenge_method')).toBe('S256');
     expect(authorization.searchParams.get('code_challenge')).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(authorization.searchParams.get('redirect_uri')).toBe(redirectUri);
