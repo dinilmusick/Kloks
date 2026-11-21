@@ -33,6 +33,7 @@ describe('open OAuth BFF registration without a trusted-origin catalogue', () =>
         grant_types: ['authorization_code', 'refresh_token'],
       });
       expect(options?.credentials).toBe('omit');
+      expect(options?.redirect).toBe('manual');
       expect(body).not.toHaveProperty('appId');
       expect(body).not.toHaveProperty('origin');
       return Response.json({
@@ -67,6 +68,18 @@ describe('open OAuth BFF registration without a trusted-origin catalogue', () =>
       Response.json({ error: 'rate_limited' }, { status: 429 })));
     await expect(createCanonicalApplicationOAuthBff(request, env, 'srkl').handle(request))
       .rejects.toThrow('OAUTH_CLIENT_REGISTRATION_UNAVAILABLE');
+  });
+
+  it('rejects OAuth registration redirects without following them', async () => {
+    query.mockResolvedValue([]);
+    const transport = vi.fn(async () => new Response(null, {
+      status: 302, headers: { location: 'https://unrelated.example.test/login' },
+    }));
+    vi.stubGlobal('fetch', transport);
+    await expect(createCanonicalApplicationOAuthBff(request, env, 'srkl').handle(request))
+      .rejects.toThrow('OAUTH_CLIENT_REGISTRATION_UNAVAILABLE');
+    expect(transport).toHaveBeenCalledTimes(1);
+    expect(transport.mock.calls[0]?.[1]?.redirect).toBe('manual');
   });
 
   it('rejects spoofed request hosts before any database or provider request', () => {
