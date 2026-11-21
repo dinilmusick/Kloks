@@ -155,6 +155,22 @@ describe('Kloks canonical Better Auth application OAuth BFF', () => {
     expect(flowCookie).toMatch(/^__Host-ultrst_oidc_flow=[A-Za-z0-9_-]{43}$/);
   });
 
+  it('preserves explicit Google and email choices as signed OAuth authorization fields', async () => {
+    const f = fixture();
+    for (const method of ['google', 'email']) {
+      const response = await f.bff.handle(new Request(
+        appOrigin + '/api/auth/oidc/start?method=' + method,
+      ));
+      expect(response?.status).toBe(303);
+      const authorize = new URL(response!.headers.get('location')!);
+      expect(authorize.searchParams.get('login_method')).toBe(method);
+      expect(authorize.searchParams.get('prompt')).toBe('login');
+      expect(authorize.searchParams.get('code_challenge_method')).toBe('S256');
+    }
+    expect((await f.bff.handle(new Request(appOrigin + '/api/auth/oidc/start?method=unknown')))?.status).toBe(400);
+    expect((await f.bff.handle(new Request(appOrigin + '/api/auth/oidc/start?method=google&method=email')))?.status).toBe(400);
+  });
+
   it('does server-side exchange, verifies userinfo, issues only opaque app cookie and survives refresh', async () => {
     const f = fixture();
     const { state, flowCookie } = await f.begin('/workspaces');
